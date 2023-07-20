@@ -2,6 +2,8 @@
 #include <iostream>
 #include <string>
 
+using namespace torch::indexing;
+
 template<int NF>
 class FFISubgridModel{
   public:
@@ -16,21 +18,49 @@ class FFISubgridModel{
   //==================//
   // Four dot-product //
   //==================//
-  // input dimensions: [4]
-  static double dot4(const std::vector<double>& v1, const std::vector<double>& v2){
-    double result = v1[3]*v2[3] - v1[0]*v2[0] - v1[1]*v2[1] - v1[2]*v2[2];
+  // input dimensions: [# grid cells, 4]
+  torch::Tensor dot4(const torch::Tensor& v1, const torch::Tensor& v2){
+    // time component is positive
+    torch::Tensor result = v1.index({Slice(),3}) * v2.index({Slice(),3});
+
+    // spatial components are negative
+    for(int i=0; i<3; i++){
+      result -= v1.index({Slice(),i}) * v2.index({Slice(),i});
+    }
+
     return result;
   }
 
   //==========================================//
   // Create X tensor from four-vector objects //
   //==========================================//
-  // F4 dimensions: [4, 2, NF]
-  // X dimensions: [NX]
-  /*static torch::jit::IValue X_from_F4(const torch::jit::IValue F4){
+  // F4 dimensions: [# grid cells, 4, 2, NF]
+  // X dimensions: [# grid cells, NX]
+  // u dimensions: [# grid cells, 4]
+  torch::Tensor X_from_F4(const torch::Tensor F4, const torch::Tensor u){
     int index = 0;
-    int nsims = F4.toTensor().size(0);
-  }*/
+    int nsims = F4.size(0);
+
+    torch::Tensor X = torch::zeros({nsims, NX}, torch::dtype(torch::kFloat32));
+    torch::Tensor F4_flat = F4.reshape({nsims, 4, 2*NF}); // [simulationIndex, xyzt, species]
+    for(int a=0; a<2*NF; a++){
+      torch::Tensor F1 = F4_flat.index({Slice(), Slice(), a});
+      for(int b=a; b<2*NF; b++){
+        torch::Tensor F2 = F4_flat.index({Slice(), Slice(), b});
+
+        X.index_put_({Slice(), index}, dot4(F1,F2));
+        index += 1;
+      }
+
+      // add the dot product with u
+      // subtract mean value to zero-center the data
+      X.index_put_({Slice(), index}, dot4(F1,u) - 1./(2*NF));
+      index += 1;
+    }
+    assert(index==NX);
+    return X;
+  }
+
 
   //===================================//
   // Load the serialized pytorch model //
@@ -57,8 +87,8 @@ class FFISubgridModel{
   // input and output are arrays if four-vector sets.
   // they should be indexed according to [grid cell index, spacetime component, matter/antimatter, flavor]
   // they should have size [# grid cells, 4, 2, NF]
-  torch::Tensor predict(const torch::Tensor& F4_in){
-    torch::Tensor X = torch::zeros({1, NX}, torch::dtype(torch::kFloat32));
+  torch::Tensor predict(const torch::Tensor& F4_in, const torch::Tensor& u){
+    torch::Tensor X = X_from_F4(F4_in, u);
     std::cout << X << std::endl;
 
     auto F4_out = model.forward({X}).toTensor();
