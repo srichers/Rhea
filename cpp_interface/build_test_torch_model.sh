@@ -1,4 +1,4 @@
 mkdir -p build
 cd build
-cmake -DCMAKE_PREFIX_PATH=/usr/local/libtorch ..
+cmake ..
 cmake --build . --config Release

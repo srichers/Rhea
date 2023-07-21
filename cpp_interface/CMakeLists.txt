@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(ML_test)
 
-add_definitions(-DCMAKE_PREFIX_PATH=/usr/local/libtorch)
+set(CMAKE_PREFIX_PATH "/usr/local/libtorch")
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
