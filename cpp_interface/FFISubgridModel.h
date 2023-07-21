@@ -18,7 +18,7 @@ class FFISubgridModel{
   //==================//
   // Four dot-product //
   //==================//
-  // input dimensions: [# grid cells, 4]
+  // input dimensions: [# grid cells, xyzt]
   torch::Tensor dot4(const torch::Tensor& v1, const torch::Tensor& v2){
     // time component is positive
     torch::Tensor result = v1.index({Slice(),3}) * v2.index({Slice(),3});
@@ -40,9 +40,20 @@ class FFISubgridModel{
   torch::Tensor X_from_F4(const torch::Tensor F4, const torch::Tensor u){
     int index = 0;
     int nsims = F4.size(0);
+    torch::Tensor F4_flat = F4.reshape({nsims, 4, 2*NF}); // [# grid cells, xyzt, species]
 
+    // calculate the total number density
+    torch::Tensor ndens_total = torch::zeros({nsims});
+    for(int a=0; a<2*NF; a++){
+      torch::Tensor F1 = F4_flat.index({Slice(), Slice(), a}); // [# grid cells, xyzt]
+      ndens_total += dot4(F1,u); // [# grid cells]
+    }
+
+    // normalize F4_flat by the total number density
+    F4_flat /= ndens_total.reshape({nsims,1,1});
+
+    // create the X tensor
     torch::Tensor X = torch::zeros({nsims, NX}, torch::dtype(torch::kFloat32));
-    torch::Tensor F4_flat = F4.reshape({nsims, 4, 2*NF}); // [simulationIndex, xyzt, species]
     for(int a=0; a<2*NF; a++){
       torch::Tensor F1 = F4_flat.index({Slice(), Slice(), a});
       for(int b=a; b<2*NF; b++){
@@ -89,7 +100,6 @@ class FFISubgridModel{
   // they should have size [# grid cells, 4, 2, NF]
   torch::Tensor predict(const torch::Tensor& F4_in, const torch::Tensor& u){
     torch::Tensor X = X_from_F4(F4_in, u);
-    std::cout << X << std::endl;
 
     auto F4_out = model.forward({X}).toTensor();
 
