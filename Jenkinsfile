@@ -16,7 +16,7 @@ pipeline {
 	    sh 'nvidia-smi'
 	    sh 'nvcc -V'
 	    sh 'git submodule update --init'
-	    sh 'cmake --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_C_COMPILER:FILEPATH=/usr/bin/gcc -DCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/g++ -S cpp_interface -B build -G Ninja'
+	    sh 'cmake --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE -DCMAKE_BUILD_TYPE:STRING=Debug -DCMAKE_C_COMPILER:FILEPATH=/usr/bin/gcc -DCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/g++ -S cpp_interface -B build'
 	    sh 'cmake --build build --config Debug --target all --'
 	}}
 
@@ -26,7 +26,7 @@ pipeline {
 	// Tests //
 	//=======//
 	stage('Does it run?'){ steps{
-		sh 'build/test_cpp_interface'
+		sh 'build/test_torch_model cpp_interface/sample_model.ptc'
 	}}
 
     } // stages{
