@@ -11,6 +11,7 @@ class FFISubgridModel{
   // constants defining the number of inputs/outputs
   const int NX = NF*(1 + 2*NF) + 2*NF; // number of elements in X tensor
   const int Ny = 4*NF*(NF-1); // number of elements in Y tensor
+  const int Nalpha = 4*NF*(NF-1); // number of elements in alpha tensor
 
   // the actual pytorch model
   torch::jit::script::Module model;
@@ -38,7 +39,6 @@ class FFISubgridModel{
   // X dimensions: [# grid cells, NX]
   // u dimensions: [# grid cells, 4]
   torch::Tensor X_from_F4(const torch::Tensor F4, const torch::Tensor u){
-    int index = 0;
     int nsims = F4.size(0);
     torch::Tensor F4_flat = F4.reshape({nsims, 4, 2*NF}); // [# grid cells, xyzt, species]
 
@@ -54,6 +54,7 @@ class FFISubgridModel{
 
     // create the X tensor
     torch::Tensor X = torch::zeros({nsims, NX}, torch::dtype(torch::kFloat32));
+    int index = 0;
     for(int a=0; a<2*NF; a++){
       torch::Tensor F1 = F4_flat.index({Slice(), Slice(), a});
       for(int b=a; b<2*NF; b++){
@@ -94,16 +95,50 @@ class FFISubgridModel{
     model.eval();
   }
 
-  // function that takes in a list of F4 vectors and outputs the prediction
-  // input and output are arrays if four-vector sets.
-  // they should be indexed according to [grid cell index, spacetime component, matter/antimatter, flavor]
-  // they should have size [# grid cells, 4, 2, NF]
-  torch::Tensor predict(const torch::Tensor& F4_in, const torch::Tensor& u){
-    torch::Tensor X = X_from_F4(F4_in, u);
+  // function that takes in a list of F4 vectors and outputs the prediction for the transformation matrix
+  // inputs are arrays if four-vector sets.
+  // the dimensions of F4_initial are [# grid cells, xyzt, 2, NF]
+  // the dimensions of u are [# grid cells, xyzt]
+  // the dimensions of the output are [# grid cells, Ny]
+  torch::Tensor predict_y(const torch::Tensor& F4_initial, const torch::Tensor& u){
+    torch::Tensor X = X_from_F4(F4_initial, u);
 
-    auto F4_out = model.forward({X}).toTensor();
+    torch::Tensor F4_final = model.forward({X}).toTensor();
 
-    return F4_out;
+    return F4_final;
+  }
+
+  // function to convert an input F4 and y into an output F4
+  // mirrors the python function F4_from_y
+  torch::Tensor F4_from_y(const torch::Tensor& F4_initial, const torch::Tensor& y){
+    int nsims = F4_initial.size(0);
+    torch::Tensor alpha = y.index({Slice(), Slice(0,Nalpha)}).reshape({nsims, 2*NF, 2*(NF-1)});
+    torch::Tensor F4i_flat = F4_initial.reshape({nsims, 4, 2*NF}); // [simulationIndex, xyzt, species]
+    torch::Tensor F4_final = torch::zeros({nsims, 4, 2, NF});
+    F4_final.index_put_({Slice(), Slice(), Slice(), Slice(0,NF-1)}, torch::matmul(F4i_flat, alpha).reshape({nsims,4,2,NF-1}));
+
+    // Set the final flavor such that the flavor trace is conserved
+    auto tmp = torch::sum(F4_initial, 3) - torch::sum(F4_final.index({Slice(), Slice(), Slice(), Slice(0,NF-1)}), 3);
+    std::cout << tmp.sizes() << std::endl;
+    F4_final.index_put_({Slice(), Slice(), Slice(), Slice(NF-1,NF)}, tmp.reshape({nsims,4,2,1}));
+
+    // set the antineutrino number densities to conserve lepton number
+    F4_final.index_put_({Slice(), 3, 1, Slice()}, F4_initial.index({Slice(), 3, 1, Slice()}) + (F4_final.index({Slice(), 3, 0, Slice()}) - F4_initial.index({Slice(), 3, 0, Slice()})));
+
+    return F4_final;
+  }
+
+  // function that takes in a list of F4 vectors and outputs the prediction of F4_final
+  // inputs are arrays if four-vector sets.
+  // the dimensions of F4_initial are [# grid cells, xyzt, 2, NF]
+  // the dimensions of u are [# grid cells, xyzt]
+  // the dimensions of the output are [# grid cells, xyzt, 2, NF]
+  torch::Tensor predict_F4(const torch::Tensor& F4_initial, const torch::Tensor& u){
+    torch::Tensor y = predict_y(F4_initial, u);
+
+    torch::Tensor F4_final = F4_from_y(F4_initial, y);
+
+    return F4_final;
   }
 
 };

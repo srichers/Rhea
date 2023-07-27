@@ -21,7 +21,7 @@ int main(int argc, const char* argv[]){
   torch::Tensor u = torch::zeros({1,4});
   u.index_put_({torch::indexing::Slice(),3}, 1.0);
 
-  auto output = model.predict(F4_in, u);
+  auto output = model.predict_F4(F4_in, u);
   std::cout << output << std::endl;
 
   return 0;
