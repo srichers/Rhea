@@ -40,7 +40,9 @@ class FFISubgridModel{
   // u dimensions: [# grid cells, 4]
   torch::Tensor X_from_F4(const torch::Tensor F4, const torch::Tensor u){
     int nsims = F4.size(0);
-    torch::Tensor F4_flat = F4.reshape({nsims, 4, 2*NF}); // [# grid cells, xyzt, species]
+
+    // copy the input tensor so the values don't change
+    torch::Tensor F4_flat = F4.detach().clone().reshape({nsims, 4, 2*NF}); // [# grid cells, xyzt, species]
 
     // calculate the total number density
     torch::Tensor ndens_total = torch::zeros({nsims});
@@ -86,7 +88,6 @@ class FFISubgridModel{
       std::cerr << "error loading the model\n";
       exit(1);
     }
-    std::cout << "Model "<< filename <<" loaded fine\n";
 
     // for now, tell the ML model to run on the CPU
     model.to(torch::kCPU);
@@ -119,7 +120,6 @@ class FFISubgridModel{
 
     // Set the final flavor such that the flavor trace is conserved
     auto tmp = torch::sum(F4_initial, 3) - torch::sum(F4_final.index({Slice(), Slice(), Slice(), Slice(0,NF-1)}), 3);
-    std::cout << tmp.sizes() << std::endl;
     F4_final.index_put_({Slice(), Slice(), Slice(), Slice(NF-1,NF)}, tmp.reshape({nsims,4,2,1}));
 
     // set the antineutrino number densities to conserve lepton number
