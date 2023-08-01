@@ -24,8 +24,10 @@ pipeline {
 	// Tests //
 	//=======//
 	stage('Does it run?'){ steps{
+	    dir('cpp_interface'){
 		sh 'make'
-		sh 'build/test_torch_model cpp_interface/sample_model.ptc'
+		sh './test_torch_model sample_model.ptc'
+	    }
 	}}
 
     } // stages{
