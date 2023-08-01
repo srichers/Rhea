@@ -1,2 +1,2 @@
-build
-output.txt
+test_torch_model
+*~

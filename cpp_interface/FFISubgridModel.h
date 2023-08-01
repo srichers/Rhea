@@ -80,17 +80,11 @@ class FFISubgridModel{
   // Load the serialized pytorch model //
   //===================================//
   FFISubgridModel(std::string filename){
-    try {
-      // Deserialize the ScriptModule from a file using torch::jit::load().
-      model = torch::jit::load(filename.c_str());
-    }
-    catch (const c10::Error& e) {
-      std::cerr << "error loading the model\n";
-      exit(1);
-    }
-
     // for now, tell the ML model to run on the CPU
-    model.to(torch::kCPU);
+    torch::Device device(torch::kCPU);
+
+    // Deserialize the ScriptModule from a file using torch::jit::load().
+    model = torch::jit::load(filename.c_str(), device);
 
     // set the model to evaluation mode
     model.eval();
