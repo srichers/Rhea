@@ -1,5 +1,7 @@
 COMP = g++
+ifeq ($(LIBTORCH_DIR),)
 LIBTORCH_DIR = /usr/local/libtorch
+endif
 
 INCLUDE_FLAGS = -I$(LIBTORCH_DIR)/include -I$(LIBTORCH_DIR)/include/torch/csrc/api/include
 BUILD_FLAGS = -g -DUSE_C10D_GLOO -DUSE_DISTRIBUTED -DUSE_RPC -DUSE_TENSORPIPE -D_GLIBCXX_USE_CXX11_ABI=1 -g -std=gnu++14
