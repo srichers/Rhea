@@ -25,7 +25,7 @@ int main(int argc, const char* argv[]){
 
   // put the input through the model 10 times
   auto output = F4_in;
-  for(int i=0; i<10; i++) output = model.predict_F4(output, u);
+  for(int i=0; i<10; i++) output = model.predict_F4_Minkowski(output, u);
 
   // the expected result is an even mixture of all flavors
   torch::Tensor F4_expected = torch::zeros({ngridzones,4,2,3});

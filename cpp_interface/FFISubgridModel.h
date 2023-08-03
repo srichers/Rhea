@@ -38,7 +38,8 @@ class FFISubgridModel{
   // F4 dimensions: [# grid cells, 4, 2, NF]
   // X dimensions: [# grid cells, NX]
   // u dimensions: [# grid cells, 4]
-  torch::Tensor X_from_F4(const torch::Tensor F4, const torch::Tensor u){
+  // assume Minkowski metric
+  torch::Tensor X_from_F4_Minkowski(const torch::Tensor F4, const torch::Tensor u){
     int nsims = F4.size(0);
 
     // copy the input tensor so the values don't change
@@ -90,17 +91,26 @@ class FFISubgridModel{
     model.eval();
   }
 
+  // function that takes in a list of X (built from dot products) and outputs the prediction for the transformation matrix
+  // inputs are arrays if four-vector sets.
+  // the dimensions of X are [# grid cells, NX]
+  // the dimensions of y are [# grid cells, Ny]
+  torch::Tensor predict_y(const torch::Tensor& X){
+    torch::Tensor y = model.forward({X}).toTensor();
+    return y;
+  }
+
+
   // function that takes in a list of F4 vectors and outputs the prediction for the transformation matrix
   // inputs are arrays if four-vector sets.
+  // Assume Minkowski metric
   // the dimensions of F4_initial are [# grid cells, xyzt, 2, NF]
   // the dimensions of u are [# grid cells, xyzt]
   // the dimensions of the output are [# grid cells, Ny]
-  torch::Tensor predict_y(const torch::Tensor& F4_initial, const torch::Tensor& u){
-    torch::Tensor X = X_from_F4(F4_initial, u);
-
-    torch::Tensor F4_final = model.forward({X}).toTensor();
-
-    return F4_final;
+  torch::Tensor predict_y_Minkowski(const torch::Tensor& F4_initial, const torch::Tensor& u){
+    torch::Tensor X = X_from_F4_Minkowski(F4_initial, u);
+    torch::Tensor y = predict_y(X);
+    return y;
   }
 
   // function to convert an input F4 and y into an output F4
@@ -123,15 +133,25 @@ class FFISubgridModel{
   }
 
   // function that takes in a list of F4 vectors and outputs the prediction of F4_final
-  // inputs are arrays if four-vector sets.
+  // inputs are arrays of four-vector sets.
   // the dimensions of F4_initial are [# grid cells, xyzt, 2, NF]
   // the dimensions of u are [# grid cells, xyzt]
   // the dimensions of the output are [# grid cells, xyzt, 2, NF]
-  torch::Tensor predict_F4(const torch::Tensor& F4_initial, const torch::Tensor& u){
-    torch::Tensor y = predict_y(F4_initial, u);
-
+  // assume Minkowski metric
+  torch::Tensor predict_F4_Minkowski(const torch::Tensor& F4_initial, const torch::Tensor& u){
+    torch::Tensor y = predict_y_Minkowski(F4_initial, u);
     torch::Tensor F4_final = F4_from_y(F4_initial, y);
+    return F4_final;
+  }
 
+  // function that takes in a list of F4 vectors and X inputs
+  // outputs the prediction of F4_final
+  // the dimensions of F4_initial are [# grid cells, xyzt, 2, NF]
+  // the dimensions of X are [# grid cells, NX]
+  // the dimensions of the output are [# grid cells, xyzt, 2, NF]
+  torch::Tensor predict_F4(const torch::Tensor& F4_initial, const torch::Tensor& X){
+    torch::Tensor y = predict_y(X);
+    torch::Tensor F4_final = F4_from_y(F4_initial, y);
     return F4_final;
   }
 
