@@ -39,6 +39,34 @@ class FFISubgridModel{
   // X dimensions: [# grid cells, NX]
   // u dimensions: [# grid cells, 4]
   // assume Minkowski metric
+  // Assuming NF==3, the X tensor is
+  // 0: Fe.Fe
+  // 1: Fe.Fmu
+  // 2: Fe.Ftau
+  // 3: Fe.Febar
+  // 4: Fe.Fmubar
+  // 5: Fe.Ftaubar
+  // 6: Fe.u
+  // 7: Fmu.Fmu
+  // 8: Fmu.Ftau
+  // 9: Fmu.Febar
+  // 10: Fmu.Fmubar
+  // 11: Fmu.Ftaubar
+  // 12: Fmu.u
+  // 13: Ftau.Ftau
+  // 14: Ftau.Febar
+  // 15: Ftau.Fmubar
+  // 16: Ftau.Ftaubar
+  // 17: Ftau.u
+  // 18: Febar.Febar
+  // 19: Febar.Fmubar
+  // 20: Febar.Ftaubar
+  // 21: Febar.u
+  // 22: Fmubar.Fmubar
+  // 23: Fmubar.Ftaubar
+  // 24: Fmubar.u
+  // 25: Ftaubar.Ftaubar
+  // 26: Ftaubar.u
   torch::Tensor X_from_F4_Minkowski(const torch::Tensor F4, const torch::Tensor u){
     int nsims = F4.size(0);
 
