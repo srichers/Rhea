@@ -50,9 +50,6 @@ F4_initial_list = []
 F4_final_list = []
 for d in directory_list:
     f_in = h5py.File(d+"/"+input_filename,"r")
-    #growthRateList     = np.array(f_in["growthRate(1|s)"])
-    #F4_initial_list    = np.array(f_in["F4_initial_Nsum1"])
-    #F4_final_list      = np.array(f_in["F4_final_Nsum1"])
     F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
     F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
     NF = np.array(f_in["nf"])
