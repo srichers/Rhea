@@ -14,17 +14,16 @@ from multiprocessing import Pool
 do_plot = False
 growthrate_minfac = 1e-3
 growthrate_maxfac = 1e-1
-nproc = 32
+nproc = 128
 
 # get the list of files to process
 def simulation_is_finished(dirname):
-    return True
     if "finalized" in open(dirname+"/output.txt").readlines()[-1]:
         return True
     else:
         return False
 
-dirlist = [ f.path for f in os.scandir(".") if f.is_dir() ]
+dirlist = sorted([ f.path for f in os.scandir(".") if f.is_dir() ])
 finished_list = [f for f in dirlist if simulation_is_finished(f)]
 print(len(dirlist),"directories")
 
@@ -112,7 +111,7 @@ def growth_properties(data):
 # each result has dimensions [xyzt, nu/nubar, flavor]
 def final_properties(imax, growthRate, data, dz):
     t = np.array(data["time(s)"]) # seconds
-    nt = len(t)
+    nt = len(t) 
     
     # [xyzt, nu/antinu, flavor, it]
     F4 = np.zeros((4,2,nf,nt))
@@ -163,11 +162,11 @@ def analyze_file(d):
 #=================#
 # LOOP OVER FILES #
 #=================#
-#with Pool(nproc) as p:
-#    results = p.map(analyze_file, finished_list)
-results = []
-for p in finished_list:
-    results.append(analyze_file(p))
+with Pool(nproc) as p:
+    results = p.map(analyze_file, finished_list)
+#results = []
+#for p in finished_list:
+#    results.append(analyze_file(p))
 
 # arrange data into arrays
 growthRateList    = np.array([r[0] for r in results])

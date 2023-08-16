@@ -67,7 +67,7 @@ class NeuralNetwork(nn.Module):
 
             # add the dot product with u
             # subtract mean value to zero-center the data
-            X[:,index] = dot4(F1,u) - 1./(2*NF)
+            X[:,index] = -dot4(F1,u) - 1./(2*NF)
             index += 1
         assert(index==self.NX)
         return X

@@ -35,7 +35,7 @@ activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 1e-4
-learning_rate = 1e-2
+learning_rate = 1e-3
 
 #========================#
 # use a GPU if available #
@@ -245,6 +245,32 @@ F4_test[3, 0, 0] =  1
 F4_test[3, 1, 0] =  1
 F4_test[2, 0, 0] =  1/3
 F4_test[2, 1, 0] = -1/3
+before = torch.Tensor(F4_test[None,:,:,:]).to(device)
+after = model.predict_F4(before, u)
+
+print()
+print("Fiducial Simulation")
+print("N initail")
+print(before[0,3])
+
+print("N predicted")
+after = model.predict_F4(before, u)
+print(after[0,3])
+
+print("N re-predicted")
+for i in range(5):
+    after = model.predict_F4(after, u)
+    print(after[0,3])
+
+
+#=====================================#
+# create test ("Zero FF" simulation) #
+#=====================================#
+F4_test = np.zeros((4,2,NF)) # [xyzt, nu/nubar, flavor]
+F4_test[3, 0, 0] =  1
+F4_test[3, 1, 0] =  .5
+F4_test[2, 0, 0] =  0
+F4_test[2, 1, 0] =  0
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
 after = model.predict_F4(before, u)
 

@@ -22,11 +22,11 @@ class FFISubgridModel{
   // input dimensions: [# grid cells, xyzt]
   torch::Tensor dot4(const torch::Tensor& v1, const torch::Tensor& v2){
     // time component is positive
-    torch::Tensor result = v1.index({Slice(),3}) * v2.index({Slice(),3});
+    torch::Tensor result = -v1.index({Slice(),3}) * v2.index({Slice(),3});
 
     // spatial components are negative
     for(int i=0; i<3; i++){
-      result -= v1.index({Slice(),i}) * v2.index({Slice(),i});
+      result += v1.index({Slice(),i}) * v2.index({Slice(),i});
     }
 
     return result;
@@ -170,6 +170,14 @@ class FFISubgridModel{
     torch::Tensor y = predict_y_Minkowski(F4_initial, u);
     torch::Tensor F4_final = F4_from_y(F4_initial, y);
     return F4_final;
+  }
+
+  // lowest level action of neural network.
+  // get y from X
+  // the dimensions of X are [# grid cells, NX]
+  // the dimensions of y are [# grid cells, Ny]
+  torch::Tensor y_from_X(const torch::Tensor& X){
+    return model.forward({X}).toTensor();
   }
 
   // function that takes in a list of F4 vectors and X inputs

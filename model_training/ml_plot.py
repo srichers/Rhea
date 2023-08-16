@@ -48,7 +48,7 @@ class Plotter():
         
     def plot_error(self):
         plt.clf()
-        fig,axes=plt.subplots(2,3, sharey=True, sharex=True)
+        fig,axes=plt.subplots(2,3, sharey=False, sharex=True)
         plt.subplots_adjust(wspace=0, hspace=0)
         for ax in axes.flatten():
             ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
@@ -60,14 +60,14 @@ class Plotter():
         self.plot_error_single_frame(axes[0,0], x, self.knownData,    "knownData"   )
         self.plot_error_single_frame(axes[0,1], x, self.NSM,          "NSM"         )
         self.plot_error_single_frame(axes[0,2], x, self.unphysical,   "unphysical"  )
-        self.plot_error_single_frame(axes[1,0], x, self.knownData_FS, "knownData_FS")
+        self.plot_error_single_frame(axes[1,0], x, self.knownData_FS, "knownDataFS" )
         self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,  "zerofluxfac" )
         self.plot_error_single_frame(axes[1,2], x, self.oneflavor,    "oneflavor"   )
 
         axes[1,0].set_xlabel("Epoch")
         axes[1,0].set_ylabel("Error")
         plt.xlim(0,epochs)
-        plt.ylim(1e-4,10)
+        #plt.ylim(1e-4,10)
         
         plt.savefig("train_test_error.pdf",bbox_inches="tight")
 
