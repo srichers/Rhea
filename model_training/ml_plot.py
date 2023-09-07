@@ -19,6 +19,7 @@ class Plotter():
         self.oneflavor    = PlotQuantities(epochs)
         self.unphysical   = PlotQuantities(epochs)
         self.NSM          = PlotQuantities(epochs)
+        self.ELN          = PlotQuantities(epochs)
 
     def init_plot_options(self):
         #==============#
@@ -58,7 +59,7 @@ class Plotter():
         x = range(epochs)
         
         self.plot_error_single_frame(axes[0,0], x, self.knownData,    "knownData"   )
-        self.plot_error_single_frame(axes[0,1], x, self.NSM,          "NSM"         )
+        self.plot_error_single_frame(axes[0,1], x, self.ELN,          "ELN"         )
         self.plot_error_single_frame(axes[0,2], x, self.unphysical,   "unphysical"  )
         self.plot_error_single_frame(axes[1,0], x, self.knownData_FS, "knownDataFS" )
         self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,  "zerofluxfac" )

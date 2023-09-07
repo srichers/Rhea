@@ -15,7 +15,11 @@ def unphysical_loss_fn(model, F4f_pred, F4f_true):
     ndens2 = F4f_pred[:,3,:,:]**2 # [sim, nu/nubar, flavor]
     fluxfac_error = torch.max(flux_mag2 - ndens2, torch.zeros_like(ndens2)) # [sim, nu/nubar, flavor]
     fluxfac_loss = torch.mean(fluxfac_error)
-    
+
     # total conservation loss
     return negative_density_loss + fluxfac_loss
 
+def ELN_loss_fn(model, F4f, F4i):
+    ELNi = torch.sum(F4i[:,0,:,:], axis=2)
+    ELNf = torch.sum(F4f[:,0,:,:], axis=2)
+    return torch.nn.MSELoss(reduction='mean')(ELNi, ELNf)

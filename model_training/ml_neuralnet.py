@@ -106,9 +106,6 @@ class NeuralNetwork(nn.Module):
         # Set the final flavor such that the flavor trace is conserved
         F4_final[:,:,:, self.NF-1] = torch.sum(F4_initial, axis=3) - torch.sum(F4_final[:,:,:,:self.NF-1], axis=3)
 
-        # set the antineutrino number densities to conserve lepton number
-        F4_final[:,3,1,:] = F4_initial[:,3,1,:] + (F4_final[:,3,0,:] - F4_initial[:,3,0,:])
-
         return F4_final
 
     def predict_F4(self, F4_initial, u):

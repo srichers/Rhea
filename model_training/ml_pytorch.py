@@ -20,6 +20,7 @@ directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","f
 test_size = 0.1
 epochs = 5000
 n_unphysical_check = 1000
+n_eln_conservation_check = 1000
 n_trivial_stable   = 100
 outfilename = "model.ptc"
 
@@ -115,7 +116,9 @@ print("# CHECKING PSEUDOINVERSE METHOD FOR OBTAINING Y #")
 print("#################################################")
 y_list = model.y_from_F4(F4i_train, F4f_train)
 test = model.F4_from_y(F4i_train, y_list)
-print("max reconstruction error:",torch.max(torch.abs(test-F4f_train)).item())
+error = torch.max(torch.abs(test-F4f_train)).item()
+print("max reconstruction error:",error)
+assert(error < 1e-3)
 
 #===================================#
 # Test the neutron star merger data #
@@ -156,6 +159,14 @@ for t in range(epochs):
         loss = optimizer.train(model, F4i, None, u, unphysical_loss_fn)
         loss.backward()
         p.unphysical.train_loss[t], p.unphysical.train_err[t] = optimizer.test(model, F4i, None, u, unphysical_loss_fn)
+
+    if n_eln_conservation_check>0:
+        # train on making sure the model prediction is physical
+        F4i = generate_random_F4(n_eln_conservation_check, NF, device)
+        p.ELN.test_loss[t],  p.ELN.test_err[t]  = optimizer.test(model, F4i, F4i, u, ELN_loss_fn)
+        loss = optimizer.train(model, F4i, F4i, u, ELN_loss_fn)
+        loss.backward()
+        p.ELN.train_loss[t], p.ELN.train_err[t] = optimizer.test(model, F4i, F4i, u, ELN_loss_fn)
 
     if n_trivial_stable>0:
         # train on making sure known stable distributions dont change
