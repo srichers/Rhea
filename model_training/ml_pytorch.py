@@ -44,7 +44,6 @@ learning_rate = 1e-3
 #========================#
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
-u = torch.tensor([0,0,0,1], device=device)[None,:]
 
 #===============================================#
 # read in the database from the previous script #
@@ -65,7 +64,7 @@ F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).f
 F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
 
 # normalize the data so the number densities add up to 1
-F4_initial_list, F4_final_list = ml.normalize_data(F4_initial_list, F4_final_list, u)
+F4_initial_list, F4_final_list = ml.normalize_data(F4_initial_list, F4_final_list)
 
 # make sure the data are good
 check_conservation(F4_initial_list, F4_final_list)
@@ -141,46 +140,46 @@ for t in range(epochs):
     optimizer.optimizer.zero_grad()
 
     # train on making sure the model prediction is correct
-    p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  u, comparison_loss_fn)
-    loss = optimizer.train(model, F4i_train, F4f_train, u, comparison_loss_fn)
+    p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
+    loss = optimizer.train(model, F4i_train, F4f_train, comparison_loss_fn)
     loss.backward()
-    p.knownData.train_loss[t], p.knownData.train_err[t] = optimizer.test(model, F4i_train, F4f_train, u, comparison_loss_fn)
+    p.knownData.train_loss[t], p.knownData.train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
 
     if do_augment_final_stable:
-        p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4i_test,  F4i_test,  u, comparison_loss_fn)
-        loss = optimizer.train(model, F4i_train, F4f_train, u, comparison_loss_fn)
+        p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4i_test,  F4i_test,  comparison_loss_fn)
+        loss = optimizer.train(model, F4i_train, F4f_train, comparison_loss_fn)
         loss.backward()
-        p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4i_train, F4i_train, u, comparison_loss_fn)
+        p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4i_train, F4i_train, comparison_loss_fn)
     
     if n_unphysical_check>0:
         # train on making sure the model prediction is physical
         F4i = generate_random_F4(n_unphysical_check, NF, device)
-        p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i, None, u, unphysical_loss_fn)
-        loss = optimizer.train(model, F4i, None, u, unphysical_loss_fn)
+        p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i, None, unphysical_loss_fn)
+        loss = optimizer.train(model, F4i, None, unphysical_loss_fn)
         loss.backward()
-        p.unphysical.train_loss[t], p.unphysical.train_err[t] = optimizer.test(model, F4i, None, u, unphysical_loss_fn)
+        p.unphysical.train_loss[t], p.unphysical.train_err[t] = optimizer.test(model, F4i, None, unphysical_loss_fn)
 
     if n_eln_conservation_check>0:
         # train on making sure the model prediction is physical
         F4i = generate_random_F4(n_eln_conservation_check, NF, device)
-        p.ELN.test_loss[t],  p.ELN.test_err[t]  = optimizer.test(model, F4i, F4i, u, ELN_loss_fn)
-        loss = optimizer.train(model, F4i, F4i, u, ELN_loss_fn)
+        p.ELN.test_loss[t],  p.ELN.test_err[t]  = optimizer.test(model, F4i, F4i, ELN_loss_fn)
+        loss = optimizer.train(model, F4i, F4i, ELN_loss_fn)
         loss.backward()
-        p.ELN.train_loss[t], p.ELN.train_err[t] = optimizer.test(model, F4i, F4i, u, ELN_loss_fn)
+        p.ELN.train_loss[t], p.ELN.train_err[t] = optimizer.test(model, F4i, F4i, ELN_loss_fn)
 
     if n_trivial_stable>0:
         # train on making sure known stable distributions dont change
         F4i = generate_stable_F4_zerofluxfac(n_trivial_stable, NF, device)
-        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i, F4i, u, comparison_loss_fn)
-        loss = optimizer.train(model, F4i, F4i, u, comparison_loss_fn)
+        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i, F4i, comparison_loss_fn)
+        loss = optimizer.train(model, F4i, F4i, comparison_loss_fn)
         loss.backward()
-        p.zerofluxfac.train_loss[t], p.zerofluxfac.train_err[t] = optimizer.test(model, F4i, F4i, u, comparison_loss_fn)
+        p.zerofluxfac.train_loss[t], p.zerofluxfac.train_err[t] = optimizer.test(model, F4i, F4i, comparison_loss_fn)
         
         F4i = generate_stable_F4_oneflavor(n_trivial_stable, NF, device)
-        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i, F4i, u, comparison_loss_fn)
-        loss = optimizer.train(model, F4i, F4i, u, comparison_loss_fn)
+        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i, F4i, comparison_loss_fn)
+        loss = optimizer.train(model, F4i, F4i, comparison_loss_fn)
         loss.backward()
-        p.oneflavor.train_loss[t], p.oneflavor.train_err[t] = optimizer.test(model, F4i, F4i, u, comparison_loss_fn)
+        p.oneflavor.train_loss[t], p.oneflavor.train_err[t] = optimizer.test(model, F4i, F4i, comparison_loss_fn)
                 
     optimizer.optimizer.step()
 
@@ -203,7 +202,7 @@ print("# Saving model to file #")
 print("########################")
 with torch.no_grad():
     print(F4i_test.shape)
-    X = model.X_from_F4(F4i_test, u)
+    X = model.X_from_F4(F4i_test)
     print(X.shape)
     traced_model = torch.jit.trace(model, X)
     torch.jit.save(traced_model, "model.ptc")
@@ -225,11 +224,11 @@ print("N final (actual)")
 print(F4f_train[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, u)
+after = model.predict_F4(before)
 print(after[0,3])
 
 print("N re-predicted")
-after = model.predict_F4(after, u)
+after = model.predict_F4(after)
 print(after[0,3])
 
 print()
@@ -251,11 +250,11 @@ print("N final (actual)")
 print(F4f_test[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, u)
+after = model.predict_F4(before)
 print(after[0,3])
 
 print("N re-predicted")
-after = model.predict_F4(after, u)
+after = model.predict_F4(after)
 print(after[0,3])
 
 print()
@@ -274,7 +273,7 @@ F4_test[3, 1, 0] =  1
 F4_test[2, 0, 0] =  1/3
 F4_test[2, 1, 0] = -1/3
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model.predict_F4(before, u)
+after = model.predict_F4(before)
 
 print()
 print("Fiducial Simulation")
@@ -282,12 +281,12 @@ print("N initail")
 print(before[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, u)
+after = model.predict_F4(before)
 print(after[0,3])
 
 print("N re-predicted")
 for i in range(5):
-    after = model.predict_F4(after, u)
+    after = model.predict_F4(after)
     print(after[0,3])
 
 print()
@@ -306,7 +305,7 @@ F4_test[3, 1, 0] =  .5
 F4_test[2, 0, 0] =  0
 F4_test[2, 1, 0] =  0
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model.predict_F4(before, u)
+after = model.predict_F4(before)
 
 print()
 print("Fiducial Simulation")
@@ -314,12 +313,12 @@ print("N initail")
 print(before[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, u)
+after = model.predict_F4(before)
 print(after[0,3])
 
 print("N re-predicted")
 for i in range(5):
-    after = model.predict_F4(after, u)
+    after = model.predict_F4(after)
     print(after[0,3])
 
 print()
@@ -334,7 +333,7 @@ print("# Plotting the results #")
 print("########################")
 npoints = 11
 nreps = 20
-p.plot_nue_nuebar(model, npoints, nreps, u)
+p.plot_nue_nuebar(model, npoints, nreps)
 p.plot_error()
 
 

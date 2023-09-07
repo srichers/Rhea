@@ -25,17 +25,17 @@ class Optimizer():
         self.test_stable_error = []
 
     # function to train the dataset
-    def train(self, model, F4i, F4f_true, u, loss_fn):
+    def train(self, model, F4i, F4f_true, loss_fn):
         model.train()
-        F4f_pred = model.predict_F4(F4i, u)
+        F4f_pred = model.predict_F4(F4i)
         loss = loss_fn(model, F4f_pred, F4f_true)
         return loss
 
     # function to test the model performance
-    def test(self, model, F4i, F4f_true, u, loss_fn):
+    def test(self, model, F4i, F4f_true, loss_fn):
         model.eval()
         with torch.no_grad():
-            F4f_pred = model.predict_F4(F4i, u)
+            F4f_pred = model.predict_F4(F4i)
             loss = loss_fn(model, F4f_pred, F4f_true)
             if F4f_true != None:
                 error = torch.max(torch.abs(F4f_pred - F4f_true))

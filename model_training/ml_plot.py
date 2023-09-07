@@ -72,7 +72,7 @@ class Plotter():
         
         plt.savefig("train_test_error.pdf",bbox_inches="tight")
 
-    def plot_nue_nuebar(self, model, npoints, nreps, u):
+    def plot_nue_nuebar(self, model, npoints, nreps,):
         # plot the number of electron neutrinos when varying the number of antineutrinos
         nee_list_fid    = np.zeros((npoints,nreps))
         neebar_list_fid = np.zeros((npoints,nreps))
@@ -87,7 +87,7 @@ class Plotter():
             F4_test[2, 1, 0] = -1/3 * ratio_list[i]
             F4_pred = torch.tensor(F4_test[None,:,:,:]).float()
             for j in range(nreps):
-                F4_pred = model.to('cpu').predict_F4(F4_pred.to('cpu'), u.to('cpu'))
+                F4_pred = model.to('cpu').predict_F4(F4_pred.to('cpu'))
                 nee_list_fid[i,j]    = F4_pred[0,3,0,0]
                 neebar_list_fid[i,j] = F4_pred[0,3,1,0]
                 

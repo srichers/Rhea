@@ -16,7 +16,7 @@ class NeuralNetwork(nn.Module):
 
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
-        self.NX = self.NF * (1 + 2*self.NF) + 2*self.NF
+        self.NX = self.NF * (1 + 2*self.NF)
         self.Ny = (2*NF)**2
 
         # put together the layers of the neural network
@@ -57,7 +57,7 @@ class NeuralNetwork(nn.Module):
     
     # Create an array of the dot product of each species with itself and each other species
     # Input dimensions expeced to be [sim, xyzt, nu/nubar, flavor]
-    def X_from_F4(self, F4, u):
+    def X_from_F4(self, F4):
         index = 0
         nsims = F4.shape[0]
         NF = F4.shape[-1]
@@ -70,11 +70,6 @@ class NeuralNetwork(nn.Module):
 
                 X[:,index] = dot4(F1,F2)
                 index += 1
-
-            # add the dot product with u
-            # subtract mean value to zero-center the data
-            X[:,index] = -dot4(F1,u) - 1./(2*NF)
-            index += 1
         assert(index==self.NX)
         return X
 
@@ -106,8 +101,8 @@ class NeuralNetwork(nn.Module):
 
         return F4_final
 
-    def predict_F4(self, F4_initial, u):
-        X = self.X_from_F4(F4_initial, u)
+    def predict_F4(self, F4_initial):
+        X = self.X_from_F4(F4_initial)
         y = self.forward(X)
         F4_final = self.F4_from_y(F4_initial, y)
         return F4_final

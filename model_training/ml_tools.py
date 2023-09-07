@@ -10,16 +10,12 @@ from ml_loss import *
 def dot4(v1,v2):
     return -v1[:,3]*v2[:,3] + torch.sum(v1[:,:3]*v2[:,:3], axis=1)
 
-def normalize_data(F4_initial_list, F4_final_list, u, N_Nbar_tolerance = 1e-3):
-    # get the number densities
-    # [sim, nu/nubar, flavor]
-    N_initial = -dot4(F4_initial_list, u[:,:,None,None])
-
+# input dimensions: [sim, xyzt, nu/nubar, flavor]
+def normalize_data(F4_initial_list, F4_final_list, N_Nbar_tolerance = 1e-3):
     # normalize by the total number density
-    ntotal = torch.sum(N_initial, axis=(1,2)) # [sim]
+    ntotal = torch.sum(F4_initial_list[:,3], axis=(1,2)) # [sim]
     F4_initial_list /= ntotal[:,None,None,None]
     F4_final_list   /= ntotal[:,None,None,None]
-
     return F4_initial_list, F4_final_list
 
 def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
