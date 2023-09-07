@@ -19,12 +19,13 @@ input_filename = "many_sims_database.h5"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
 epochs = 5000
-n_unphysical_check = 10000
+n_unphysical_check = 1000
 n_trivial_stable   = 100
+outfilename = "model.ptc"
 
 # data augmentation options
 do_augment_permutation=True
-do_augment_final_stable = True
+do_augment_final_stable = False
 
 # neural network options
 nhidden = 1
@@ -42,10 +43,15 @@ learning_rate = 1e-3
 #========================#
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
+u = torch.tensor([0,0,0,1], device=device)[None,:]
 
 #===============================================#
 # read in the database from the previous script #
 #===============================================#
+print()
+print("#############################")
+print("# PREPARING TEST/TRAIN DATA #")
+print("#############################")
 F4_initial_list = []
 F4_final_list = []
 for d in directory_list:
@@ -57,6 +63,12 @@ for d in directory_list:
 F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
 F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
 
+# normalize the data so the number densities add up to 1
+F4_initial_list, F4_final_list = ml.normalize_data(F4_initial_list, F4_final_list, u)
+
+# make sure the data are good
+check_conservation(F4_initial_list, F4_final_list)
+
 # split into training and testing sets
 F4i_train, F4i_test, F4f_train, F4f_test = train_test_split(F4_initial_list, F4_final_list, test_size=test_size, random_state=42)
 
@@ -66,12 +78,6 @@ if do_augment_permutation:
     F4i_test  = ml.augment_permutation(F4i_test )
     F4f_test  = ml.augment_permutation(F4f_test )
 
-u = torch.tensor([0,0,0,1], device=device)[None,:]
-
-# normalize the data so the number densities add up to 1
-F4i_train, F4f_train = ml.normalize_data(F4i_train, F4f_train, u)
-F4i_test,  F4f_test  = ml.normalize_data(F4i_test,  F4f_test,  u)
-
 # move the arrays over to the gpu
 F4i_train = torch.Tensor(F4i_train).to(device)
 F4f_train = torch.Tensor(F4f_train).to(device)
@@ -80,10 +86,13 @@ F4f_test  = torch.Tensor(F4f_test ).to(device)
 print("Train:",F4i_train.shape)
 print("Test:",F4i_test.shape)
 
-
 #=======================#
 # instantiate the model #
 #=======================#
+print()
+print("#############################")
+print("# SETTING UP NEURAL NETWORK #")
+print("#############################")
 model = NeuralNetwork(NF,
                       nhidden,
                       width,
@@ -94,9 +103,16 @@ optimizer = Optimizer(model,
                       weight_decay,
                       learning_rate,
                       device)
-
-# some helpful info
 print(model)
+
+
+#=============================================================#
+# check that we can obtain a value for y using pseudoinverses #
+#=============================================================#
+print()
+print("#################################################")
+print("# CHECKING PSEUDOINVERSE METHOD FOR OBTAINING Y #")
+print("#################################################")
 y_list = model.y_from_F4(F4i_train, F4f_train)
 test = model.F4_from_y(F4i_train, y_list)
 print("max reconstruction error:",torch.max(torch.abs(test-F4f_train)).item())
@@ -104,35 +120,19 @@ print("max reconstruction error:",torch.max(torch.abs(test-F4f_train)).item())
 #===================================#
 # Test the neutron star merger data #
 #===================================#
-f_in = h5py.File("Emu_many1D/many_sims_database_RUN_standard_3F_RUN_standard_3F.h5","r")
-F4_initial_NSM_missingflavor = np.array(f_in["F4_initial_Nsum1"]) # [simulationIndex, xyzt, nu/nubar, flavor]
-F4_final_NSM_missingflavor   = np.array(f_in["F4_final_Nsum1"  ])
-f_in.close()
-
-# reshape to three flavor array
-nsims_NSM = F4_initial_NSM_missingflavor.shape[0]
-newshape = (nsims_NSM,4,2,3)
-F4_initial_NSM = np.zeros(newshape)
-F4_final_NSM = np.zeros(newshape)
-F4_initial_NSM[:,:,:,:2] = F4_initial_NSM_missingflavor
-F4_final_NSM[:,:,:,:2] = F4_final_NSM_missingflavor
-F4_initial_NSM[:,:,:,2] = F4_initial_NSM[:,:,:,1]
-F4_final_NSM[:,:,:,2] = F4_final_NSM[:,:,:,1]
-F4_initial_NSM = torch.tensor(F4_initial_NSM, device=device).float()
-F4_final_NSM = torch.tensor(F4_final_NSM, device=device).float()
-
-# normalize the data so the number densities add up to 1
-F4_initial_NSM, F4_final_NSM = ml.normalize_data(F4_initial_NSM, F4_final_NSM, u)
-F4_initial_NSM = torch.Tensor(F4_initial_NSM).to(device)
-F4_final_NSM   = torch.Tensor(F4_final_NSM  ).to(device)
-F4_final_NSM[:,:,1,:] = F4_final_NSM[:,:,0,:] + F4_initial_NSM[:,:,1,:] - F4_initial_NSM[:,:,0,:]
-
-print("NSM:",F4_initial_NSM.shape)
 print()
+print("######################")
+print("# PREPARING NSM DATA #")
+print("######################")
+print("NSM data is useless. Ignoring.")
 
 #===============#
 # training loop #
 #===============#
+print()
+print("############")
+print("# Training #")
+print("############")
 p = Plotter(epochs)
 for t in range(epochs):
     optimizer.optimizer.zero_grad()
@@ -173,32 +173,39 @@ for t in range(epochs):
                 
     optimizer.optimizer.step()
 
-    p.NSM.test_loss[t], p.NSM.test_err[t] = optimizer.test(model, F4_initial_NSM, F4_final_NSM, u, comparison_loss_fn)
+    #p.NSM.test_loss[t], p.NSM.test_err[t] = optimizer.test(model, F4_initial_NSM, F4_final_NSM, u, comparison_loss_fn)
     
     # report max error
-    if((t+1)%(epochs//10)==0):
+    if((t+1)%100==0):
         print(f"Epoch {t+1}")
         print("Train max error:",        p.knownData.train_err[t])
         print("Test max error:",         p.knownData.test_err[t])
-        print("NSM max error:",          p.NSM.test_err[t])
+        #print("NSM max error:",          p.NSM.test_err[t])
         print()
 
 print("Done!")
 
 # save the model to file
+print()
+print("########################")
+print("# Saving model to file #")
+print("########################")
 with torch.no_grad():
-    print(F4_initial_NSM.shape)
-    X = model.X_from_F4(F4_initial_NSM, u)
+    print(F4i_test.shape)
+    X = model.X_from_F4(F4i_test, u)
     print(X.shape)
     traced_model = torch.jit.trace(model, X)
     torch.jit.save(traced_model, "model.ptc")
-
+    print("Saving to",outfilename)
 
 #===================================#
 # Test one point from training data #
 #===================================#
 print()
-print("Training Data")
+print("##########################################")
+print("# Testing a point from the TRAINING data #")
+print("##########################################")
+print()
 print("N initial")
 before = F4i_train[0:1,:,:,:]
 print(before[0,3])
@@ -214,11 +221,17 @@ print("N re-predicted")
 after = model.predict_F4(after, u)
 print(after[0,3])
 
+print()
+check_conservation(before,after)
+
 #===================================#
 # Test one point from test data #
 #===================================#
 print()
-print("Test Data")
+print("######################################")
+print("# Testing a point from the TEST data #")
+print("######################################")
+print()
 print("N initial")
 before = F4i_test[0:1,:,:,:]
 print(before[0,3])
@@ -234,9 +247,16 @@ print("N re-predicted")
 after = model.predict_F4(after, u)
 print(after[0,3])
 
+print()
+check_conservation(before,after)
+
 #=====================================#
 # create test ("Fiducial" simulation) #
 #=====================================#
+print()
+print("#############################")
+print("# Testing the FIDUCIAL case #")
+print("#############################")
 F4_test = np.zeros((4,2,NF)) # [xyzt, nu/nubar, flavor]
 F4_test[3, 0, 0] =  1
 F4_test[3, 1, 0] =  1
@@ -259,10 +279,16 @@ for i in range(5):
     after = model.predict_F4(after, u)
     print(after[0,3])
 
+print()
+check_conservation(before,after)
 
 #=====================================#
 # create test ("Zero FF" simulation) #
 #=====================================#
+print()
+print("####################################")
+print("# Testing the Zero Flux Factor case#")
+print("####################################")
 F4_test = np.zeros((4,2,NF)) # [xyzt, nu/nubar, flavor]
 F4_test[3, 0, 0] =  1
 F4_test[3, 1, 0] =  .5
@@ -285,7 +311,16 @@ for i in range(5):
     after = model.predict_F4(after, u)
     print(after[0,3])
 
+print()
+check_conservation(before,after)
 
+#==================#
+# plot the results #
+#==================#
+print()
+print("########################")
+print("# Plotting the results #")
+print("########################")
 npoints = 11
 nreps = 20
 p.plot_nue_nuebar(model, npoints, nreps, u)

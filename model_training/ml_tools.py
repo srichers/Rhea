@@ -14,25 +14,42 @@ def normalize_data(F4_initial_list, F4_final_list, u, N_Nbar_tolerance = 1e-3):
     # get the number densities
     # [sim, nu/nubar, flavor]
     N_initial = -dot4(F4_initial_list, u[:,:,None,None])
-    N_final   = -dot4(F4_final_list,   u[:,:,None,None])
 
     # normalize by the total number density
     ntotal = torch.sum(N_initial, axis=(1,2)) # [sim]
     F4_initial_list /= ntotal[:,None,None,None]
     F4_final_list   /= ntotal[:,None,None,None]
-    N_initial       /= ntotal[:,None,None]
-    N_final         /= ntotal[:,None,None]
-
-    # N-Nbar must be preserved for SI-only Hamiltonian
-    # Check that this actually happened in the simulations
-    N_Nbar_initial = N_initial[:,0,:] - N_initial[:,1,:]
-    N_Nbar_final   = N_final[  :,0,:] - N_final[  :,1,:]
-    N_Nbar_difference = N_Nbar_initial - N_Nbar_final
-    N_Nbar_error = torch.max(torch.abs(N_Nbar_difference))
-    print("N_Nbar_error = ", N_Nbar_error)
-    assert(N_Nbar_error < N_Nbar_tolerance)
 
     return F4_initial_list, F4_final_list
+
+def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
+    # N-Nbar must be preserved for SI-only Hamiltonian
+    # Check that this actually happened in the simulations
+    N_initial = F4_initial_list[:,3,:,:]
+    N_final   =   F4_final_list[:,3,:,:]
+    N_Nbar_initial = N_initial[:,0,:] - N_initial[:,1,:]
+    N_Nbar_final   = N_final[  :,0,:] - N_final[  :,1,:]
+    N_Nbar_difference = (N_Nbar_initial - N_Nbar_final)
+    N_Nbar_error = torch.max(torch.abs(N_Nbar_difference))
+    print("N_Nbar_error = ", N_Nbar_error.item())
+    assert(N_Nbar_error < tolerance)
+
+    # check for number conservation
+    F4_flavorsum_initial = torch.sum(F4_initial_list, axis=(3))
+    F4_flavorsum_final   = torch.sum(F4_final_list,   axis=(3))
+    F4_flavorsum_error = torch.max(torch.abs(F4_flavorsum_initial - F4_flavorsum_final))
+    print("F4_flavorsum_difference = ", F4_flavorsum_error.item())
+    assert(F4_flavorsum_error < tolerance)
+
+    # check that the sum of number densities is 1
+    Ntot_initial = torch.sum(N_initial, axis=(1,2))
+    Ntot_final   = torch.sum(N_final,   axis=(1,2))
+    Ntot_initial_error = torch.max(torch.abs(Ntot_initial-1))
+    Ntot_final_error   = torch.max(torch.abs(Ntot_final  -1))
+    print("Ntot_initial_error = ", Ntot_initial_error.item())
+    print("Ntot_final_error   = ",   Ntot_final_error.item())
+    assert(Ntot_initial_error < tolerance)
+    assert(Ntot_final_error   < tolerance)
 
 
 # assume input of size [nsims, xyzt, nu/nubar, flavor]
