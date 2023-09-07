@@ -17,8 +17,7 @@ class NeuralNetwork(nn.Module):
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
         self.NX = self.NF * (1 + 2*self.NF) + 2*self.NF
-        self.Nalpha = 4*self.NF*(self.NF-1)
-        self.Ny = self.Nalpha # + 1 # alpha and the stability bit
+        self.Ny = (2*NF)**2
 
         # put together the layers of the neural network
         modules = []
@@ -74,19 +73,12 @@ class NeuralNetwork(nn.Module):
 
     # get the expected output from the ML model from a pairof initial and final F4 vectors
     # input dimensions expected to be [sim, xyzt, nu/nubar, flavor]
-    # Treat all but the last flavor as output, since it is determined by conservation
-    # last bit is to indicate instability if >1
     def y_from_F4(self, F4_initial, F4_final):
         # calculate transformation matrix
         nsims = F4_initial.shape[0]
         F4i_flat = F4_initial.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
-        F4f_flat = F4_final[:,:,:,:self.NF-1].reshape((nsims, 4, 2*(self.NF-1))) # [simulationIndex, xyzt, species]
-        alpha = torch.zeros((nsims,2*self.NF,2*(self.NF-1)), device=F4_initial.device)
-        alpha = torch.matmul(torch.linalg.pinv(F4i_flat), F4f_flat)
-
-        # store numbers in y
-        y = torch.zeros((nsims,self.Ny), device=F4_initial.device)
-        y[:,:self.Nalpha] = alpha.reshape((nsims,self.Nalpha))
+        F4f_flat = F4_final.reshape(  (nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
+        y = torch.matmul(torch.linalg.pinv(F4i_flat), F4f_flat)
 
         return y
 
@@ -98,10 +90,8 @@ class NeuralNetwork(nn.Module):
     def F4_from_y(self, F4_initial, y):
 
         nsims = F4_initial.shape[0]
-        alpha = y[:,:self.Nalpha].reshape((nsims, 2*self.NF, 2*(self.NF-1)))
         F4i_flat = F4_initial.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
-        F4_final = torch.zeros((nsims, 4, 2, self.NF), device=F4_initial.device)
-        F4_final[:,:,:,:self.NF-1] = torch.matmul(F4i_flat, alpha).reshape(nsims,4,2,self.NF-1)
+        F4_final = torch.matmul(F4i_flat, y).reshape(nsims,4,2,self.NF)
 
         # Set the final flavor such that the flavor trace is conserved
         F4_final[:,:,:, self.NF-1] = torch.sum(F4_initial, axis=3) - torch.sum(F4_final[:,:,:,:self.NF-1], axis=3)
@@ -110,7 +100,7 @@ class NeuralNetwork(nn.Module):
 
     def predict_F4(self, F4_initial, u):
         X = self.X_from_F4(F4_initial, u)
-        y = self(X)
+        y = self(X).reshape(X.shape[0], 2*self.NF,2*self.NF)
         F4_final = self.F4_from_y(F4_initial, y)
         return F4_final
 

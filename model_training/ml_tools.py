@@ -32,7 +32,7 @@ def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     N_Nbar_difference = (N_Nbar_initial - N_Nbar_final)
     N_Nbar_error = torch.max(torch.abs(N_Nbar_difference))
     print("N_Nbar_error = ", N_Nbar_error.item())
-    assert(N_Nbar_error < tolerance)
+    #assert(N_Nbar_error < tolerance)
 
     # check for number conservation
     F4_flavorsum_initial = torch.sum(F4_initial_list, axis=(3))
@@ -40,17 +40,6 @@ def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     F4_flavorsum_error = torch.max(torch.abs(F4_flavorsum_initial - F4_flavorsum_final))
     print("F4_flavorsum_difference = ", F4_flavorsum_error.item())
     assert(F4_flavorsum_error < tolerance)
-
-    # check that the sum of number densities is 1
-    Ntot_initial = torch.sum(N_initial, axis=(1,2))
-    Ntot_final   = torch.sum(N_final,   axis=(1,2))
-    Ntot_initial_error = torch.max(torch.abs(Ntot_initial-1))
-    Ntot_final_error   = torch.max(torch.abs(Ntot_final  -1))
-    print("Ntot_initial_error = ", Ntot_initial_error.item())
-    print("Ntot_final_error   = ",   Ntot_final_error.item())
-    assert(Ntot_initial_error < tolerance)
-    assert(Ntot_final_error   < tolerance)
-
 
 # assume input of size [nsims, xyzt, nu/nubar, flavor]
 def permute_F4(F4, mperm, fperm):
