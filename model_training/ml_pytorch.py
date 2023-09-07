@@ -59,7 +59,7 @@ for d in directory_list:
     f_in = h5py.File(d+"/"+input_filename,"r")
     F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
     F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
-    NF = np.array(f_in["nf"])
+    NF = int(np.array(f_in["nf"]))
     f_in.close()
 F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
 F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()

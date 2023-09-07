@@ -38,9 +38,16 @@ class NeuralNetwork(nn.Module):
         self.apply(self._init_weights)
 
     # Push the inputs through the neural network
+    # output is indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
     def forward(self,x):
-        logits = self.linear_activation_stack(x).reshape(x.shape[0], 2,self.NF,2,self.NF)
-        return logits
+        y = self.linear_activation_stack(x).reshape(x.shape[0], 2,self.NF,2,self.NF)
+
+        # enforce conservation of particle number
+        deltaij = torch.eye(2, device=x.device)[None,:,None,:,None]
+        yflavorsum = torch.sum(y,axis=2)[:,:,None,:,:]
+        y = y + (deltaij - yflavorsum) / self.NF
+
+        return y
     
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -96,9 +103,6 @@ class NeuralNetwork(nn.Module):
         # i and j indicate nu/nubar
         # a and b indicate flavor
         F4_final = torch.einsum("niajb,nmjb->nmia", y, F4_initial)
-
-        # Set the final flavor such that the flavor trace is conserved
-        F4_final[:,:,:, self.NF-1] = torch.sum(F4_initial, axis=3) - torch.sum(F4_final[:,:,:,:self.NF-1], axis=3)
 
         return F4_final
 
