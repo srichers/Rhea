@@ -101,9 +101,18 @@ class NeuralNetwork(nn.Module):
 
         return F4_final
 
-    def predict_F4(self, F4_initial):
+    def predict_F4(self, F4_initial, conserve_lepton_number=False):
         X = self.X_from_F4(F4_initial)
         y = self.forward(X)
         F4_final = self.F4_from_y(F4_initial, y)
+
+        if conserve_lepton_number:
+            # set the antineutrino number densities to conserve lepton number
+            Jt_initial = F4_initial[:,3,0,:] - F4_initial[:,3,1,:]
+            Jt_final   =   F4_final[:,3,0,:] -   F4_final[:,3,1,:]
+            delta_Jt = Jt_final - Jt_initial
+            F4_final[:,3,0,:] = F4_final[:,3,0,:] - 0.5*delta_Jt
+            F4_final[:,3,1,:] = F4_final[:,3,1,:] + 0.5*delta_Jt
+
         return F4_final
 

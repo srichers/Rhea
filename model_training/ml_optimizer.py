@@ -8,11 +8,13 @@ class Optimizer():
                  op = torch.optim.Adam, # Adam, SGD, RMSprop
                  weight_decay = 1e-5,
                  learning_rate = 1e-2,
-                 device = torch.device("cpu")
+                 device = torch.device("cpu"),
+                 conserve_lepton_number=False
                  ): 
         self.NF = model.NF
         self.optimizer = op(model.parameters(), weight_decay=weight_decay, lr=learning_rate)
         self.device = device
+        self.conserve_lepton_number = conserve_lepton_number
 
         # arrays
         self.train_error = []
@@ -27,7 +29,7 @@ class Optimizer():
     # function to train the dataset
     def train(self, model, F4i, F4f_true, loss_fn):
         model.train()
-        F4f_pred = model.predict_F4(F4i)
+        F4f_pred = model.predict_F4(F4i, conserve_lepton_number=self.conserve_lepton_number)
         loss = loss_fn(model, F4f_pred, F4f_true)
         return loss
 
@@ -35,7 +37,7 @@ class Optimizer():
     def test(self, model, F4i, F4f_true, loss_fn):
         model.eval()
         with torch.no_grad():
-            F4f_pred = model.predict_F4(F4i)
+            F4f_pred = model.predict_F4(F4i, conserve_lepton_number=self.conserve_lepton_number)
             loss = loss_fn(model, F4f_pred, F4f_true)
             if F4f_true != None:
                 error = torch.max(torch.abs(F4f_pred - F4f_true))

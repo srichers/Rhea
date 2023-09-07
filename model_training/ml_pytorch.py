@@ -18,7 +18,7 @@ from ml_plot import *
 input_filename = "many_sims_database.h5"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 5000
+epochs = 500
 n_unphysical_check = 1000
 n_eln_conservation_check = 1000
 n_trivial_stable   = 100
@@ -27,6 +27,7 @@ outfilename = "model.ptc"
 # data augmentation options
 do_augment_permutation=True
 do_augment_final_stable = False
+conserve_lepton_number=True
 
 # neural network options
 nhidden = 1
@@ -102,7 +103,8 @@ optimizer = Optimizer(model,
                       op,
                       weight_decay,
                       learning_rate,
-                      device)
+                      device,
+                      conserve_lepton_number=conserve_lepton_number)
 print(model)
 
 
@@ -224,11 +226,11 @@ print("N final (actual)")
 print(F4f_train[0,3])
 
 print("N predicted")
-after = model.predict_F4(before)
+after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print("N re-predicted")
-after = model.predict_F4(after)
+after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print()
@@ -250,11 +252,11 @@ print("N final (actual)")
 print(F4f_test[0,3])
 
 print("N predicted")
-after = model.predict_F4(before)
+after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print("N re-predicted")
-after = model.predict_F4(after)
+after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print()
@@ -273,7 +275,7 @@ F4_test[3, 1, 0] =  1
 F4_test[2, 0, 0] =  1/3
 F4_test[2, 1, 0] = -1/3
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model.predict_F4(before)
+after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 
 print()
 print("Fiducial Simulation")
@@ -281,12 +283,12 @@ print("N initail")
 print(before[0,3])
 
 print("N predicted")
-after = model.predict_F4(before)
+after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print("N re-predicted")
 for i in range(5):
-    after = model.predict_F4(after)
+    after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
     print(after[0,3])
 
 print()
@@ -305,7 +307,7 @@ F4_test[3, 1, 0] =  .5
 F4_test[2, 0, 0] =  0
 F4_test[2, 1, 0] =  0
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model.predict_F4(before)
+after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 
 print()
 print("Fiducial Simulation")
@@ -313,12 +315,12 @@ print("N initail")
 print(before[0,3])
 
 print("N predicted")
-after = model.predict_F4(before)
+after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print("N re-predicted")
 for i in range(5):
-    after = model.predict_F4(after)
+    after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
     print(after[0,3])
 
 print()
