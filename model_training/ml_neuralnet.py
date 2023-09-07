@@ -39,7 +39,7 @@ class NeuralNetwork(nn.Module):
 
     # Push the inputs through the neural network
     def forward(self,x):
-        logits = self.linear_activation_stack(x)
+        logits = self.linear_activation_stack(x).reshape(x.shape[0], 2,self.NF,2,self.NF)
         return logits
     
     def _init_weights(self, module):
@@ -78,20 +78,24 @@ class NeuralNetwork(nn.Module):
         nsims = F4_initial.shape[0]
         F4i_flat = F4_initial.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
         F4f_flat = F4_final.reshape(  (nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
-        y = torch.matmul(torch.linalg.pinv(F4i_flat), F4f_flat)
+        y = torch.matmul(torch.linalg.pinv(F4i_flat), F4f_flat) # [sim, species, species]
+        y = torch.transpose(y,1,2).reshape(nsims,2,self.NF,2,self.NF) # [sim, nu/nubar, species, nu/nubar, species]
+
 
         return y
 
     # Use the initial F4 and the ML output to calculate the final F4
     # F4_initial must have shape [sim, xyzt, nu/nubar, flavor]
-    # y must have shape [2*NF**2]
+    # y must have shape [sim,2,NF,2,NF]
     # F4_final has shape [sim, xyzt, nu/nubar, flavor]
     # Treat all but the last flavor as output, since it is determined by conservation
     def F4_from_y(self, F4_initial, y):
-
-        nsims = F4_initial.shape[0]
-        F4i_flat = F4_initial.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
-        F4_final = torch.matmul(F4i_flat, y).reshape(nsims,4,2,self.NF)
+        # tensor product with y
+        # n indicates the simulation index
+        # m indicates the spacetime index
+        # i and j indicate nu/nubar
+        # a and b indicate flavor
+        F4_final = torch.einsum("niajb,nmjb->nmia", y, F4_initial)
 
         # Set the final flavor such that the flavor trace is conserved
         F4_final[:,:,:, self.NF-1] = torch.sum(F4_initial, axis=3) - torch.sum(F4_final[:,:,:,:self.NF-1], axis=3)
@@ -100,7 +104,7 @@ class NeuralNetwork(nn.Module):
 
     def predict_F4(self, F4_initial, u):
         X = self.X_from_F4(F4_initial, u)
-        y = self(X).reshape(X.shape[0], 2*self.NF,2*self.NF)
+        y = self.forward(X)
         F4_final = self.F4_from_y(F4_initial, y)
         return F4_final
 
