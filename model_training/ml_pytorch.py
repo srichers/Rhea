@@ -18,7 +18,7 @@ from ml_plot import *
 input_filename = "many_sims_database.h5"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 500
+epochs = 5000
 n_unphysical_check = 1000
 n_eln_conservation_check = 1000
 n_trivial_stable   = 100
@@ -65,7 +65,9 @@ F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).f
 F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
 
 # normalize the data so the number densities add up to 1
-F4_initial_list, F4_final_list = ml.normalize_data(F4_initial_list, F4_final_list)
+ntot = ml.ntotal(F4_initial_list)
+F4_initial_list = F4_initial_list / ntot[:,None,None,None]
+F4_final_list   = F4_final_list   / ntot[:,None,None,None]
 
 # make sure the data are good
 check_conservation(F4_initial_list, F4_final_list)
