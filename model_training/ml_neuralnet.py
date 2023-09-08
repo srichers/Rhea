@@ -60,7 +60,6 @@ class NeuralNetwork(nn.Module):
     def X_from_F4(self, F4):
         index = 0
         nsims = F4.shape[0]
-        NF = F4.shape[-1]
         X = torch.zeros((nsims, self.NX), device=F4.device)
         F4_flat = F4.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
         for a in range(2*self.NF):
