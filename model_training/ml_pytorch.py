@@ -22,7 +22,7 @@ epochs = 5000
 n_unphysical_check = 1000
 n_eln_conservation_check = 1000
 n_trivial_stable   = 100
-outfilename = "model.ptc"
+outfilename = "model"
 
 # data augmentation options
 do_augment_permutation=True
@@ -204,13 +204,19 @@ print()
 print("########################")
 print("# Saving model to file #")
 print("########################")
-with torch.no_grad():
-    print(F4i_test.shape)
-    X = model.X_from_F4(F4i_test)
-    print(X.shape)
-    traced_model = torch.jit.trace(model, X)
-    torch.jit.save(traced_model, "model.ptc")
-    print("Saving to",outfilename)
+def save_model(model, outfilename, device):
+    with torch.no_grad():
+        print(F4i_test.shape)
+
+        model.to(device)
+        X = model.to(device).X_from_F4(F4i_test.to(device))
+        traced_model = torch.jit.trace(model, X)
+        torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
+        print("Saving to",outfilename+"_"+device+".ptc")
+
+save_model(model, outfilename, "cpu")
+if device=="cuda":
+    save_model(model, outfilename, "cuda")
 
 #===================================#
 # Test one point from training data #

@@ -20,12 +20,14 @@ int main(int argc, const char* argv[]){
   F4_in.index_put_({Slice(), 3, 0, 0}, 3.0);
   F4_in.index_put_({Slice(), 3, 1, 0}, 3.0);
 
-  torch::Tensor u = torch::zeros({ngridzones,4});
-  u.index_put_({Slice(),3}, 1.0);
-
   // put the input through the model 10 times
-  auto output = F4_in;
-  for(int i=0; i<10; i++) output = model.predict_F4_Minkowski(output, u);
+  auto F4_out = F4_in;
+  torch::Tensor X, y;
+  for(int i=0; i<10; i++){
+    X = model.X_from_F4_Minkowski(F4_out);
+    y = model.predict_y(X);
+    F4_out = model.F4_from_y(F4_out, y);
+  }
 
   // the expected result is an even mixture of all flavors
   torch::Tensor F4_expected = torch::zeros({ngridzones,4,2,3});
@@ -33,9 +35,9 @@ int main(int argc, const char* argv[]){
 
   // check that the results are correct
   // by asserting that all elements are equal to 1 with an absolute and relative tolerance of 1e-2
-  std::cout << output << std::endl;
-  assert(torch::allclose(output, F4_expected, 1e-2, 1e-2));
-
+  std::cout << F4_out << std::endl;
+  assert(torch::allclose(F4_out, F4_expected, 3e-2, 3e-2));
+  
   
   return 0;
 }

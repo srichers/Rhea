@@ -26,7 +26,7 @@ pipeline {
 	stage('Does it run?'){ steps{
 	    dir('cpp_interface'){
 		sh 'make'
-		sh './test_torch_model sample_model.ptc'
+		sh './test_torch_model model_cpu.ptc'
 	    }
 	}}
 
