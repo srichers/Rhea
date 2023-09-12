@@ -19,15 +19,17 @@ input_filename = "many_sims_database.h5"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
 epochs = 5000
-n_unphysical_check = 1000
-n_eln_conservation_check = 1000
-n_trivial_stable   = 100
+batch_size = 1000
+print_every = 1
 outfilename = "model"
 
 # data augmentation options
 do_augment_permutation=True
 do_augment_final_stable = False
 conserve_lepton_number=True
+do_unphysical_check = True
+do_eln_conservation_check = True
+do_trivial_stable   = True
 
 # neural network options
 nhidden = 1
@@ -132,6 +134,18 @@ print("# PREPARING NSM DATA #")
 print("######################")
 print("NSM data is useless. Ignoring.")
 
+#=====================================================#
+# Load training data into data loader for minibatches #
+#=====================================================#
+print()
+print("###########################################")
+print("# LOADING TRAINING DATA INTO DATA LOADERS #")
+print("###########################################")
+dataset = torch.utils.data.TensorDataset(F4i_train, F4f_train)
+batch_size = max(batch_size, len(dataset))
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+print("batchsize=",batch_size)
+
 #===============#
 # training loop #
 #===============#
@@ -141,60 +155,69 @@ print("# Training #")
 print("############")
 p = Plotter(epochs)
 for t in range(epochs):
+    # reset gradients in the optimizer
     optimizer.optimizer.zero_grad()
 
-    # train on making sure the model prediction is correct
-    p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
-    loss = optimizer.train(model, F4i_train, F4f_train, comparison_loss_fn)
-    loss.backward()
-    p.knownData.train_loss[t], p.knownData.train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
-
-    if do_augment_final_stable:
-        p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4i_test,  F4i_test,  comparison_loss_fn)
-        loss = optimizer.train(model, F4i_train, F4f_train, comparison_loss_fn)
+    # load in a batch of data from the dataset
+    for F4i_batch, F4f_batch in dataloader:
+        # train on making sure the model prediction is correct
+        loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
         loss.backward()
-        p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4i_train, F4i_train, comparison_loss_fn)
-    
-    if n_unphysical_check>0:
+
+        if do_augment_final_stable:
+            loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
+            loss.backward()
+
         # train on making sure the model prediction is physical
-        F4i = generate_random_F4(n_unphysical_check, NF, device)
-        p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i, None, unphysical_loss_fn)
-        loss = optimizer.train(model, F4i, None, unphysical_loss_fn)
-        loss.backward()
-        p.unphysical.train_loss[t], p.unphysical.train_err[t] = optimizer.test(model, F4i, None, unphysical_loss_fn)
+        if do_unphysical_check:
+            F4i_unphysical = generate_random_F4(batch_size, NF, device)
+            loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn)
+            loss.backward()
 
-    if n_eln_conservation_check>0:
         # train on making sure the model prediction is physical
-        F4i = generate_random_F4(n_eln_conservation_check, NF, device)
-        p.ELN.test_loss[t],  p.ELN.test_err[t]  = optimizer.test(model, F4i, F4i, ELN_loss_fn)
-        loss = optimizer.train(model, F4i, F4i, ELN_loss_fn)
-        loss.backward()
-        p.ELN.train_loss[t], p.ELN.train_err[t] = optimizer.test(model, F4i, F4i, ELN_loss_fn)
+        if do_eln_conservation_check:
+            F4i_eln = generate_random_F4(batch_size, NF, device)
+            loss = optimizer.train(model, F4i_eln, F4i_eln, ELN_loss_fn)
+            loss.backward()
 
-    if n_trivial_stable>0:
         # train on making sure known stable distributions dont change
-        F4i = generate_stable_F4_zerofluxfac(n_trivial_stable, NF, device)
-        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i, F4i, comparison_loss_fn)
-        loss = optimizer.train(model, F4i, F4i, comparison_loss_fn)
-        loss.backward()
-        p.zerofluxfac.train_loss[t], p.zerofluxfac.train_err[t] = optimizer.test(model, F4i, F4i, comparison_loss_fn)
-        
-        F4i = generate_stable_F4_oneflavor(n_trivial_stable, NF, device)
-        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i, F4i, comparison_loss_fn)
-        loss = optimizer.train(model, F4i, F4i, comparison_loss_fn)
-        loss.backward()
-        p.oneflavor.train_loss[t], p.oneflavor.train_err[t] = optimizer.test(model, F4i, F4i, comparison_loss_fn)
-                
-    optimizer.optimizer.step()
+        if do_trivial_stable:
+            F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
+            loss = optimizer.train(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
+            loss.backward()
 
-    #p.NSM.test_loss[t], p.NSM.test_err[t] = optimizer.test(model, F4_initial_NSM, F4_final_NSM, u, comparison_loss_fn)
+            F4i_1f = generate_stable_F4_oneflavor(batch_size, NF, device)
+            loss = optimizer.train(model, F4i_1f, F4i_1f, comparison_loss_fn)
+            loss.backward()
+
+        # update the weights
+        optimizer.optimizer.step()
+
+    # Evaluate training errors
+    p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
+    p.knownData.train_loss[t], p.knownData.train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
+    if do_augment_final_stable:
+        p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4f_test,  F4f_test,  comparison_loss_fn)
+        p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)    
+    if do_unphysical_check:
+        F4i_unphysical = generate_random_F4(batch_size, NF, device)
+        p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
+    if do_eln_conservation_check:
+        F4i_eln = generate_random_F4(batch_size, NF, device)
+        p.ELN.test_loss[t],  p.ELN.test_err[t]  = optimizer.test(model, F4i_eln, F4i_eln, ELN_loss_fn)
+    if do_trivial_stable:
+        F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
+        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
+        F4i_1f = generate_stable_F4_oneflavor(batch_size, NF, device)
+        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i_1f, F4i_1f, comparison_loss_fn)
     
     # report max error
-    if((t+1)%100==0):
+    if((t+1)%print_every==0):
         print(f"Epoch {t+1}")
-        print("Train max error:",        p.knownData.train_err[t])
-        print("Test max error:",         p.knownData.test_err[t])
-        #print("NSM max error:",          p.NSM.test_err[t])
+        print("Train max error:", p.knownData.train_err[t])
+        print("Test max error:",  p.knownData.test_err[t])
+        print("Train loss:",      p.knownData.train_loss[t])
+        print("Test loss:",       p.knownData.test_loss[t])
         print()
 
 print("Done!")
