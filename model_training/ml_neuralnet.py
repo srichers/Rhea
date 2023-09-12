@@ -49,6 +49,19 @@ class NeuralNetwork(nn.Module):
 
         return y
     
+    # convert the 3-flavor matrix into an effective 2-flavor matrix
+    # input and output are indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
+    # This assumes that the x flavors will represent the SUM of mu and tau flavors.
+    def convert_y_to_2flavor(self, y):
+        y2F = torch.zeros((y.shape[0],2,2,2,2), device=y.device)
+
+        y2F[:,:,0,:,0] =                 y[:, :, 0 , :, 0 ]
+        y2F[:,:,0,:,1] = 0.5 * torch.sum(y[:, :, 0 , :, 1:], axis=(  3))
+        y2F[:,:,1,:,1] = 0.5 * torch.sum(y[:, :, 1:, :, 1:], axis=(2,4))
+        y2F[:,:,1,:,0] =       torch.sum(y[:, :, 1:, :, 0 ], axis=(2  ))
+
+        return y2F
+    
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
             torch.nn.init.kaiming_normal_(module.weight)

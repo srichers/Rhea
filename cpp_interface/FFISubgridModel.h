@@ -102,9 +102,20 @@ class FFISubgridModel{
   // the dimensions of X are [# grid cells, NX]
   // the dimensions of y are [# grid cells, 2,NF,2,NF]
   torch::Tensor predict_y(const torch::Tensor& X){
-    int nsims = X.size(0);
-    torch::Tensor y = model.forward({X}).toTensor();
-    return y;
+    return model.forward({X}).toTensor();
+  }
+
+  // convert a 3-flavor y tensor to a 2-flavor y tensor
+  // y3 has shape [sim,2,NF,2,NF]
+  // y2 has shape [sim,2,2,2]
+  torch::Tensor convert_y_to_2F(const torch::Tensor& y){
+    int nsims = y.size(0);
+    torch::Tensor y2 = torch::zeros({nsims,2,2,2,2});
+    y2.index_put_({Slice(), Slice(), 0, Slice(), 0},                 (y.index({Slice(), Slice(), 0            , Slice(), 0            })       ));
+    y2.index_put_({Slice(), Slice(), 0, Slice(), 1}, 0.5 * torch::sum(y.index({Slice(), Slice(), 0            , Slice(), Slice(1,None)}), {  3}));
+    y2.index_put_({Slice(), Slice(), 1, Slice(), 1}, 0.5 * torch::sum(y.index({Slice(), Slice(), Slice(1,None), Slice(), Slice(1,None)}), {2,4}));
+    y2.index_put_({Slice(), Slice(), 1, Slice(), 0},       torch::sum(y.index({Slice(), Slice(), Slice(1,None), Slice(), 0            }), {2  }));
+    return y2;
   }
 
   // function to convert an input F4 and y into an output F4

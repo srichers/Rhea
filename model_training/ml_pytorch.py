@@ -209,7 +209,7 @@ def save_model(model, outfilename, device):
         print(F4i_test.shape)
 
         model.to(device)
-        X = model.to(device).X_from_F4(F4i_test.to(device))
+        X = model.X_from_F4(F4i_test.to(device))
         traced_model = torch.jit.trace(model, X)
         torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
         print("Saving to",outfilename+"_"+device+".ptc")
@@ -295,9 +295,20 @@ after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print("N re-predicted")
-for i in range(5):
-    after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
-    print(after[0,3])
+after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+print(after[0,3])
+
+print("2 Flavor")
+before_2F = before[:,:,:,0:2]
+X = model.X_from_F4(before)
+y = model.forward(X)
+y2F = model.convert_y_to_2flavor(y)
+after_3F = model.F4_from_y(before   , y  )
+after_2F = model.F4_from_y(before_2F, y2F)
+print("3F")
+print(after_3F[0,3])
+print("2F")
+print(after_2F[0,3])
 
 print()
 check_conservation(before,after)
@@ -327,9 +338,8 @@ after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
 print("N re-predicted")
-for i in range(5):
-    after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
-    print(after[0,3])
+after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+print(after[0,3])
 
 print()
 check_conservation(before,after)
