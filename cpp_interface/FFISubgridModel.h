@@ -20,10 +20,10 @@ class FFISubgridModel{
   //==================//
   // input dimensions: [# grid cells, xyzt]
   torch::Tensor dot4_Minkowski(const torch::Tensor& v1, const torch::Tensor& v2){
-    // time component is positive
+    // time component is negative
     torch::Tensor result = -v1.index({Slice(),3}) * v2.index({Slice(),3});
 
-    // spatial components are negative
+    // spatial components are positive
     for(int i=0; i<3; i++){
       result += v1.index({Slice(),i}) * v2.index({Slice(),i});
     }
