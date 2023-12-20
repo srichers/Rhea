@@ -13,19 +13,19 @@ class PlotQuantities():
 
 class Plotter():
     def __init__(self, epochs):
-        self.knownData    = PlotQuantities(epochs)
-        self.knownData_FS = PlotQuantities(epochs)
-        self.zerofluxfac  = PlotQuantities(epochs)
-        self.oneflavor    = PlotQuantities(epochs)
-        self.unphysical   = PlotQuantities(epochs)
-        self.NSM          = PlotQuantities(epochs)
-        self.ELN          = PlotQuantities(epochs)
+        self.knownData      = PlotQuantities(epochs)
+        self.knownData_FS   = PlotQuantities(epochs)
+        self.zerofluxfac    = PlotQuantities(epochs)
+        self.oneflavor      = PlotQuantities(epochs)
+        self.unphysical     = PlotQuantities(epochs)
+        self.NSM            = PlotQuantities(epochs)
+        self.particlenumber = PlotQuantities(epochs)
 
     def init_plot_options(self):
         #==============#
         # plot options #
         #==============#
-        mpl.rcParams['font.size'] = 22
+        mpl.rcParams['font.size'] = 8
         mpl.rcParams['font.family'] = 'serif'
         mpl.rc('text', usetex=True)
         mpl.rcParams['xtick.major.size'] = 7
@@ -40,16 +40,16 @@ class Plotter():
         mpl.rcParams['axes.linewidth'] = 2
 
     def plot_error_single_frame(self, ax, x, p, label):
-        ax.set_title(label)
-        ax.semilogy(x, np.sqrt(p.train_loss), label="Sqrt(train_loss)", color="black", linewidth=0.5)
-        ax.semilogy(x, np.sqrt(p.test_loss),  label="Sqrt(test_loss)",  color="black", linewidth=2  )
-        ax.semilogy(x, p.train_err, label="train_maxerr", color="black", linestyle="--", linewidth=0.5)
-        ax.semilogy(x, p.test_err,  label="test_maxerr",  color="black", linestyle="--", linewidth=2  )
-        #ax.legend(frameon=False,fontsize=16)
+        ax.set_title(label, y = 1.0, pad=-14)
+        ax.semilogy(x, np.sqrt(p.train_loss), label="Sqrt(train_loss)", color="blue", linewidth=2)
+        ax.semilogy(x, np.sqrt(p.test_loss),  label="Sqrt(test_loss)",  color="black", linewidth=2)
+        ax.semilogy(x, p.train_err, label="train_maxerr", color="blue", linewidth=0.5)
+        ax.semilogy(x, p.test_err,  label="test_maxerr",  color="black", linewidth=0.5)
+        #ax.legend(frameon=False,fontsize=8)
         
     def plot_error(self):
         plt.clf()
-        fig,axes=plt.subplots(2,3, sharey=False, sharex=True)
+        fig,axes=plt.subplots(2,3, sharey=True, sharex=True)
         plt.subplots_adjust(wspace=0, hspace=0)
         for ax in axes.flatten():
             ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
@@ -58,12 +58,13 @@ class Plotter():
         epochs = len(self.knownData.train_err)
         x = range(epochs)
         
-        self.plot_error_single_frame(axes[0,0], x, self.knownData,    "knownData"   )
-        self.plot_error_single_frame(axes[0,1], x, self.ELN,          "ELN"         )
-        self.plot_error_single_frame(axes[0,2], x, self.unphysical,   "unphysical"  )
-        self.plot_error_single_frame(axes[1,0], x, self.knownData_FS, "knownDataFS" )
-        self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,  "zerofluxfac" )
-        self.plot_error_single_frame(axes[1,2], x, self.oneflavor,    "oneflavor"   )
+        self.plot_error_single_frame(axes[0,0], x, self.knownData,     "known data"         )
+        self.plot_error_single_frame(axes[0,1], x, self.particlenumber,"particle number"    )
+        self.plot_error_single_frame(axes[0,2], x, self.unphysical,    "unphysical"         )
+        self.plot_error_single_frame(axes[1,0], x, self.knownData_FS,  "final stable"       )
+        self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,   "zero fluxfac stable")
+        self.plot_error_single_frame(axes[1,2], x, self.oneflavor,     "one flavor stable"  )
+        axes[0,0].legend(frameon=False,fontsize=8)
 
         axes[1,0].set_xlabel("Epoch")
         axes[1,0].set_ylabel("Error")

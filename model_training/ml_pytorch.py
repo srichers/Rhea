@@ -26,12 +26,12 @@ outfilename = "model"
 # data augmentation options
 do_augment_permutation=True
 do_augment_final_stable = False
-conserve_lepton_number=True
 do_unphysical_check = True
-do_eln_conservation_check = True
+do_particlenumber_conservation_check = True
 do_trivial_stable   = True
 
 # neural network options
+conserve_lepton_number=True
 nhidden = 1
 width = 32
 dropout_probability = 0.5
@@ -155,11 +155,13 @@ print("# Training #")
 print("############")
 p = Plotter(epochs)
 for t in range(epochs):
-    # reset gradients in the optimizer
-    optimizer.optimizer.zero_grad()
 
     # load in a batch of data from the dataset
     for F4i_batch, F4f_batch in dataloader:
+
+        # reset gradients in the optimizer
+        optimizer.optimizer.zero_grad()
+
         # train on making sure the model prediction is correct
         loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
         loss.backward()
@@ -175,9 +177,9 @@ for t in range(epochs):
             loss.backward()
 
         # train on making sure the model prediction is physical
-        if do_eln_conservation_check:
-            F4i_eln = generate_random_F4(batch_size, NF, device)
-            loss = optimizer.train(model, F4i_eln, F4i_eln, ELN_loss_fn)
+        if do_particlenumber_conservation_check:
+            F4i_particlenumber = generate_random_F4(batch_size, NF, device)
+            loss = optimizer.train(model, F4i_particlenumber, F4i_particlenumber, particle_number_loss_fn)
             loss.backward()
 
         # train on making sure known stable distributions dont change
@@ -202,9 +204,11 @@ for t in range(epochs):
     if do_unphysical_check:
         F4i_unphysical = generate_random_F4(batch_size, NF, device)
         p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
-    if do_eln_conservation_check:
-        F4i_eln = generate_random_F4(batch_size, NF, device)
-        p.ELN.test_loss[t],  p.ELN.test_err[t]  = optimizer.test(model, F4i_eln, F4i_eln, ELN_loss_fn)
+    if do_particlenumber_conservation_check:
+        # don't collect error because we are not testing the final state
+        # rather, we are just using the defined loss function to estimate the particle number conservation violation
+        F4i_particlenumber = generate_random_F4(batch_size, NF, device)
+        p.particlenumber.test_loss[t],  _  = optimizer.test(model, F4i_particlenumber, F4i_particlenumber, particle_number_loss_fn)
     if do_trivial_stable:
         F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
         p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
@@ -376,6 +380,7 @@ print("# Plotting the results #")
 print("########################")
 npoints = 11
 nreps = 20
+p.init_plot_options()
 p.plot_nue_nuebar(model, npoints, nreps)
 p.plot_error()
 
