@@ -8,9 +8,8 @@ The model_training folder contains all of the scripts we use to collect data fro
 The file <pre><code>ml_pytorch.py</code></pre> is the main script that creates a trained model. Below are a description of the parameters used:
 
 [filenames]
+* <pre><code>basedir = "/mnt/scratch/srichers/ML_FFI"</code></pre> The working directory. Input data is assumed to lie in a subdirectory called <pre><code>input_data</code></pre>.
 * <pre><code>directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z"]</code></pre> Uses simulated data from each directory in the list.
-* <pre><code>input_filename = "many_sims_database.h5"</code></pre> Uses the file <pre><code>many_sims_database.h5</code></pre> from each of the directories in the directory list.
-* <pre><code>outfilename = "model"</code></pre> Creates two output models (one for CPU and one for GPU) with the names <pre><code>model_cuda.ptc</code></pre> and <pre><code>model_cpu.ptc</code></pre>.
 
 [training]
 * <pre><code>test_size = 0.1</code></pre> 10% of the data is used as the test set. The other 90% is used for training.

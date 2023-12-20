@@ -15,13 +15,12 @@ from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 
-input_filename = "many_sims_database.h5"
+basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
 epochs = 5000
 batch_size = 1000
 print_every = 1
-outfilename = "model"
 
 # data augmentation options
 do_augment_permutation=True
@@ -58,7 +57,7 @@ print("#############################")
 F4_initial_list = []
 F4_final_list = []
 for d in directory_list:
-    f_in = h5py.File(d+"/"+input_filename,"r")
+    f_in = h5py.File(basedir+"/input_data/"+d+"/many_sims_database.h5","r")
     F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
     F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
     NF = int(np.array(f_in["nf"]))
@@ -231,6 +230,7 @@ print()
 print("########################")
 print("# Saving model to file #")
 print("########################")
+outfilename = "model"
 def save_model(model, outfilename, device):
     with torch.no_grad():
         print(F4i_test.shape)
