@@ -59,7 +59,7 @@ class Plotter():
         x = range(epochs)
         
         self.plot_error_single_frame(axes[0,0], x, self.knownData,     "known data"         )
-        self.plot_error_single_frame(axes[0,1], x, self.particlenumber,"particle number"    )
+        self.plot_error_single_frame(axes[0,1], x, self.NSM,           "NSM stable"         )
         self.plot_error_single_frame(axes[0,2], x, self.unphysical,    "unphysical"         )
         self.plot_error_single_frame(axes[1,0], x, self.knownData_FS,  "final stable"       )
         self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,   "zero fluxfac stable")

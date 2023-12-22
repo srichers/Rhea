@@ -18,7 +18,7 @@ from ml_plot import *
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 5000
+epochs = 100
 batch_size = 1000
 print_every = 1
 
@@ -28,6 +28,7 @@ do_augment_final_stable = False
 do_unphysical_check = True
 do_particlenumber_conservation_check = True
 do_trivial_stable   = True
+do_NSM_stable = True
 
 # neural network options
 conserve_lepton_number=True
@@ -89,6 +90,58 @@ F4i_test  = torch.Tensor(F4i_test ).to(device)
 F4f_test  = torch.Tensor(F4f_test ).to(device)
 print("Train:",F4i_train.shape)
 print("Test:",F4i_test.shape)
+
+#=================================================#
+# read in the stable points from the NSM snapshot #
+print()
+print("#############################")
+print("# READING NSM STABLE POINTS #")
+print("#############################")
+# note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
+# take only the y-z slice to limit the size of the data.
+if do_NSM_stable:
+    f_in = h5py.File(basedir+"/input_data/model_rl0_orthonormal.h5","r")
+    discriminant = np.array(f_in["crossing_discriminant"])[100,:,:]
+    # n has shape [Nx,Ny,Nz]]
+    ne = np.array(f_in["n_e(1|ccm)"])[0,:,:]
+    na = np.array(f_in["n_a(1|ccm)"])[0,:,:]
+    nx = np.array(f_in["n_x(1|ccm)"])[0,:,:]
+    # f has shape [3, Nx,Ny,Nz]
+    fe = np.array(f_in["fn_e(1|ccm)"])[:,0,:,:]
+    fa = np.array(f_in["fn_a(1|ccm)"])[:,0,:,:]
+    fx = np.array(f_in["fn_x(1|ccm)"])[:,0,:,:]
+    f_in.close()
+
+    stable_locs = np.where(discriminant<=0)
+    nlocs = len(stable_locs[0])
+    print(nlocs,"points")
+    F4_NSM_stable = np.zeros((nlocs,4,2,NF))
+    F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
+    F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
+    F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
+    for i in range(3):
+        F4_NSM_stable[:,i,0,0  ] = fe[i][stable_locs]
+        F4_NSM_stable[:,i,1,0  ] = fa[i][stable_locs]
+        F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
+
+    # convert into a tensor
+    F4_NSM_stable = torch.tensor(F4_NSM_stable)
+
+    # normalize the data so the number densities add up to 1
+    ntot = ml.ntotal(F4_NSM_stable)
+    F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
+
+    # split into training and testing sets
+    # don't need the final values because they are the same as the initial
+    F4_NSM_train, F4_NSM_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
+
+    if do_augment_permutation:
+        F4_NSM_train = ml.augment_permutation(F4_NSM_train)
+        F4_NSM_test  = ml.augment_permutation(F4_NSM_test )
+
+    # move the array to the device
+    F4_NSM_train = torch.Tensor(F4_NSM_train).to(device)
+    F4_NSM_test  = torch.Tensor(F4_NSM_test ).to(device)
 
 #=======================#
 # instantiate the model #
@@ -169,6 +222,10 @@ for t in range(epochs):
             loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
             loss.backward()
 
+        if do_NSM_stable:
+            loss = optimizer.train(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)
+            loss.backward()
+
         # train on making sure the model prediction is physical
         if do_unphysical_check:
             F4i_unphysical = generate_random_F4(batch_size, NF, device)
@@ -199,7 +256,10 @@ for t in range(epochs):
     p.knownData.train_loss[t], p.knownData.train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
     if do_augment_final_stable:
         p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4f_test,  F4f_test,  comparison_loss_fn)
-        p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)    
+        p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)
+    if do_NSM_stable:
+        p.NSM.test_loss[t],  p.NSM.test_err[t]  = optimizer.test(model, F4_NSM_test,  F4_NSM_test,  comparison_loss_fn)
+        p.NSM.train_loss[t], p.NSM.train_err[t] = optimizer.test(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)    
     if do_unphysical_check:
         F4i_unphysical = generate_random_F4(batch_size, NF, device)
         p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
