@@ -23,7 +23,7 @@ batch_size = 1000
 print_every = 1
 
 # data augmentation options
-do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
+do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = True
 do_unphysical_check = True
 do_particlenumber_conservation_check = True # really doesn't do anything, since it's built into the ML structure
