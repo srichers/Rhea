@@ -32,7 +32,7 @@ do_NSM_stable = True
 
 # neural network options
 conserve_lepton_number=True
-nhidden = 1
+nhidden = 2
 width = 32
 dropout_probability = 0.5
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
