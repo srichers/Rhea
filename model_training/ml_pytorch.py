@@ -35,6 +35,7 @@ conserve_lepton_number=True
 nhidden = 3
 width = 32
 dropout_probability = 0.5
+do_fdotu = False
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
@@ -152,6 +153,7 @@ print("#############################")
 print("# SETTING UP NEURAL NETWORK #")
 print("#############################")
 model = NeuralNetwork(NF,
+                      do_fdotu,
                       nhidden,
                       width,
                       dropout_probability,

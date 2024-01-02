@@ -5,6 +5,7 @@ from ml_tools import dot4
 # define the NN model
 class NeuralNetwork(nn.Module):
     def __init__(self, NF,
+                 do_fdotu,
                  nhidden = 1,
                  width = 4,
                  dropout_probability = 0.5,
@@ -17,7 +18,10 @@ class NeuralNetwork(nn.Module):
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
         self.NX = self.NF * (1 + 2*self.NF)
+        if do_fdotu:
+            self.NX += 2*self.NF
         self.Ny = (2*NF)**2
+        self.do_fdotu = do_fdotu
 
         # put together the layers of the neural network
         modules = []
@@ -82,6 +86,15 @@ class NeuralNetwork(nn.Module):
 
                 X[:,index] = dot4(F1,F2)
                 index += 1
+
+        # add the u dot products
+        if self.do_fdotu:
+            u = torch.zeros((4), device=F4.device)
+            u[3] = 1
+            for a in range(2*self.NF):
+                X[:,index] = dot4(F4_flat[:,:,a], u[None,:])
+                index += 1
+        
         assert(index==self.NX)
         return X
 
