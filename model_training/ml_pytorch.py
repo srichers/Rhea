@@ -24,7 +24,7 @@ print_every = 1
 
 # data augmentation options
 do_augment_permutation=True
-do_augment_final_stable = False
+do_augment_final_stable = True
 do_unphysical_check = True
 do_particlenumber_conservation_check = True
 do_trivial_stable   = True
