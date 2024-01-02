@@ -23,10 +23,10 @@ batch_size = 1000
 print_every = 1
 
 # data augmentation options
-do_augment_permutation=True
+do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = True
 do_unphysical_check = True
-do_particlenumber_conservation_check = True
+do_particlenumber_conservation_check = True # really doesn't do anything, since it's built into the ML structure
 do_trivial_stable   = True
 do_NSM_stable = True
 
@@ -127,7 +127,7 @@ if do_NSM_stable:
         F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
 
     # convert into a tensor
-    F4_NSM_stable = torch.tensor(F4_NSM_stable)
+    F4_NSM_stable = torch.tensor(F4_NSM_stable).float()
 
     # normalize the data so the number densities add up to 1
     ntot = ml.ntotal(F4_NSM_stable)
@@ -179,15 +179,6 @@ test = model.F4_from_y(F4i_train, y_list)
 error = torch.max(torch.abs(test-F4f_train)).item()
 print("max reconstruction error:",error)
 assert(error < 1e-3)
-
-#===================================#
-# Test the neutron star merger data #
-#===================================#
-print()
-print("######################")
-print("# PREPARING NSM DATA #")
-print("######################")
-print("NSM data is useless. Ignoring.")
 
 #=====================================================#
 # Load training data into data loader for minibatches #
@@ -384,7 +375,6 @@ before = torch.Tensor(F4_test[None,:,:,:]).to(device)
 after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 
 print()
-print("Fiducial Simulation")
 print("N initail")
 print(before[0,3])
 
@@ -427,7 +417,6 @@ before = torch.Tensor(F4_test[None,:,:,:]).to(device)
 after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 
 print()
-print("Fiducial Simulation")
 print("N initail")
 print(before[0,3])
 

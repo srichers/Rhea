@@ -59,7 +59,7 @@ def augment_permutation(F4_list):
     nfperm = len(flavor_permutations)
     nperms = nmperm * nfperm
 
-    F4_augmented = torch.zeros((nsims*nperms, 4, 2, NF), device=F4_list.device)
+    F4_augmented = torch.zeros((nsims*nperms, 4, 2, NF), device=F4_list.device).float()
     
     for mi in range(len(matter_permutations)):
         for fi in range(len(flavor_permutations)):
