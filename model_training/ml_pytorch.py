@@ -18,7 +18,7 @@ from ml_plot import *
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 100
+epochs = 500
 batch_size = 1000
 print_every = 1
 
