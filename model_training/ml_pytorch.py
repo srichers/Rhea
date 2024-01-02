@@ -63,6 +63,7 @@ for d in directory_list:
     F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
     NF = int(np.array(f_in["nf"]))
     f_in.close()
+    print(len(F4_initial_list[-1]),"points in",d)
 F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
 F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
 
@@ -211,45 +212,53 @@ for t in range(epochs):
     # load in a batch of data from the dataset
     for F4i_batch, F4f_batch in dataloader:
 
-        # reset gradients in the optimizer
-        optimizer.optimizer.zero_grad()
-
         # train on making sure the model prediction is correct
+        optimizer.optimizer.zero_grad()
         loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
         loss.backward()
+        optimizer.optimizer.step()
 
         if do_augment_final_stable:
+            optimizer.optimizer.zero_grad()
             loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
             loss.backward()
+            optimizer.optimizer.step()
 
         if do_NSM_stable:
+            optimizer.optimizer.zero_grad()
             loss = optimizer.train(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)
             loss.backward()
+            optimizer.optimizer.step()
 
         # train on making sure the model prediction is physical
         if do_unphysical_check:
+            optimizer.optimizer.zero_grad()
             F4i_unphysical = generate_random_F4(batch_size, NF, device)
             loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn)
             loss.backward()
+            optimizer.optimizer.step()
 
         # train on making sure the model prediction is physical
         if do_particlenumber_conservation_check:
+            optimizer.optimizer.zero_grad()
             F4i_particlenumber = generate_random_F4(batch_size, NF, device)
             loss = optimizer.train(model, F4i_particlenumber, F4i_particlenumber, particle_number_loss_fn)
             loss.backward()
+            optimizer.optimizer.step()
 
         # train on making sure known stable distributions dont change
         if do_trivial_stable:
+            optimizer.optimizer.zero_grad()
             F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
             loss = optimizer.train(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
             loss.backward()
+            optimizer.optimizer.step()
 
+            optimizer.optimizer.zero_grad()
             F4i_1f = generate_stable_F4_oneflavor(batch_size, NF, device)
             loss = optimizer.train(model, F4i_1f, F4i_1f, comparison_loss_fn)
             loss.backward()
-
-        # update the weights
-        optimizer.optimizer.step()
+            optimizer.optimizer.step()
 
     # Evaluate training errors
     p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
