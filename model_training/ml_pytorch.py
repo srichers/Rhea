@@ -6,20 +6,19 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 from torch import nn
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import ml_tools as ml
-import torchviz
 from ml_loss import *
 from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
+from ml_trainmodel import *
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
 epochs = 500
-batch_size = 1000
+batch_size = -1
+dataset_size_list = [2,10,100,1000,-1]
 print_every = 1
 
 # data augmentation options
@@ -99,6 +98,8 @@ print()
 print("#############################")
 print("# READING NSM STABLE POINTS #")
 print("#############################")
+F4_NSM_train = None
+F4_NSM_test = None
 # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
 # take only the y-z slice to limit the size of the data.
 if do_NSM_stable:
@@ -180,113 +181,46 @@ error = torch.max(torch.abs(test-F4f_train)).item()
 print("max reconstruction error:",error)
 assert(error < 1e-3)
 
-#=====================================================#
-# Load training data into data loader for minibatches #
-#=====================================================#
-print()
-print("###########################################")
-print("# LOADING TRAINING DATA INTO DATA LOADERS #")
-print("###########################################")
-dataset = torch.utils.data.TensorDataset(F4i_train, F4f_train)
-batch_size = max(batch_size, len(dataset))
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
-print("batchsize=",batch_size)
+print("######################")
+print("# Training the model #")
+print("######################")
+plotter_array = []
+for dataset_size in dataset_size_list:
+    print("Training dataset size:",dataset_size)
+    model, p = train_model(NF,
+                   do_fdotu,
+                   nhidden,
+                   width,
+                   dropout_probability,
+                   activation,
+                   op,
+                   weight_decay,
+                   learning_rate,
+                   epochs,
+                   batch_size,
+                   dataset_size,
+                   print_every,
+                   device,
+                   conserve_lepton_number,
+                   do_augment_final_stable,
+                   do_NSM_stable,
+                   do_unphysical_check,
+                   do_particlenumber_conservation_check,
+                   do_trivial_stable,
+                   comparison_loss_fn,
+                   unphysical_loss_fn,
+                   particle_number_loss_fn,
+                   F4i_train,
+                   F4f_train,
+                   F4i_test,
+                   F4f_test,
+                   F4_NSM_train,
+                   F4_NSM_test)
+    plotter_array.append(p)
 
-#===============#
-# training loop #
-#===============#
-print()
-print("############")
-print("# Training #")
-print("############")
-p = Plotter(epochs)
-for t in range(epochs):
-
-    # load in a batch of data from the dataset
-    for F4i_batch, F4f_batch in dataloader:
-
-        # train on making sure the model prediction is correct
-        optimizer.optimizer.zero_grad()
-        loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
-        loss.backward()
-        optimizer.optimizer.step()
-
-        if do_augment_final_stable:
-            optimizer.optimizer.zero_grad()
-            loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
-            loss.backward()
-            optimizer.optimizer.step()
-
-        if do_NSM_stable:
-            optimizer.optimizer.zero_grad()
-            loss = optimizer.train(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)
-            loss.backward()
-            optimizer.optimizer.step()
-
-        # train on making sure the model prediction is physical
-        if do_unphysical_check:
-            optimizer.optimizer.zero_grad()
-            F4i_unphysical = generate_random_F4(batch_size, NF, device)
-            loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn)
-            loss.backward()
-            optimizer.optimizer.step()
-
-        # train on making sure the model prediction is physical
-        if do_particlenumber_conservation_check:
-            optimizer.optimizer.zero_grad()
-            F4i_particlenumber = generate_random_F4(batch_size, NF, device)
-            loss = optimizer.train(model, F4i_particlenumber, F4i_particlenumber, particle_number_loss_fn)
-            loss.backward()
-            optimizer.optimizer.step()
-
-        # train on making sure known stable distributions dont change
-        if do_trivial_stable:
-            optimizer.optimizer.zero_grad()
-            F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
-            loss = optimizer.train(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
-            loss.backward()
-            optimizer.optimizer.step()
-
-            optimizer.optimizer.zero_grad()
-            F4i_1f = generate_stable_F4_oneflavor(batch_size, NF, device)
-            loss = optimizer.train(model, F4i_1f, F4i_1f, comparison_loss_fn)
-            loss.backward()
-            optimizer.optimizer.step()
-
-    # Evaluate training errors
-    p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
-    p.knownData.train_loss[t], p.knownData.train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
-    if do_augment_final_stable:
-        p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4f_test,  F4f_test,  comparison_loss_fn)
-        p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)
-    if do_NSM_stable:
-        p.NSM.test_loss[t],  p.NSM.test_err[t]  = optimizer.test(model, F4_NSM_test,  F4_NSM_test,  comparison_loss_fn)
-        p.NSM.train_loss[t], p.NSM.train_err[t] = optimizer.test(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)    
-    if do_unphysical_check:
-        F4i_unphysical = generate_random_F4(batch_size, NF, device)
-        p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
-    if do_particlenumber_conservation_check:
-        # don't collect error because we are not testing the final state
-        # rather, we are just using the defined loss function to estimate the particle number conservation violation
-        F4i_particlenumber = generate_random_F4(batch_size, NF, device)
-        p.particlenumber.test_loss[t],  _  = optimizer.test(model, F4i_particlenumber, F4i_particlenumber, particle_number_loss_fn)
-    if do_trivial_stable:
-        F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
-        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
-        F4i_1f = generate_stable_F4_oneflavor(batch_size, NF, device)
-        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i_1f, F4i_1f, comparison_loss_fn)
-    
-    # report max error
-    if((t+1)%print_every==0):
-        print(f"Epoch {t+1}")
-        print("Train max error:", p.knownData.train_err[t])
-        print("Test max error:",  p.knownData.test_err[t])
-        print("Train loss:",      p.knownData.train_loss[t])
-        print("Test loss:",       p.knownData.test_loss[t])
-        print()
-
-print("Done!")
-
+# use the largest dataset size for the rest of these metrics
+p = plotter_array[-1]
+ 
 # save the model to file
 print()
 print("########################")
@@ -417,7 +351,7 @@ before = torch.Tensor(F4_test[None,:,:,:]).to(device)
 after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 
 print()
-print("N initail")
+print("N initial")
 print(before[0,3])
 
 print("N predicted")
@@ -444,4 +378,20 @@ p.init_plot_options()
 p.plot_nue_nuebar(model, npoints, nreps)
 p.plot_error()
 
+# plot the loss as a function of dataset size using the array of plotters
+train_loss = np.array([p.knownData.train_loss[-1] for p in plotter_array])
+test_loss  = np.array([p.knownData.test_loss[-1]  for p in plotter_array])
+xvals = np.array(dataset_size_list)
+xvals[np.where(xvals==-1)] = F4i_train.shape[0]
+
+plt.clf()
+fig,ax=plt.subplots(1,1)
+ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
+ax.minorticks_on()
+plt.plot(xvals, np.sqrt(train_loss), label="train")
+plt.plot(xvals, np.sqrt(test_loss),  label="test")
+plt.legend(frameon=False)
+plt.xlabel("Dataset size")
+plt.ylabel("Error")
+plt.savefig("dataset_size.pdf",bbox_inches="tight")
 
