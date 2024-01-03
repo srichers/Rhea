@@ -16,32 +16,32 @@ from ml_trainmodel import *
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 500
+epochs = 50 # 500
 batch_size = -1
-dataset_size_list = [2,10,100,1000,-1]
-print_every = 1
+dataset_size_list = [1] #[2,10,100,1000,-1]
+print_every = 10
 
 # data augmentation options
 do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
-do_augment_final_stable = True
-do_unphysical_check = True
-do_particlenumber_conservation_check = True # really doesn't do anything, since it's built into the ML structure
-do_trivial_stable   = True
-do_NSM_stable = True
+do_augment_final_stable = False # True
+do_unphysical_check = False # True
+do_particlenumber_conservation_check = False # True really doesn't do anything, since it's built into the ML structure
+do_trivial_stable   = False # True
+do_NSM_stable = False # True
 
 # neural network options
 conserve_lepton_number=True
-nhidden = 3
-width = 32
-dropout_probability = 0.5
-do_batchnorm = True
+nhidden = 1 # 3
+width = 8 # 32
+dropout_probability = 0 # 0.5
+do_batchnorm = False # True
 do_fdotu = False
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
-op = torch.optim.Adam # Adam, SGD, RMSprop
-weight_decay = 1e-4
-learning_rate = 1e-3
+op = torch.optim.SGD # Adam, SGD, RMSprop
+weight_decay = 0 #1e-4
+learning_rate = 1e2 # 1e-3
 
 #========================#
 # use a GPU if available #
@@ -183,6 +183,7 @@ error = torch.max(torch.abs(test-F4f_train)).item()
 print("max reconstruction error:",error)
 assert(error < 1e-3)
 
+print()
 print("######################")
 print("# Training the model #")
 print("######################")
@@ -244,6 +245,9 @@ save_model(model, outfilename, "cpu")
 if device=="cuda":
     save_model(model, outfilename, "cuda")
 
+# set model to evaluation mode
+model.eval()
+
 #===================================#
 # Test one point from training data #
 #===================================#
@@ -263,11 +267,13 @@ print("N predicted")
 after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
-print("N re-predicted")
-after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
-print(after[0,3])
+#print("N re-predicted")
+#after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+#print(after[0,3])
 
 print()
+print("loss = ",comparison_loss_fn(model, after, F4f_train[0:1,:,:,:]).item())
+print("error = ",torch.max(torch.abs(after - F4f_train[0:1,:,:,:])).item())
 check_conservation(before,after)
 
 #===================================#
@@ -289,11 +295,13 @@ print("N predicted")
 after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
 print(after[0,3])
 
-print("N re-predicted")
-after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
-print(after[0,3])
+#print("N re-predicted")
+#after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+#print(after[0,3])
 
 print()
+print("loss = ",comparison_loss_fn(model, after, F4f_train[0:1,:,:,:]).item())
+print("error = ",torch.max(torch.abs(after - F4f_train[0:1,:,:,:])).item())
 check_conservation(before,after)
 
 #=====================================#
