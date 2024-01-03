@@ -34,6 +34,7 @@ conserve_lepton_number=True
 nhidden = 3
 width = 32
 dropout_probability = 0.5
+do_batchnorm = True
 do_fdotu = False
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
@@ -158,7 +159,8 @@ model = NeuralNetwork(NF,
                       nhidden,
                       width,
                       dropout_probability,
-                      activation).to(device)
+                      activation,
+                      do_batchnorm).to(device)
 optimizer = Optimizer(model,
                       op,
                       weight_decay,
@@ -192,6 +194,7 @@ for dataset_size in dataset_size_list:
                    nhidden,
                    width,
                    dropout_probability,
+                   do_batchnorm,
                    activation,
                    op,
                    weight_decay,

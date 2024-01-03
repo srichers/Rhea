@@ -5,11 +5,11 @@ from ml_generate import *
 
 class Optimizer():
     def __init__(self, model,
-                 op = torch.optim.Adam, # Adam, SGD, RMSprop
-                 weight_decay = 1e-5,
-                 learning_rate = 1e-2,
-                 device = torch.device("cpu"),
-                 conserve_lepton_number=False
+                 op, # Adam, SGD, RMSprop
+                 weight_decay,
+                 learning_rate,
+                 device,
+                 conserve_lepton_number
                  ): 
         self.NF = model.NF
         self.optimizer = op(model.parameters(), weight_decay=weight_decay, lr=learning_rate)

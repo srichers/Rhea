@@ -6,10 +6,11 @@ from ml_tools import dot4
 class NeuralNetwork(nn.Module):
     def __init__(self, NF,
                  do_fdotu,
-                 nhidden = 1,
-                 width = 4,
-                 dropout_probability = 0.5,
-                 activation = nn.ReLU):
+                 nhidden,
+                 width,
+                 dropout_probability,
+                 activation,
+                 do_batchnorm):
         super().__init__()
 
         # store input arguments
@@ -32,9 +33,11 @@ class NeuralNetwork(nn.Module):
             modules.append(activation())
             for i in range(nhidden):
                 modules.append(nn.Linear(width,width))
-                modules.append(nn.BatchNorm1d(width))
+                if do_batchnorm:
+                    modules.append(nn.BatchNorm1d(width))
                 modules.append(activation())
-                modules.append(nn.Dropout(dropout_probability))
+                if dropout_probability > 0:
+                    modules.append(nn.Dropout(dropout_probability))
             modules.append(nn.Linear(width, self.Ny))
         self.linear_activation_stack = nn.Sequential(*modules)
         
