@@ -62,7 +62,9 @@ def train_model(NF,
         batch_size = dataset_size
     assert(dataset_size <= F4i_train.shape[0])
     assert(batch_size <= dataset_size)
-    dataset = torch.utils.data.TensorDataset(F4i_train[:dataset_size], F4f_train[:dataset_size])
+    F4i_train = F4i_train[:dataset_size]
+    F4f_train = F4f_train[:dataset_size]
+    dataset = torch.utils.data.TensorDataset(F4i_train, F4f_train)
     batch_size = max(batch_size, len(dataset))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print("batchsize=",batch_size)
@@ -150,10 +152,10 @@ def train_model(NF,
         # report max error
         if((t+1)%print_every==0):
             print(f"Epoch {t+1}")
-            print("Train max error:", p.knownData.train_err[t])
-            print("Test max error:",  p.knownData.test_err[t])
             print("Train loss:",      p.knownData.train_loss[t])
             print("Test loss:",       p.knownData.test_loss[t])
+            print("Train max error:", p.knownData.train_err[t])
+            print("Test max error:",  p.knownData.test_err[t])
             print()
 
     return model, p
