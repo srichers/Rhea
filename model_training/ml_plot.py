@@ -46,11 +46,18 @@ class Plotter():
         ax.semilogy(x, p.train_err, label="train_maxerr", color="blue", linewidth=0.5)
         ax.semilogy(x, p.test_err,  label="test_maxerr",  color="black", linewidth=0.5)
 
+        def set_nonzero_minmax(ymin, ymax, ylist):
+            nonzero_values = ylist[np.where(ylist>0)]
+            if len(nonzero_values) > 0:
+                ymin = min(ymin, nonzero_values.min())
+                ymax = max(ymax, nonzero_values.max())
+            return ymin, ymax
+
         # return the minimum and maximum values of all four curves
-        this_ymin = min(np.sqrt(p.train_loss).min(), np.sqrt(p.test_loss).min(), p.train_err.min(), p.test_err.min())
-        this_ymax = max(np.sqrt(p.train_loss).max(), np.sqrt(p.test_loss).max(), p.train_err.max(), p.test_err.max())
-        ymin = min(ymin, this_ymin) if this_ymin > 0 else ymin
-        ymax = max(ymax, this_ymax) if this_ymax > 0 else ymax
+        ymin, ymax = set_nonzero_minmax(ymin, ymax, np.sqrt(p.train_loss))
+        ymin, ymax = set_nonzero_minmax(ymin, ymax, np.sqrt(p.test_loss))
+        ymin, ymax = set_nonzero_minmax(ymin, ymax, p.train_err)
+        ymin, ymax = set_nonzero_minmax(ymin, ymax, p.test_err)
         return ymin, ymax
         
     def plot_error(self):
