@@ -50,8 +50,6 @@ def train_model(NF,
                           learning_rate,
                           device,
                           conserve_lepton_number=conserve_lepton_number)
-    print(model)
-
 
     #=====================================================#
     # Load training data into data loader for minibatches #
