@@ -16,7 +16,7 @@ from ml_trainmodel import *
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 500
+epochs = 1000
 batch_size = -1
 dataset_size_list = [2,10,100,1000,-1]
 print_every = 10
@@ -32,10 +32,10 @@ do_NSM_stable = False # True
 # neural network options
 conserve_lepton_number=True
 nhidden = 1 # 3
-width = 8 # 32
+width = 16 # 32
 dropout_probability = 0 # 0.5
 do_batchnorm = False # True
-do_fdotu = False
+do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
