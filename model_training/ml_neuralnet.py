@@ -24,21 +24,37 @@ class NeuralNetwork(nn.Module):
         self.Ny = (2*NF)**2
         self.do_fdotu = do_fdotu
 
+        # append a full layer including linear, activation, and batchnorm
+        def append_full_layer(modules, in_dim, out_dim):
+            modules.append(nn.Linear(in_dim, out_dim))
+            if do_batchnorm:
+                modules.append(nn.BatchNorm1d(out_dim))
+            modules.append(activation())
+            if dropout_probability > 0:
+                modules.append(nn.Dropout(dropout_probability))
+            return modules
+
+
         # put together the layers of the neural network
         modules = []
         if nhidden==0:
+
+            # just stupid linear regression
             modules.append(nn.Linear(self.NX, self.Ny))
+
         else:
-            modules.append(nn.Linear(self.NX, width))
-            modules.append(activation())
+
+            # set up input layer
+            modules = append_full_layer(modules, self.NX, width)
+
+            # set up hidden layers
             for i in range(nhidden):
-                modules.append(nn.Linear(width,width))
-                if do_batchnorm:
-                    modules.append(nn.BatchNorm1d(width))
-                modules.append(activation())
-                if dropout_probability > 0:
-                    modules.append(nn.Dropout(dropout_probability))
+                modules = append_full_layer(modules, width, width)
+
+            # set up final layer
             modules.append(nn.Linear(width, self.Ny))
+
+        # turn the list of modules into a sequential model
         self.linear_activation_stack = nn.Sequential(*modules)
         
         # initialize the weights
