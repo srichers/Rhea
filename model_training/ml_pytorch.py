@@ -26,12 +26,12 @@ do_augment_permutation=False # this is the most expensive option to make true, a
 do_augment_final_stable = False # True
 do_unphysical_check = True # True - seems to help prevent crazy results
 do_particlenumber_conservation_check = False # True really doesn't do anything, since it's built into the ML structure
-do_trivial_stable   = False # True
+do_trivial_stable   = True # True
 do_NSM_stable = False # True
 
 # neural network options
 conserve_lepton_number=True
-nhidden = 5 # 3
+nhidden = 5
 width = 256
 dropout_probability = 0 # 0.5
 do_batchnorm = False # False - Seems to make things worse
