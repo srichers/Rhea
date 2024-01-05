@@ -24,7 +24,7 @@ print_every = 10
 # data augmentation options
 do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = False # True
-do_unphysical_check = True # True
+do_unphysical_check = True # True - seems to help prevent crazy results
 do_particlenumber_conservation_check = False # True really doesn't do anything, since it's built into the ML structure
 do_trivial_stable   = False # True
 do_NSM_stable = False # True
@@ -32,9 +32,9 @@ do_NSM_stable = False # True
 # neural network options
 conserve_lepton_number=True
 nhidden = 5 # 3
-width = 128 # 32
+width = 256
 dropout_probability = 0 # 0.5
-do_batchnorm = False # True
+do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
