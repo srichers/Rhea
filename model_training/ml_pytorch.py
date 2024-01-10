@@ -19,7 +19,7 @@ test_size = 0.1
 epochs = 1000
 batch_size = -1
 dataset_size_list = [2,10,100,1000,3200] # -1 means use all the data
-n_generate = 100
+n_generate = 1000
 print_every = 10
 
 # data augmentation options
