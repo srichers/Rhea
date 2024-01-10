@@ -16,9 +16,9 @@ from ml_trainmodel import *
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 1000
+epochs = 5000
 batch_size = -1
-dataset_size_list = [2,10,100,1000,-1]
+dataset_size_list = [2,10,100,1000,3200] # -1 means use all the data
 print_every = 10
 
 # data augmentation options
@@ -32,8 +32,8 @@ do_NSM_stable = False # True
 # neural network options
 conserve_lepton_number=True
 nhidden = 5
-width = 256
-dropout_probability = 0 # 0.5
+width = 1024
+dropout_probability = 0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU

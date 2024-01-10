@@ -54,6 +54,9 @@ class NeuralNetwork(nn.Module):
             # set up final layer
             modules.append(nn.Linear(width, self.Ny))
 
+            # apply tanh to limit outputs to be from -1 to 1 to limit the amount of craziness possible
+            modules.append(nn.Tanh())
+
         # turn the list of modules into a sequential model
         self.linear_activation_stack = nn.Sequential(*modules)
         
