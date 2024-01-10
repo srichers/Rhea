@@ -16,7 +16,7 @@ from ml_trainmodel import *
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 1000
+epochs = 500
 batch_size = -1
 dataset_size_list = [2,10,100,1000,3200] # -1 means use all the data
 n_generate = 1000
@@ -40,7 +40,7 @@ activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
-weight_decay = 0 #1e-4
+weight_decay = 1e-5
 learning_rate = 1e-3 # 1e-3
 
 #========================#
