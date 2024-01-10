@@ -19,7 +19,6 @@ class Plotter():
         self.oneflavor      = PlotQuantities(epochs)
         self.unphysical     = PlotQuantities(epochs)
         self.NSM            = PlotQuantities(epochs)
-        self.particlenumber = PlotQuantities(epochs)
 
     def init_plot_options(self):
         #==============#

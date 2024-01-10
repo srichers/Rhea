@@ -16,6 +16,7 @@ def train_model(NF,
                 learning_rate,
                 epochs,
                 batch_size,
+                n_generate,
                 dataset_size,
                 print_every,
                 device,
@@ -23,11 +24,9 @@ def train_model(NF,
                 do_augment_final_stable,
                 do_NSM_stable,
                 do_unphysical_check,
-                do_particlenumber_conservation_check,
                 do_trivial_stable,
                 comparison_loss_fn,
                 unphysical_loss_fn,
-                particle_number_loss_fn,
                 F4i_train,
                 F4f_train,
                 F4i_test,
@@ -93,23 +92,17 @@ def train_model(NF,
 
             # train on making sure the model prediction is physical
             if do_unphysical_check:
-                F4i_unphysical = generate_random_F4(batch_size, NF, device)
+                F4i_unphysical = generate_random_F4(n_generate, NF, device)
                 loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn)
-                loss.backward()
-
-            # train on making sure the model prediction is physical
-            if do_particlenumber_conservation_check:
-                F4i_particlenumber = generate_random_F4(batch_size, NF, device)
-                loss = optimizer.train(model, F4i_particlenumber, F4i_particlenumber, particle_number_loss_fn)
                 loss.backward()
 
             # train on making sure known stable distributions dont change
             if do_trivial_stable:
-                F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
+                F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
                 loss = optimizer.train(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
                 loss.backward()
 
-                F4i_1f = generate_stable_F4_oneflavor(batch_size, NF, device)
+                F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
                 loss = optimizer.train(model, F4i_1f, F4i_1f, comparison_loss_fn)
                 loss.backward()
 
@@ -126,17 +119,12 @@ def train_model(NF,
             p.NSM.test_loss[t],  p.NSM.test_err[t]  = optimizer.test(model, F4_NSM_test,  F4_NSM_test,  comparison_loss_fn)
             p.NSM.train_loss[t], p.NSM.train_err[t] = optimizer.test(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)    
         if do_unphysical_check:
-            F4i_unphysical = generate_random_F4(batch_size, NF, device)
+            F4i_unphysical = generate_random_F4(n_generate, NF, device)
             p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
-        if do_particlenumber_conservation_check:
-            # don't collect error because we are not testing the final state
-            # rather, we are just using the defined loss function to estimate the particle number conservation violation
-            F4i_particlenumber = generate_random_F4(batch_size, NF, device)
-            p.particlenumber.test_loss[t],  _  = optimizer.test(model, F4i_particlenumber, F4i_particlenumber, particle_number_loss_fn)
         if do_trivial_stable:
-            F4i_0ff = generate_stable_F4_zerofluxfac(batch_size, NF, device)
+            F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
             p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
-            F4i_1f = generate_stable_F4_oneflavor(batch_size, NF, device)
+            F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
             p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i_1f, F4i_1f, comparison_loss_fn)
 
         # report max error

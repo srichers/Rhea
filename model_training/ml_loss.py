@@ -18,10 +18,3 @@ def unphysical_loss_fn(model, F4f_pred, F4f_true):
 
     # total conservation loss
     return negative_density_loss + fluxfac_loss
-
-# enforce conservation of particle number
-# inputs are indexed as [sim, xyzt, nu/nubar, flavor]
-def particle_number_loss_fn(model, F4f, F4i):
-    PNi = torch.sum(F4i[:,3,:,:], axis=2)
-    PNf = torch.sum(F4f[:,3,:,:], axis=2)
-    return torch.nn.MSELoss(reduction='mean')(PNi, PNf)

@@ -16,16 +16,16 @@ from ml_trainmodel import *
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
 test_size = 0.1
-epochs = 5000
+epochs = 1000
 batch_size = -1
 dataset_size_list = [2,10,100,1000,3200] # -1 means use all the data
+n_generate = 100
 print_every = 10
 
 # data augmentation options
 do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = False # True
 do_unphysical_check = True # True - seems to help prevent crazy results
-do_particlenumber_conservation_check = False # True really doesn't do anything, since it's built into the ML structure
 do_trivial_stable   = True # True
 do_NSM_stable = False # True
 
@@ -202,6 +202,7 @@ for dataset_size in dataset_size_list:
                    learning_rate,
                    epochs,
                    batch_size,
+                   n_generate,
                    dataset_size,
                    print_every,
                    device,
@@ -209,11 +210,9 @@ for dataset_size in dataset_size_list:
                    do_augment_final_stable,
                    do_NSM_stable,
                    do_unphysical_check,
-                   do_particlenumber_conservation_check,
                    do_trivial_stable,
                    comparison_loss_fn,
                    unphysical_loss_fn,
-                   particle_number_loss_fn,
                    F4i_train,
                    F4f_train,
                    F4i_test,
