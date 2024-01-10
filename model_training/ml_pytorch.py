@@ -18,7 +18,7 @@ directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","f
 test_size = 0.1
 epochs = 500
 batch_size = -1
-dataset_size_list = [2,10,100,1000,3200] # -1 means use all the data
+dataset_size_list = [10,100,1000,3200] # -1 means use all the data
 n_generate = 1000
 print_every = 10
 
@@ -103,49 +103,42 @@ F4_NSM_train = None
 F4_NSM_test = None
 # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
 # take only the y-z slice to limit the size of the data.
-if do_NSM_stable:
-    f_in = h5py.File(basedir+"/input_data/model_rl0_orthonormal.h5","r")
-    discriminant = np.array(f_in["crossing_discriminant"])[100,:,:]
-    # n has shape [Nx,Ny,Nz]]
-    ne = np.array(f_in["n_e(1|ccm)"])[0,:,:]
-    na = np.array(f_in["n_a(1|ccm)"])[0,:,:]
-    nx = np.array(f_in["n_x(1|ccm)"])[0,:,:]
-    # f has shape [3, Nx,Ny,Nz]
-    fe = np.array(f_in["fn_e(1|ccm)"])[:,0,:,:]
-    fa = np.array(f_in["fn_a(1|ccm)"])[:,0,:,:]
-    fx = np.array(f_in["fn_x(1|ccm)"])[:,0,:,:]
-    f_in.close()
-
-    stable_locs = np.where(discriminant<=0)
-    nlocs = len(stable_locs[0])
-    print(nlocs,"points")
-    F4_NSM_stable = np.zeros((nlocs,4,2,NF))
-    F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
-    F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
-    F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
-    for i in range(3):
-        F4_NSM_stable[:,i,0,0  ] = fe[i][stable_locs]
-        F4_NSM_stable[:,i,1,0  ] = fa[i][stable_locs]
-        F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
-
-    # convert into a tensor
-    F4_NSM_stable = torch.tensor(F4_NSM_stable).float()
-
-    # normalize the data so the number densities add up to 1
-    ntot = ml.ntotal(F4_NSM_stable)
-    F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
-
-    # split into training and testing sets
-    # don't need the final values because they are the same as the initial
-    F4_NSM_train, F4_NSM_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
-
-    if do_augment_permutation:
-        F4_NSM_train = ml.augment_permutation(F4_NSM_train)
-        F4_NSM_test  = ml.augment_permutation(F4_NSM_test )
-
-    # move the array to the device
-    F4_NSM_train = torch.Tensor(F4_NSM_train).to(device)
-    F4_NSM_test  = torch.Tensor(F4_NSM_test ).to(device)
+f_in = h5py.File(basedir+"/input_data/model_rl0_orthonormal.h5","r")
+discriminant = np.array(f_in["crossing_discriminant"])[100,:,:]
+# n has shape [Nx,Ny,Nz]]
+ne = np.array(f_in["n_e(1|ccm)"])[0,:,:]
+na = np.array(f_in["n_a(1|ccm)"])[0,:,:]
+nx = np.array(f_in["n_x(1|ccm)"])[0,:,:]
+# f has shape [3, Nx,Ny,Nz]
+fe = np.array(f_in["fn_e(1|ccm)"])[:,0,:,:]
+fa = np.array(f_in["fn_a(1|ccm)"])[:,0,:,:]
+fx = np.array(f_in["fn_x(1|ccm)"])[:,0,:,:]
+f_in.close()
+stable_locs = np.where(discriminant<=0)
+nlocs = len(stable_locs[0])
+print(nlocs,"points")
+F4_NSM_stable = np.zeros((nlocs,4,2,NF))
+F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
+F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
+F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
+for i in range(3):
+    F4_NSM_stable[:,i,0,0  ] = fe[i][stable_locs]
+    F4_NSM_stable[:,i,1,0  ] = fa[i][stable_locs]
+    F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
+# convert into a tensor
+F4_NSM_stable = torch.tensor(F4_NSM_stable).float()
+# normalize the data so the number densities add up to 1
+ntot = ml.ntotal(F4_NSM_stable)
+F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
+# split into training and testing sets
+# don't need the final values because they are the same as the initial
+F4_NSM_train, F4_NSM_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
+if do_augment_permutation:
+    F4_NSM_train = ml.augment_permutation(F4_NSM_train)
+    F4_NSM_test  = ml.augment_permutation(F4_NSM_test )
+# move the array to the device
+F4_NSM_train = torch.Tensor(F4_NSM_train).to(device)
+F4_NSM_test  = torch.Tensor(F4_NSM_test ).to(device)
 
 #=======================#
 # instantiate the model #
