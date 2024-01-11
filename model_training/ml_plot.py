@@ -9,6 +9,18 @@ class PlotQuantities():
         self.train_err  = np.zeros(epochs)
         self.test_loss  = np.zeros(epochs)
         self.test_err   = np.zeros(epochs)
+
+    # second initializer that will create all of the same quantities,
+    # but will also accept a plotquantities object of a smaller size
+    # and fill in the values from that plotquantities object
+    def fill_from_plotquantities(self, plotquantities):
+        n_fill_values = len(plotquantities.train_loss)
+        assert(len(self.train_loss) > n_fill_values)
+
+        self.train_loss[:n_fill_values] = plotquantities.train_loss
+        self.train_err[ :n_fill_values] = plotquantities.train_err
+        self.test_loss[ :n_fill_values] = plotquantities.test_loss
+        self.test_err[  :n_fill_values] = plotquantities.test_err
     
 
 class Plotter():
@@ -19,6 +31,16 @@ class Plotter():
         self.oneflavor      = PlotQuantities(epochs)
         self.unphysical     = PlotQuantities(epochs)
         self.NSM            = PlotQuantities(epochs)
+
+    # second initializer that will create all of the same quantities, but will also accept a plotter object as an argument
+    # and fill in the values from that plotter object
+    def fill_from_plotter(self, plotter):
+        self.knownData.fill_from_plotquantities(plotter.knownData)
+        self.knownData_FS.fill_from_plotquantities(plotter.knownData_FS)
+        self.zerofluxfac.fill_from_plotquantities(plotter.zerofluxfac)
+        self.oneflavor.fill_from_plotquantities(plotter.oneflavor)
+        self.unphysical.fill_from_plotquantities(plotter.unphysical)
+        self.NSM.fill_from_plotquantities(plotter.NSM)
 
     def init_plot_options(self):
         #==============#
