@@ -17,7 +17,7 @@ import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
-do_unpickle = True
+do_unpickle = False
 test_size = 0.1
 epochs = 500
 batch_size = -1
