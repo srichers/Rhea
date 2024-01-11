@@ -48,24 +48,24 @@ def train_model(model,
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print("batchsize=",batch_size)
 
-    # generate randomized data and evaluate the test error
-    F4i_unphysical_test = generate_random_F4(n_generate, NF, device)
-    F4i_0ff_test = generate_stable_F4_zerofluxfac(n_generate, NF, device)
-    F4i_1f_test = generate_stable_F4_oneflavor(n_generate, NF, device)
-
     #===============#
     # training loop #
     #===============#
     epochs_already_done = len(plotter.knownData.train_loss)
     for t in range(epochs_already_done, epochs):
 
+        # generate randomized data and evaluate the test error
+        F4i_unphysical = generate_random_F4(n_generate, NF, device)
+        F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
+        F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
+
         # log the test error
         p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
         p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4f_test,  F4f_test,  comparison_loss_fn)
         p.NSM.test_loss[t],  p.NSM.test_err[t]  = optimizer.test(model, F4_NSM_test,  F4_NSM_test,  comparison_loss_fn)
-        p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical_test, None, unphysical_loss_fn)
-        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i_0ff_test, F4i_0ff_test, comparison_loss_fn)
-        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i_1f_test, F4i_1f_test, comparison_loss_fn)
+        p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
+        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
+        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i_1f, F4i_1f, comparison_loss_fn)
 
 
         # load in a batch of data from the dataset
@@ -114,14 +114,11 @@ def train_model(model,
             print(f"Epoch {t+1}")
             print("Train loss:",      p.knownData.train_loss[t])
             print("Test loss:",       p.knownData.test_loss[t])
-            if do_augment_final_stable:
-                print("Test FS loss:",       p.knownData_FS.test_loss[t])
+            print("Test FS loss:",       p.knownData_FS.test_loss[t])
             print("Test NSM loss:",       p.NSM.test_loss[t])
-            if do_unphysical_check:
-                print("Test unphysical loss:",       p.unphysical.test_loss[t])
-            if do_trivial_stable:
-                print("Test zerofluxfac loss:",       p.zerofluxfac.test_loss[t])
-                print("Test oneflavor loss:",       p.oneflavor.test_loss[t])
+            print("Test unphysical loss:",       p.unphysical.test_loss[t])
+            print("Test zerofluxfac loss:",       p.zerofluxfac.test_loss[t])
+            print("Test oneflavor loss:",       p.oneflavor.test_loss[t])
             
             print()
 
