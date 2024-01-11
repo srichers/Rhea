@@ -400,7 +400,7 @@ npoints = 11
 nreps = 20
 p.init_plot_options()
 p.plot_nue_nuebar(model, npoints, nreps)
-p.plot_error()
+p.plot_error(ymin=1e-5)
 
 # plot the loss as a function of dataset size using the array of plotters
 train_loss = np.array([p.knownData.train_loss[-1] for p in plotter_array])

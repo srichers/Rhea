@@ -88,7 +88,7 @@ class Plotter():
         ax.semilogy(x, p.train_err, label="train_maxerr", color="blue", linewidth=0.5)
         ax.semilogy(x, p.test_err,  label="test_maxerr",  color="black", linewidth=0.5)
 
-    def plot_error(self):
+    def plot_error(self, ymin=0, ymax=0):
         plt.clf()
         fig,axes=plt.subplots(2,3, sharey=True, sharex=True)
         plt.subplots_adjust(wspace=0, hspace=0)
@@ -111,7 +111,12 @@ class Plotter():
         axes[1,0].set_ylabel("Error")
         plt.xlim(0,epochs)
 
-        ymin,ymax = self.minmax()
+        minval, maxval = self.minmax()
+        if ymin==0:
+            ymin = minval
+        if ymax==0:
+            ymax = maxval
+
         for ax in axes.flatten():
             ax.set_ylim(ymin,ymax)
         
