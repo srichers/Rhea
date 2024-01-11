@@ -21,6 +21,17 @@ class PlotQuantities():
         self.train_err[ :n_fill_values] = plotquantities.train_err
         self.test_loss[ :n_fill_values] = plotquantities.test_loss
         self.test_err[  :n_fill_values] = plotquantities.test_err
+
+    # return the minimum of only nonzero values, and the maximum of all datasets
+    def minmax(self):
+        minval = 1e100
+        maxval = 0
+        for p in [self.train_loss, self.train_err, self.test_loss, self.test_err]:
+            nonzero_values = p[np.where(p>0)]
+            if len(nonzero_values) > 0:
+                minval = min(minval, nonzero_values.min())
+                maxval = max(maxval, nonzero_values.max())
+        return minval, maxval
     
 
 class Plotter():
@@ -31,6 +42,16 @@ class Plotter():
         self.oneflavor      = PlotQuantities(epochs)
         self.unphysical     = PlotQuantities(epochs)
         self.NSM            = PlotQuantities(epochs)
+
+    # return the minimum and maximum values of all datasets
+    def minmax(self):
+        minval = 1e100
+        maxval = 0
+        for p in [self.knownData, self.knownData_FS, self.zerofluxfac, self.oneflavor, self.unphysical, self.NSM]:
+            minval_p, maxval_p = p.minmax()
+            minval = min(minval, minval_p)
+            maxval = max(maxval, maxval_p)
+        return minval, maxval
 
     # second initializer that will create all of the same quantities, but will also accept a plotter object as an argument
     # and fill in the values from that plotter object
@@ -60,27 +81,13 @@ class Plotter():
         mpl.rcParams['ytick.minor.width'] = 2
         mpl.rcParams['axes.linewidth'] = 2
 
-    def plot_error_single_frame(self, ax, x, p, label, ymin, ymax):
+    def plot_error_single_frame(self, ax, x, p, label):
         ax.set_title(label, y = 1.0, pad=-14)
         ax.semilogy(x, np.sqrt(p.train_loss), label="Sqrt(train_loss)", color="blue", linewidth=2)
         ax.semilogy(x, np.sqrt(p.test_loss),  label="Sqrt(test_loss)",  color="black", linewidth=2)
         ax.semilogy(x, p.train_err, label="train_maxerr", color="blue", linewidth=0.5)
         ax.semilogy(x, p.test_err,  label="test_maxerr",  color="black", linewidth=0.5)
 
-        def set_nonzero_minmax(ymin, ymax, ylist):
-            nonzero_values = ylist[np.where(ylist>0)]
-            if len(nonzero_values) > 0:
-                ymin = min(ymin, nonzero_values.min())
-                ymax = max(ymax, nonzero_values.max())
-            return ymin, ymax
-
-        # return the minimum and maximum values of all four curves
-        ymin, ymax = set_nonzero_minmax(ymin, ymax, np.sqrt(p.train_loss))
-        ymin, ymax = set_nonzero_minmax(ymin, ymax, np.sqrt(p.test_loss))
-        ymin, ymax = set_nonzero_minmax(ymin, ymax, p.train_err)
-        ymin, ymax = set_nonzero_minmax(ymin, ymax, p.test_err)
-        return ymin, ymax
-        
     def plot_error(self):
         plt.clf()
         fig,axes=plt.subplots(2,3, sharey=True, sharex=True)
@@ -92,20 +99,21 @@ class Plotter():
         epochs = len(self.knownData.train_err)
         x = range(epochs)
         
-        ymin = 1e100
-        ymax = 0
-        ymin, ymax = self.plot_error_single_frame(axes[0,0], x, self.knownData,     "known data"         , ymin, ymax)
-        ymin, ymax = self.plot_error_single_frame(axes[0,1], x, self.NSM,           "NSM stable"         , ymin, ymax)
-        ymin, ymax = self.plot_error_single_frame(axes[0,2], x, self.unphysical,    "unphysical"         , ymin, ymax)
-        ymin, ymax = self.plot_error_single_frame(axes[1,0], x, self.knownData_FS,  "final stable"       , ymin, ymax)
-        ymin, ymax = self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,   "zero fluxfac stable", ymin, ymax)
-        ymin, ymax = self.plot_error_single_frame(axes[1,2], x, self.oneflavor,     "one flavor stable"  , ymin, ymax)
+        self.plot_error_single_frame(axes[0,0], x, self.knownData,     "known data"         )
+        self.plot_error_single_frame(axes[0,1], x, self.NSM,           "NSM stable"         )
+        self.plot_error_single_frame(axes[0,2], x, self.unphysical,    "unphysical"         )
+        self.plot_error_single_frame(axes[1,0], x, self.knownData_FS,  "final stable"       )
+        self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,   "zero fluxfac stable")
+        self.plot_error_single_frame(axes[1,2], x, self.oneflavor,     "one flavor stable"  )
         axes[0,0].legend(frameon=False,fontsize=8)
 
         axes[1,0].set_xlabel("Epoch")
         axes[1,0].set_ylabel("Error")
         plt.xlim(0,epochs)
-        plt.ylim(ymin,ymax)
+
+        ymin,ymax = self.minmax()
+        for ax in axes.flatten():
+            ax.set_ylim(ymin,ymax)
         
         plt.savefig("train_test_error.pdf",bbox_inches="tight")
 
