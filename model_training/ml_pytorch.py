@@ -13,9 +13,11 @@ from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
 import copy
+import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
+do_unpickle = False
 test_size = 0.1
 epochs = 500
 batch_size = -1
@@ -214,9 +216,15 @@ for i in range(len(dataset_size_list)):
         F4f_test,
         F4_NSM_train,
         F4_NSM_test)
+    
+    # pickle the model, optimizer, and plotter
+    with open("model_"+str(dataset_size_list[i])+".pkl", "wb") as f:
+        pickle.dump([model_array[i], optimizer_array[i], plotter_array[i]], f)
 
 # use the largest dataset size for the rest of these metrics
 p = plotter_array[-1]
+model = model_array[-1]
+optimizer = optimizer_array[-1]
  
 # save the model to file
 print()
