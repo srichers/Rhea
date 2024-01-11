@@ -12,6 +12,7 @@ from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
+import copy
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
@@ -160,8 +161,17 @@ optimizer = Optimizer(model,
                       learning_rate,
                       device,
                       conserve_lepton_number=conserve_lepton_number)
+plotter = Plotter(0)
 print(model)
 
+# set up an array of models, optimizers, and plotters for different dataset sizes
+model_array = []
+optimizer_array = []
+plotter_array = []
+for dataset_size in dataset_size_list:
+    plotter_array.append(copy.deepcopy(plotter))
+    model_array.append(copy.deepcopy(model))
+    optimizer_array.append(copy.deepcopy(optimizer))
 
 #=============================================================#
 # check that we can obtain a value for y using pseudoinverses #
@@ -180,39 +190,30 @@ print()
 print("######################")
 print("# Training the model #")
 print("######################")
-plotter_array = []
-for dataset_size in dataset_size_list:
-    print("Training dataset size:",dataset_size)
-    model, p = train_model(NF,
-                   do_fdotu,
-                   nhidden,
-                   width,
-                   dropout_probability,
-                   do_batchnorm,
-                   activation,
-                   op,
-                   weight_decay,
-                   learning_rate,
-                   epochs,
-                   batch_size,
-                   n_generate,
-                   dataset_size,
-                   print_every,
-                   device,
-                   conserve_lepton_number,
-                   do_augment_final_stable,
-                   do_NSM_stable,
-                   do_unphysical_check,
-                   do_trivial_stable,
-                   comparison_loss_fn,
-                   unphysical_loss_fn,
-                   F4i_train,
-                   F4f_train,
-                   F4i_test,
-                   F4f_test,
-                   F4_NSM_train,
-                   F4_NSM_test)
-    plotter_array.append(p)
+for i in range(len(dataset_size_list)):
+    model_array[i], optimizer_array[i], plotter_array[i] = train_model(
+        model_array[i],
+        optimizer_array[i],
+        plotter_array[i],
+        NF,
+        epochs,
+        batch_size,
+        n_generate,
+        dataset_size_list[i],
+        print_every,
+        device,
+        do_augment_final_stable,
+        do_NSM_stable,
+        do_unphysical_check,
+        do_trivial_stable,
+        comparison_loss_fn,
+        unphysical_loss_fn,
+        F4i_train,
+        F4f_train,
+        F4i_test,
+        F4f_test,
+        F4_NSM_train,
+        F4_NSM_test)
 
 # use the largest dataset size for the rest of these metrics
 p = plotter_array[-1]

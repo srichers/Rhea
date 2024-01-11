@@ -4,23 +4,16 @@ from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 
-def train_model(NF,
-                do_fdotu,
-                nhidden,
-                width,
-                dropout_probability,
-                do_batchnorm,
-                activation,
-                op,
-                weight_decay,
-                learning_rate,
+def train_model(model,
+                optimizer,
+                plotter,
+                NF,
                 epochs,
                 batch_size,
                 n_generate,
                 dataset_size,
                 print_every,
                 device,
-                conserve_lepton_number,
                 do_augment_final_stable,
                 do_NSM_stable,
                 do_unphysical_check,
@@ -33,22 +26,11 @@ def train_model(NF,
                 F4f_test,
                 F4_NSM_train,
                 F4_NSM_test):
-    #=======================#
-    # instantiate the model #
-    #=======================#
-    model = NeuralNetwork(NF,
-                          do_fdotu,
-                          nhidden,
-                          width,
-                          dropout_probability,
-                          activation,
-                          do_batchnorm).to(device)
-    optimizer = Optimizer(model,
-                          op,
-                          weight_decay,
-                          learning_rate,
-                          device,
-                          conserve_lepton_number=conserve_lepton_number)
+    print("Training dataset size:",dataset_size)
+
+    # create a new plotter object of larger size if epochs is larger than the plotter object
+    p = Plotter(epochs)
+    p.fill_from_plotter(plotter)
 
     #=====================================================#
     # Load training data into data loader for minibatches #
@@ -69,8 +51,8 @@ def train_model(NF,
     #===============#
     # training loop #
     #===============#
-    p = Plotter(epochs)
-    for t in range(epochs):
+    epochs_already_done = len(plotter.knownData.train_loss)
+    for t in range(epochs_already_done, epochs):
 
         # generate randomized data and evaluate the test error
         p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
@@ -144,4 +126,4 @@ def train_model(NF,
             
             print()
 
-    return model, p
+    return model, optimizer, p
