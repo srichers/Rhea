@@ -171,18 +171,18 @@ else:
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-    optimizer = Optimizer(model,
-                      op,
-                      weight_decay,
-                      learning_rate,
-                      device,
-                      conserve_lepton_number=conserve_lepton_number)
     plotter = Plotter(0)
 
     for dataset_size in dataset_size_list:
         plotter_array.append(copy.deepcopy(plotter))
         model_array.append(copy.deepcopy(model))
-        optimizer_array.append(copy.deepcopy(optimizer))
+        optimizer_array.append(Optimizer(
+            model_array[-1],
+            op,
+            weight_decay,
+            learning_rate,
+            device,
+            conserve_lepton_number=conserve_lepton_number))
 
 print(model_array[-1])
 
