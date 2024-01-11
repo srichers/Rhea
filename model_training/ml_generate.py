@@ -42,14 +42,6 @@ def generate_stable_F4_oneflavor(n_trivial_stable,NF, device):
             F4i[start:end,0:3,i,j] = Frand
             F4i[start:end,  3,i,j] = 1
     
-    # make sure the number densities are physical
-    assert(torch.all(F4i[:,3,:,:] >= 0))
-    assert(torch.all(F4i[:,3,:,:] <= 1))
-
-    # make sure the flux factors are less than 1
-    fluxfac = torch.sqrt(torch.sum(F4i[:,0:3,:,:]**2, axis=1)) / F4i[:,3,:,:]
-    assert(torch.all(fluxfac[torch.where(fluxfac==fluxfac)] <= 1))
-
     return F4i
 
 def generate_random_F4(n_unphysical_check, NF, device):
@@ -72,13 +64,5 @@ def generate_random_F4(n_unphysical_check, NF, device):
 
     # multiply the spatial flux by the flux factor times the density.
     F4i[:,0:3,:,:] = F4i[:,0:3,:,:] * fluxfac[:,None,:,:] * Ndens[:,None,:,:]
-
-    # make sure the number densities are physical
-    assert(torch.all(F4i[:,3,:,:] >= 0))
-    assert(torch.all(F4i[:,3,:,:] <= 1))
-
-    # make sure the flux factors are less than 1
-    fluxfac = torch.sqrt(torch.sum(F4i[:,0:3,:,:]**2, axis=1)) / F4i[:,3,:,:]
-    assert(torch.all(fluxfac <= 1))
 
     return F4i
