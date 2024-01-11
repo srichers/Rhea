@@ -17,7 +17,7 @@ import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
-do_unpickle = False
+do_unpickle = True
 test_size = 0.1
 epochs = 500
 batch_size = -1
@@ -150,30 +150,42 @@ print()
 print("#############################")
 print("# SETTING UP NEURAL NETWORK #")
 print("#############################")
-model = NeuralNetwork(NF,
+# set up an array of models, optimizers, and plotters for different dataset sizes
+model_array = []
+optimizer_array = []
+plotter_array = []
+
+if do_unpickle:
+    for dataset_size in dataset_size_list:
+        with open("model_"+str(dataset_size)+".pkl", "rb") as f:
+            model, optimizer, plotter = pickle.load(f)
+        model_array.append(model)
+        optimizer_array.append(optimizer)
+        plotter_array.append(plotter)
+
+else:
+    model = NeuralNetwork(NF,
                       do_fdotu,
                       nhidden,
                       width,
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-optimizer = Optimizer(model,
+    optimizer = Optimizer(model,
                       op,
                       weight_decay,
                       learning_rate,
                       device,
                       conserve_lepton_number=conserve_lepton_number)
-plotter = Plotter(0)
-print(model)
+    plotter = Plotter(0)
 
-# set up an array of models, optimizers, and plotters for different dataset sizes
-model_array = []
-optimizer_array = []
-plotter_array = []
-for dataset_size in dataset_size_list:
-    plotter_array.append(copy.deepcopy(plotter))
-    model_array.append(copy.deepcopy(model))
-    optimizer_array.append(copy.deepcopy(optimizer))
+    for dataset_size in dataset_size_list:
+        plotter_array.append(copy.deepcopy(plotter))
+        model_array.append(copy.deepcopy(model))
+        optimizer_array.append(copy.deepcopy(optimizer))
+
+print(model_array[-1])
+
 
 #=============================================================#
 # check that we can obtain a value for y using pseudoinverses #
