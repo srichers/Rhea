@@ -9,9 +9,14 @@ class FFISubgridModel{
   public:
 
   // constants defining the number of inputs/outputs
-  const int NX = NF*(1 + 2*NF); // number of elements in X tensor
+  // NX = NF*(1 + 2*NF) if no fdotu input, with additional 2*NF if fdotu input
+  // NY is (2*NF)*(2*NF)
+  const bool do_fdotu = true; // assume to be true for now
+  const int NX_nofdotu = NF*(1 + 2*NF);
+  const int NX_fdotu = NX_nofdotu + 2*NF;
+  const int NX = do_fdotu ? NX_fdotu : NX_nofdotu;
   const int Ny = (2*NF)*(2*NF); // number of elements in Y tensor
-
+  
   // the actual pytorch model
   torch::jit::script::Module model;
 
@@ -59,6 +64,13 @@ class FFISubgridModel{
   // 18: Fmubar.Fmubar
   // 19: Fmubar.Ftaubar
   // 20: Ftaubar.Ftaubar
+  // IF do_fdotu:
+  // 21: Fe.u
+  // 22: Fmu.u
+  // 23: Ftau.u
+  // 24: Febar.u
+  // 25: Fmubar.u
+  // 26: Ftaubar.u
   torch::Tensor X_from_F4_Minkowski(const torch::Tensor F4){
     int nsims = F4.size(0);
 
@@ -73,6 +85,8 @@ class FFISubgridModel{
     // create the X tensor
     torch::Tensor X = torch::zeros({nsims, NX}, torch::dtype(torch::kFloat32));
     int index = 0;
+
+    // put the dot product of each species with each other species into the X tensor
     for(int a=0; a<2*NF; a++){
       torch::Tensor F1 = F4_normalized.index({Slice(), Slice(), a});
       for(int b=a; b<2*NF; b++){
@@ -81,6 +95,21 @@ class FFISubgridModel{
         index++;
       }
     }
+
+    if(do_fdotu){
+      // the fluid velocity just has a 1 in the t component
+      torch::Tensor u = torch::zeros({nsims,4});
+      u.index_put_({Slice(), 3}, 1.0);
+
+      // put the dot product of each species with the fluid velocity into the X tensor
+      for(int a=0; a<2*NF; a++){
+        torch::Tensor F1 = F4_normalized.index({Slice(), Slice(), a});
+        torch::Tensor u = F4_normalized.index({Slice(), Slice(), 3});
+        X.index_put_({Slice(), index}, dot4_Minkowski(F1,u));
+        index++;
+      }
+    }
+
     assert(index == NX);
     return X;
   }
