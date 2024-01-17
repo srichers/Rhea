@@ -16,17 +16,18 @@ import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
-do_unpickle = False
+NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
+do_unpickle = True
 test_size = 0.1
-epochs = 500
+epochs = 12000
 batch_size = -1
-dataset_size_list = [10,100,1000,3200] # -1 means use all the data
+dataset_size_list = [10,100,1000,10000, -1] # -1 means use all the data
 n_generate = 1000
 print_every = 10
 
 # data augmentation options
-do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
-do_augment_final_stable = False # True
+do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
+do_augment_final_stable = True # True
 do_unphysical_check = True # True - seems to help prevent crazy results
 do_trivial_stable   = True # True
 do_NSM_stable = False # True
@@ -34,16 +35,19 @@ do_NSM_stable = False # True
 # neural network options
 conserve_lepton_number=True
 nhidden = 5
-width = 1024
-dropout_probability = 0.1 # 0.5
+width = 2048
+dropout_probability = 0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
-weight_decay = 1e-5
-learning_rate = 1e-3 # 1e-3
+weight_decay = 0
+learning_rate = 1e-5 # 1e-3
+
+# the number of flavors should be 3
+NF = 3
 
 #========================#
 # use a GPU if available #
@@ -64,7 +68,7 @@ for d in directory_list:
     f_in = h5py.File(basedir+"/input_data/"+d+"/many_sims_database.h5","r")
     F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
     F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
-    NF = int(np.array(f_in["nf"]))
+    assert(NF == int(np.array(f_in["nf"])) )
     f_in.close()
     print(len(F4_initial_list[-1]),"points in",d)
 F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
@@ -141,6 +145,24 @@ if do_augment_permutation:
 # move the array to the device
 F4_NSM_train = torch.Tensor(F4_NSM_train).to(device)
 F4_NSM_test  = torch.Tensor(F4_NSM_test ).to(device)
+
+#===========================#
+# read NSM simulated points #
+#===========================#
+print()
+print("################################")
+print("# READING NSM SIMULATED POINTS #")
+print("################################")
+print("these data are worthless.")
+#filename = basedir+"/input_data/Emu_many1D/"+NSM_simulated_filename
+#with h5py.File(filename,"r") as f_in:
+#    initial = np.array(f_in["F4_initial"]) # [simulationIndex, xyzt, nu/nubar, flavor]
+#    final   = np.array(f_in["F4_final"]) # [simulationIndex, xyzt, nu/nubar, flavor]
+
+## these data have 2 flavors. Convert to 3 flavors by splitting the mu/tau flavors
+#F4_NSM_simulated_initial = np.zeros((initial.shape[0],4,2,NF))
+#F4_NSM_simulated_initial[:,:,:,0]  = initial[:,:,:,0]
+#F4_NSM_simulated_initial[:,:,:,1:] = initial[:,:,:,1] / 2.
 
 #=======================#
 # instantiate the model #
@@ -403,6 +425,7 @@ test_loss  = np.array([p.knownData.test_loss[-1]  for p in plotter_array])
 xvals = np.array(dataset_size_list)
 xvals[np.where(xvals==-1)] = F4i_train.shape[0]
 
+# plot the loss as a function of dataset size
 plt.clf()
 fig,ax=plt.subplots(1,1)
 ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
@@ -411,6 +434,18 @@ plt.plot(xvals, np.sqrt(train_loss), label="train")
 plt.plot(xvals, np.sqrt(test_loss),  label="test")
 plt.legend(frameon=False)
 plt.xlabel("Dataset size")
-plt.ylabel("Error")
+plt.ylabel("Max Component Error")
 plt.savefig("dataset_size.pdf",bbox_inches="tight")
+
+# plot the error histogram for the test data
+n_generate = 10000
+F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
+F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
+error_histogram(model, F4i_train, F4f_train, 100, 0, 0.1, "histogram_train.pdf")
+error_histogram(model, F4i_test, F4f_test, 100, 0, 0.1, "histogram_test.pdf")
+error_histogram(model, F4_NSM_train, F4_NSM_train, 100, 0, 0.1, "histogram_NSM_train.pdf")
+error_histogram(model, F4_NSM_test, F4_NSM_test, 100, 0, 0.1, "histogram_NSM_test.pdf")
+error_histogram(model, F4i_0ff, F4i_0ff, 100, 0, 0.1, "histogram_0ff.pdf")
+error_histogram(model, F4i_1f, F4i_1f, 100, 0, 0.1, "histogram_1f.pdf")
+error_histogram(model, F4i_train, F4i_train, 100, 0, 0.1, "histogram_donothing.pdf")
 

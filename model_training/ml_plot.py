@@ -15,7 +15,7 @@ class PlotQuantities():
     # and fill in the values from that plotquantities object
     def fill_from_plotquantities(self, plotquantities):
         n_fill_values = len(plotquantities.train_loss)
-        assert(len(self.train_loss) > n_fill_values)
+        assert(len(self.train_loss) >= n_fill_values)
 
         self.train_loss[:n_fill_values] = plotquantities.train_loss
         self.train_err[ :n_fill_values] = plotquantities.train_err
@@ -135,11 +135,11 @@ class Plotter():
             F4_test[3, 1, 0] =  ratio_list[i]
             F4_test[2, 0, 0] =  1/3
             F4_test[2, 1, 0] = -1/3 * ratio_list[i]
-            F4_pred = torch.tensor(F4_test[None,:,:,:]).float()
+            F4_pred = torch.tensor(F4_test[None,:,:,:]).float().to(next(model.parameters()).device)
             for j in range(nreps):
-                F4_pred = model.to('cpu').predict_F4(F4_pred.to('cpu'))
-                nee_list_fid[i,j]    = F4_pred[0,3,0,0]
-                neebar_list_fid[i,j] = F4_pred[0,3,1,0]
+                F4_pred = model.predict_F4(F4_pred)
+                nee_list_fid[i,j]    = F4_pred[0,3,0,0].to('cpu')
+                neebar_list_fid[i,j] = F4_pred[0,3,1,0].to('cpu')
                 
         plt.clf()
         fig,ax=plt.subplots(1,1)
@@ -157,6 +157,31 @@ class Plotter():
         plt.axhline(1./3., color="green", linewidth=0.5)
         plt.savefig("nue_vs_nuebar.pdf",bbox_inches="tight")
 
+# apply the model to a dataset and create a histogram of the magnitudes of the error
+# F4 has dimensions [sim, xyzt, nu/nubar, flavor]
+def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, filename):
+    # get the predicted final F4
+    F4_pred = model.predict_F4(F4_initial)
+
+    # calculate the error
+    F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()
+
+    # calculate the magnitude of the error
+    F4_error_mag = np.max(np.abs(F4_error), axis=(1,2,3))
+
+    # calculate the total number density in each simulation
+    N = F4_final[:,3,:,:].to('cpu').detach().numpy()
+    N = np.sum(N, axis=(1,2))
+
+    # plot the histogram
+    plt.clf()
+    plt.hist(F4_error_mag/N, bins=bins, range=(xmin,xmax), log=False)
+    plt.xlabel("Max Component Error")
+    plt.ylabel("Count")
+    plt.xlim(xmin,xmax)
+    plt.tick_params(axis='both',which="both", direction="in",top=True,right=True)
+    plt.minorticks_on()
+    plt.savefig(filename,bbox_inches="tight")
         
 # visualize the network using torchviz
 #y = model(X_train)
