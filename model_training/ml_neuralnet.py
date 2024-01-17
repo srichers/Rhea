@@ -101,6 +101,16 @@ class NeuralNetwork(nn.Module):
         nsims = F4.shape[0]
         X = torch.zeros((nsims, self.NX), device=F4.device)
         F4_flat = F4.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
+
+        # calculate the total number density based on the t component of the four-vector
+        # [sim]
+        N = torch.sum(F4_flat[:,3,:], axis=1)
+
+        # normalize F4 by the total number density
+        # [sim, xyzt, 2*NF]
+        F4_flat = F4_flat / N[:,None,None]
+
+        # add the dot products of each species with each other species
         for a in range(2*self.NF):
             for b in range(a,2*self.NF):
                 F1 = F4_flat[:,:,a]
