@@ -12,7 +12,6 @@ from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
-import copy
 import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
@@ -155,34 +154,30 @@ model_array = []
 optimizer_array = []
 plotter_array = []
 
-if do_unpickle:
-    for dataset_size in dataset_size_list:
+for dataset_size in dataset_size_list:
+    if do_unpickle:
         with open("model_"+str(dataset_size)+".pkl", "rb") as f:
             model, optimizer, plotter = pickle.load(f)
-        model_array.append(model)
-        optimizer_array.append(optimizer)
-        plotter_array.append(plotter)
 
-else:
-    model = NeuralNetwork(NF,
+    else:
+        model = NeuralNetwork(NF,
                       do_fdotu,
                       nhidden,
                       width,
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-    plotter = Plotter(0)
+        plotter = Plotter(0)
 
-    for dataset_size in dataset_size_list:
-        plotter_array.append(copy.deepcopy(plotter))
-        model_array.append(copy.deepcopy(model))
-        optimizer_array.append(Optimizer(
-            model_array[-1],
-            op,
-            weight_decay,
-            learning_rate,
-            device,
-            conserve_lepton_number=conserve_lepton_number))
+    plotter_array.append(plotter)
+    model_array.append(model)
+    optimizer_array.append(Optimizer(
+        model_array[-1],
+        op,
+        weight_decay,
+        learning_rate,
+        device,
+        conserve_lepton_number=conserve_lepton_number))
 
 print(model_array[-1])
 
