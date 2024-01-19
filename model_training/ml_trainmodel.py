@@ -3,6 +3,7 @@ from ml_loss import *
 from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
+from ml_maxentropy import *
 
 def train_asymptotic_model(model,
                 optimizer,
@@ -103,6 +104,18 @@ def train_stability_model(model,
                 do_trivial_stable):
     
     print("Training dataset size:",n_generate)
+
+    F4i = generate_random_F4(n_generate, NF, 'cpu', zero_weight=10)
+
+    # count the number of stable points
+    unstable = has_crossing(F4i.detach().numpy(), NF, 64)
+    print("Stable:",np.sum(unstable==False),"Unstable:",np.sum(unstable==True))
+
+    # try with more physical data - set heavy lepton neutrinos to be identical
+    F4i[:,:,:,1:] = F4i[:,:,:,1:2]
+    unstable = has_crossing(F4i.detach().numpy(), NF, 64)
+    print("Stable:",np.sum(unstable==False),"Unstable:",np.sum(unstable==True))
+
 
     # create a new plotter object of larger size if epochs is larger than the plotter object
     p = Plotter(epochs)

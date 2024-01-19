@@ -80,15 +80,12 @@ def has_crossing(F4i, NF, nphi_equator):
     fluxfac = Fmag / F4i[:,3,:,:]
 
     # avoid nans by setting fluxfac to zero when F4i is zero
-    badlocs = np.where(Fmag==0)
+    badlocs = np.where(Fmag/F4i[:,3,:,:] < 1e-6)
     fluxfac[badlocs] = 0
 
     # avoid nans by setting flux factor of 1 within machine precision to 1
-    print("fluxfac:", np.min(fluxfac), np.max(fluxfac), np.median(fluxfac))
     assert(np.all(fluxfac<=1+1e-6))
     fluxfac = np.minimum(fluxfac, 1)
-
-    print("ndens:", np.min(F4i[:,3,:,:]), np.max(F4i[:,3,:,:]), np.median(F4i[:,3,:,:]))
     assert(np.all(fluxfac>=0))
 
     # get Z for each species
@@ -140,17 +137,19 @@ def has_crossing(F4i, NF, nphi_equator):
 
     return crosses_zero
 
-# run test case
-F4i = torch.zeros((1,4,2,3))
-F4i[0,3,0,0] = 1
-F4i[0,3,1,0] = 2
-print("should be false:", has_crossing(F4i.detach().numpy(), 3, 64))
 
-F4i = torch.zeros((1,4,2,3))
-F4i[0,3,0,0] = 1
-F4i[0,3,1,0] = 1
-F4i[0,0,0,0] =  0.5
-F4i[0,0,1,0] = -0.5
-print("should be true:", has_crossing(F4i.detach().numpy(), 3, 64))
+if __name__ == "__main__":
+    # run test case
+    F4i = torch.zeros((1,4,2,3))
+    F4i[0,3,0,0] = 1
+    F4i[0,3,1,0] = 2
+    print("should be false:", has_crossing(F4i.detach().numpy(), 3, 64))
+
+    F4i = torch.zeros((1,4,2,3))
+    F4i[0,3,0,0] = 1
+    F4i[0,3,1,0] = 1
+    F4i[0,0,0,0] =  0.5
+    F4i[0,0,1,0] = -0.5
+    print("should be true:", has_crossing(F4i.detach().numpy(), 3, 64))
 
         
