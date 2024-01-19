@@ -35,19 +35,16 @@ class PlotQuantities():
     
 
 class Plotter():
-    def __init__(self, epochs):
-        self.knownData      = PlotQuantities(epochs)
-        self.knownData_FS   = PlotQuantities(epochs)
-        self.zerofluxfac    = PlotQuantities(epochs)
-        self.oneflavor      = PlotQuantities(epochs)
-        self.unphysical     = PlotQuantities(epochs)
-        self.NSM            = PlotQuantities(epochs)
+    def __init__(self, epochs, names):
+        self.data = {}
+        for name in names:
+            self.data[name] = PlotQuantities(epochs)
 
     # return the minimum and maximum values of all datasets
     def minmax(self):
         minval = 1e100
         maxval = 0
-        for p in [self.knownData, self.knownData_FS, self.zerofluxfac, self.oneflavor, self.unphysical, self.NSM]:
+        for p in self.data.values():
             minval_p, maxval_p = p.minmax()
             minval = min(minval, minval_p)
             maxval = max(maxval, maxval_p)
@@ -56,12 +53,8 @@ class Plotter():
     # second initializer that will create all of the same quantities, but will also accept a plotter object as an argument
     # and fill in the values from that plotter object
     def fill_from_plotter(self, plotter):
-        self.knownData.fill_from_plotquantities(plotter.knownData)
-        self.knownData_FS.fill_from_plotquantities(plotter.knownData_FS)
-        self.zerofluxfac.fill_from_plotquantities(plotter.zerofluxfac)
-        self.oneflavor.fill_from_plotquantities(plotter.oneflavor)
-        self.unphysical.fill_from_plotquantities(plotter.unphysical)
-        self.NSM.fill_from_plotquantities(plotter.NSM)
+        for name in self.data.keys():
+            self.data[name].fill_from_plotquantities(plotter.data[name])
 
     def init_plot_options(self):
         #==============#
@@ -90,25 +83,23 @@ class Plotter():
 
     def plot_error(self, ymin=0, ymax=0):
         plt.clf()
-        fig,axes=plt.subplots(2,3, sharey=True, sharex=True)
+        nplots = len(self.data)
+        fig,axes=plt.subplots(1,nplots, sharey=True, sharex=True)
         plt.subplots_adjust(wspace=0, hspace=0)
         for ax in axes.flatten():
             ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
             ax.minorticks_on()
 
-        epochs = len(self.knownData.train_err)
+        epochs = len(self.data["knownData"].train_err)
         x = range(epochs)
         
-        self.plot_error_single_frame(axes[0,0], x, self.knownData,     "known data"         )
-        self.plot_error_single_frame(axes[0,1], x, self.NSM,           "NSM stable"         )
-        self.plot_error_single_frame(axes[0,2], x, self.unphysical,    "unphysical"         )
-        self.plot_error_single_frame(axes[1,0], x, self.knownData_FS,  "final stable"       )
-        self.plot_error_single_frame(axes[1,1], x, self.zerofluxfac,   "zero fluxfac stable")
-        self.plot_error_single_frame(axes[1,2], x, self.oneflavor,     "one flavor stable"  )
-        axes[0,0].legend(frameon=False,fontsize=8)
+        for i,name in enumerate(self.data.keys()):
+            self.plot_error_single_frame(axes[i], x, self.data[name], name)
+            axes[i].legend(frameon=False,fontsize=8)
+        axes[0].legend(frameon=False,fontsize=8)
 
-        axes[1,0].set_xlabel("Epoch")
-        axes[1,0].set_ylabel("Error")
+        axes[0].set_xlabel("Epoch")
+        axes[0].set_ylabel("Error")
         plt.xlim(0,epochs)
 
         minval, maxval = self.minmax()
@@ -122,40 +113,38 @@ class Plotter():
         
         plt.savefig("train_test_error.pdf",bbox_inches="tight")
 
-    def plot_nue_nuebar(self, model, npoints, nreps,):
-        # plot the number of electron neutrinos when varying the number of antineutrinos
-        nee_list_fid    = np.zeros((npoints,nreps))
-        neebar_list_fid = np.zeros((npoints,nreps))
-        nee_list_23     = np.zeros((npoints,nreps))
-        neebar_list_23  = np.zeros((npoints,nreps))
-        ratio_list = np.array(range(npoints)) / (npoints-1)
-        for i in range(npoints):
-            F4_test = np.zeros((4,2,model.NF)) # [xyzt, nu/nubar, flavor]
-            F4_test[3, 0, 0] =  1
-            F4_test[3, 1, 0] =  ratio_list[i]
-            F4_test[2, 0, 0] =  1/3
-            F4_test[2, 1, 0] = -1/3 * ratio_list[i]
-            F4_pred = torch.tensor(F4_test[None,:,:,:]).float().to(next(model.parameters()).device)
-            for j in range(nreps):
-                F4_pred = model.predict_F4(F4_pred)
-                nee_list_fid[i,j]    = F4_pred[0,3,0,0].to('cpu')
-                neebar_list_fid[i,j] = F4_pred[0,3,1,0].to('cpu')
-                
-        plt.clf()
-        fig,ax=plt.subplots(1,1)
-        ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
-        ax.minorticks_on()
-
+def plot_nue_nuebar(model, npoints, nreps,):
+    # plot the number of electron neutrinos when varying the number of antineutrinos
+    nee_list_fid    = np.zeros((npoints,nreps))
+    neebar_list_fid = np.zeros((npoints,nreps))
+    nee_list_23     = np.zeros((npoints,nreps))
+    neebar_list_23  = np.zeros((npoints,nreps))
+    ratio_list = np.array(range(npoints)) / (npoints-1)
+    for i in range(npoints):
+        F4_test = np.zeros((4,2,model.NF)) # [xyzt, nu/nubar, flavor]
+        F4_test[3, 0, 0] =  1
+        F4_test[3, 1, 0] =  ratio_list[i]
+        F4_test[2, 0, 0] =  1/3
+        F4_test[2, 1, 0] = -1/3 * ratio_list[i]
+        F4_pred = torch.tensor(F4_test[None,:,:,:]).float().to(next(model.parameters()).device)
         for j in range(nreps):
-            plt.plot(ratio_list, nee_list_fid[:,j], linewidth=2, color=mpl.cm.jet(j/(nreps-1)) )#, label="$N_{\\nu_e}$")
-
-        plt.legend(frameon=False)
-        plt.xlabel("$N_{\\bar{\\nu}_e} / N_{\\nu_e}$")
-        plt.ylabel("$N_{\\nu_e}$")
-        plt.ylim(0.3,1)
-        plt.xlim(0,1)
-        plt.axhline(1./3., color="green", linewidth=0.5)
-        plt.savefig("nue_vs_nuebar.pdf",bbox_inches="tight")
+            F4_pred = model.predict_F4(F4_pred)
+            nee_list_fid[i,j]    = F4_pred[0,3,0,0].to('cpu')
+            neebar_list_fid[i,j] = F4_pred[0,3,1,0].to('cpu')
+            
+    plt.clf()
+    fig,ax=plt.subplots(1,1)
+    ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
+    ax.minorticks_on()
+    for j in range(nreps):
+        plt.plot(ratio_list, nee_list_fid[:,j], linewidth=2, color=mpl.cm.jet(j/(nreps-1)) )#, label="$N_{\\nu_e}$")
+    plt.legend(frameon=False)
+    plt.xlabel("$N_{\\bar{\\nu}_e} / N_{\\nu_e}$")
+    plt.ylabel("$N_{\\nu_e}$")
+    plt.ylim(0.3,1)
+    plt.xlim(0,1)
+    plt.axhline(1./3., color="green", linewidth=0.5)
+    plt.savefig("nue_vs_nuebar.pdf",bbox_inches="tight")
 
 def plot_histogram(error, bins, xmin, xmax, filename):
     error[np.where(error>xmax)] = xmax

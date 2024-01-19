@@ -227,12 +227,12 @@ print("########################")
 npoints = 11
 nreps = 20
 p.init_plot_options()
-p.plot_nue_nuebar(model, npoints, nreps)
+plot_nue_nuebar(model, npoints, nreps)
 p.plot_error(ymin=1e-5)
 
 # plot the loss as a function of dataset size using the array of plotters
-train_loss = np.array([p.knownData.train_loss[-1] for p in plotter_array])
-test_loss  = np.array([p.knownData.test_loss[-1]  for p in plotter_array])
+train_loss = np.array([p.data["knownData"].train_loss[-1] for p in plotter_array])
+test_loss  = np.array([p.data["knownData"].test_loss[-1]  for p in plotter_array])
 xvals = np.array(dataset_size_list)
 xvals[np.where(xvals==-1)] = F4i_train.shape[0]
 

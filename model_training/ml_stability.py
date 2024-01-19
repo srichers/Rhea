@@ -11,14 +11,14 @@ import pickle
 
 do_unpickle = False
 test_size = 0.1
-epochs = 12000
-batch_size = -1
+epochs = 500
 dataset_size_list = [10,100,1000] # -1 means use all the data
-n_generate = 1000
 print_every = 10
+n_equatorial = 64
+zero_fluxfac_bias = 10
 
 conserve_lepton_number=True
-nhidden = 2
+nhidden = 0
 width = 256
 dropout_probability = 0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
@@ -45,7 +45,7 @@ print(f"Using {device} device")
 #===============#
 # training data #
 #===============#
-F4i_test = generate_random_F4(n_generate, NF, device)
+F4i_test = generate_random_F4(dataset_size_list[-1], NF, device)
 
 
 #=======================#
@@ -74,11 +74,11 @@ for dataset_size in dataset_size_list:
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-        plotter = Plotter(0)
+        plotter = Plotter(0,["random","heavy","0ff","1f"])
 
     plotter_array.append(plotter)
     model_array.append(model)
-    optimizer_array.append(Optimizer(
+    optimizer_array.append(StabilityOptimizer(
         model_array[-1],
         op,
         weight_decay,
@@ -93,6 +93,7 @@ print()
 print("######################")
 print("# Training the model #")
 print("######################")
+# BCEWithLogistsLoss contains the sigmoid built in. Don't put sigmoid in model):
 for i in range(len(dataset_size_list)):
     model_array[i], optimizer_array[i], plotter_array[i] = train_stability_model(
         model_array[i],
@@ -100,11 +101,12 @@ for i in range(len(dataset_size_list)):
         plotter_array[i],
         NF,
         epochs,
-        batch_size,
         dataset_size_list[i],
         print_every,
         device,
-        do_trivial_stable)
+        n_equatorial,
+        zero_fluxfac_bias,
+        nn.BCEWithLogitsLoss()) 
     
     # pickle the model, optimizer, and plotter
     with open(outfilename+str(dataset_size_list[i])+".pkl", "wb") as f:

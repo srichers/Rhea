@@ -60,11 +60,11 @@ print(f"Using {device} device")
 F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test = read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
 
 # test for stability under max entropy condition
-train_crossing = has_crossing(F4i_train.cpu().detach().numpy(), NF, 64)
+#train_crossing = has_crossing(F4i_train.cpu().detach().numpy(), NF, 64)
 
 # count the number of stable simulations
-print("stable:",np.sum(train_crossing==False))
-print("unstable:",np.sum(train_crossing==True))
+#print("stable:",np.sum(train_crossing==False))
+#print("unstable:",np.sum(train_crossing==True))
 
 #=======================#
 # instantiate the model #
@@ -92,11 +92,11 @@ for dataset_size in dataset_size_list:
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-        plotter = Plotter(0)
+        plotter = Plotter(0,["knownData","unphysical"])
 
     plotter_array.append(plotter)
     model_array.append(model)
-    optimizer_array.append(Optimizer(
+    optimizer_array.append(AsymptoticOptimizer(
         model_array[-1],
         op,
         weight_decay,

@@ -110,6 +110,12 @@ class NeuralNetwork(nn.Module):
         
         assert(index==self.NX)
         return X
+    
+    # return the y value, which represents the INPUT to a sigmoid function that determines stability
+    def predict_unstable(self, F4_initial):
+        X = self.X_from_F4(F4_initial)
+        y = self.forward(X)
+        return y
 
 
 class AsymptoticNeuralNetwork(NeuralNetwork):

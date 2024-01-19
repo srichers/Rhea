@@ -128,14 +128,15 @@ def has_crossing(F4i, NF, nphi_equator):
     assert(iG==NG)
 
     # check whether each G crosses zero
-    crosses_zero = np.zeros((nsims,NG), dtype=bool)
+    crosses_zero = np.zeros((nsims,NG))
     for i in range(NG):
         minval = np.min(G[:,i,:], axis=1)
         maxval = np.max(G[:,i,:], axis=1)
         crosses_zero[:,i] = minval*maxval<0
-    crosses_zero = np.any(crosses_zero, axis=1) # [nsims]
+    crosses_zero = np.any(crosses_zero, axis=1).astype(float) # [nsims]
 
-    return crosses_zero
+    # add extra unit dimension to compatibility with loss functions
+    return crosses_zero[:,None]
 
 
 if __name__ == "__main__":

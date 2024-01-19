@@ -16,16 +16,7 @@ class Optimizer():
         self.device = device
         self.conserve_lepton_number = conserve_lepton_number
 
-        # arrays
-        self.train_error = []
-        self.test_error = []
-        self.train_reconstruction_error = []
-        self.test_reconstruction_error = []
-        self.train_unphysical_error = []
-        self.test_unphysical_error = []
-        self.train_stable_error = []
-        self.test_stable_error = []
-
+class AsymptoticOptimizer(Optimizer):
     # function to train the dataset
     def train(self, model, F4i, F4f_true, loss_fn):
         model.train()
@@ -45,3 +36,19 @@ class Optimizer():
                 error = None
             return loss, error
             
+class StabilityOptimizer(Optimizer):
+    # function to train the dataset
+    def train(self, model, F4i, unstable, loss_fn):
+        model.train()
+        unstable_pred = model.predict_unstable(F4i)
+        loss = loss_fn(unstable_pred, unstable)
+        return loss
+    
+    # function to test the model performance
+    def test(self, model, F4i, unstable, loss_fn):
+        model.eval()
+        with torch.no_grad():
+            unstable_pred = model.predict_unstable(F4i)
+            loss = loss_fn(unstable_pred, unstable)
+            error = torch.max(torch.abs(unstable_pred - unstable))
+            return loss, error
