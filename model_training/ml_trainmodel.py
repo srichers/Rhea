@@ -81,9 +81,8 @@ def train_asymptotic_model(model,
         # report max error
         if((t+1)%print_every==0):
             print(f"Epoch {t+1}")
-            print("Train loss:",      p.data["knownData"].train_loss[t])
-            print("Test loss:",       p.data["knownData"].test_loss[t])
-            print("Test unphysical loss:",       p.data["unphysical"].test_loss[t])
+            for key in p.data.keys():
+                print(key, p.data[key].train_loss[t],  p.data[key].test_loss[t])
             
             print()
 
