@@ -112,7 +112,7 @@ def train_stability_model(model,
     print("Stable:",np.sum(unstable==False),"Unstable:",np.sum(unstable==True))
 
     # try with more physical data - set heavy lepton neutrinos to be identical
-    F4i[:,:,:,1:] = F4i[:,:,:,1:2]
+    F4i[:,:,:,1:] = F4i[:,:,0,1][:,:,None,None]
     unstable = has_crossing(F4i.detach().numpy(), NF, 64)
     print("Stable:",np.sum(unstable==False),"Unstable:",np.sum(unstable==True))
 
