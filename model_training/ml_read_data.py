@@ -29,8 +29,15 @@ def read_data(NF, basedir, directory_list, test_size, device, do_augment_permuta
     F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
     F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
 
-    # normalize the data so the number densities add up to 1
+    # fix slightly negative energy densities
     ntot = ml.ntotal(F4_initial_list)
+    ndens = F4_initial_list[:,3,:,:]
+    badlocs = torch.where(ndens < 0)
+    assert(torch.all(ndens/ntot[:,None,None] > -1e10))
+    for i in range(4):
+        F4_initial_list[:,i,:,:][badlocs] = 0
+
+    # normalize the data so the number densities add up to 1
     F4_initial_list = F4_initial_list / ntot[:,None,None,None]
     F4_final_list   = F4_final_list   / ntot[:,None,None,None]
 

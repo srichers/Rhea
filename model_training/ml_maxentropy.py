@@ -74,12 +74,22 @@ def has_crossing(F4i, NF, nphi_equator):
 
     # evaluate the flux factor for each species
     Fmag = np.sqrt(np.sum(F4i[:,0:3,:,:]**2, axis=1))
-    fluxfac = Fmag / F4i[:,3,:,:]
     Fhat = F4i[:,0:3,:,:] / Fmag[:,None,:,:] # [sim, xyz, nu/nubar, flavor]
+
+    # calculate flux factor
+    fluxfac = Fmag / F4i[:,3,:,:]
 
     # avoid nans by setting fluxfac to zero when F4i is zero
     badlocs = np.where(Fmag==0)
     fluxfac[badlocs] = 0
+
+    # avoid nans by setting flux factor of 1 within machine precision to 1
+    print("fluxfac:", np.min(fluxfac), np.max(fluxfac), np.median(fluxfac))
+    assert(np.all(fluxfac<=1+1e-6))
+    fluxfac = np.minimum(fluxfac, 1)
+
+    print("ndens:", np.min(F4i[:,3,:,:]), np.max(F4i[:,3,:,:]), np.median(F4i[:,3,:,:]))
+    assert(np.all(fluxfac>=0))
 
     # get Z for each species
     Z = np.zeros((nsims,2,NF))
@@ -123,8 +133,8 @@ def has_crossing(F4i, NF, nphi_equator):
     # check whether each G crosses zero
     crosses_zero = np.zeros((nsims,NG), dtype=bool)
     for i in range(NG):
-        minval = np.min(G[:,i,:])
-        maxval = np.max(G[:,i,:])
+        minval = np.min(G[:,i,:], axis=1)
+        maxval = np.max(G[:,i,:], axis=1)
         crosses_zero[:,i] = minval*maxval<0
     crosses_zero = np.any(crosses_zero, axis=1) # [nsims]
 

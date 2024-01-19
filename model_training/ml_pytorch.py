@@ -9,6 +9,7 @@ from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
+from ml_maxentropy import *
 from ml_read_data import *
 import pickle
 
@@ -57,6 +58,13 @@ print(f"Using {device} device")
 # read the data #
 #===============#
 F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test = read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
+
+# test for stability under max entropy condition
+train_crossing = has_crossing(F4i_train.cpu().detach().numpy(), NF, 64)
+
+# count the number of stable simulations
+print("stable:",np.sum(train_crossing==False))
+print("unstable:",np.sum(train_crossing==True))
 
 #=======================#
 # instantiate the model #
