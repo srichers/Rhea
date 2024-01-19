@@ -157,6 +157,18 @@ class Plotter():
         plt.axhline(1./3., color="green", linewidth=0.5)
         plt.savefig("nue_vs_nuebar.pdf",bbox_inches="tight")
 
+def plot_histogram(error, bins, xmin, xmax, filename):
+    error[np.where(error>xmax)] = xmax
+    # plot the histogram
+    plt.clf()
+    plt.hist(error, bins=bins, range=(xmin,xmax), log=True)
+    plt.xlabel("Max Component Error")
+    plt.ylabel("Count")
+    plt.xlim(xmin,xmax)
+    plt.tick_params(axis='both',which="both", direction="in",top=True,right=True)
+    plt.minorticks_on()
+    plt.savefig(filename,bbox_inches="tight")
+
 # apply the model to a dataset and create a histogram of the magnitudes of the error
 # F4 has dimensions [sim, xyzt, nu/nubar, flavor]
 def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, filename):
@@ -173,15 +185,8 @@ def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, filename):
     N = F4_final[:,3,:,:].to('cpu').detach().numpy()
     N = np.sum(N, axis=(1,2))
 
-    # plot the histogram
-    plt.clf()
-    plt.hist(F4_error_mag/N, bins=bins, range=(xmin,xmax), log=False)
-    plt.xlabel("Max Component Error")
-    plt.ylabel("Count")
-    plt.xlim(xmin,xmax)
-    plt.tick_params(axis='both',which="both", direction="in",top=True,right=True)
-    plt.minorticks_on()
-    plt.savefig(filename,bbox_inches="tight")
+    plot_histogram(F4_error_mag/N, bins, xmin, xmax, filename)
+
         
 # visualize the network using torchviz
 #y = model(X_train)

@@ -448,4 +448,26 @@ error_histogram(model, F4_NSM_test, F4_NSM_test, 100, 0, 0.1, "histogram_NSM_tes
 error_histogram(model, F4i_0ff, F4i_0ff, 100, 0, 0.1, "histogram_0ff.pdf")
 error_histogram(model, F4i_1f, F4i_1f, 100, 0, 0.1, "histogram_1f.pdf")
 error_histogram(model, F4i_train, F4i_train, 100, 0, 0.1, "histogram_donothing.pdf")
+error_histogram(model, F4f_train, F4f_train, 100, 0, 0.1, "histogram_finalstable_train.pdf")
+error_histogram(model, F4f_test, F4f_test, 100, 0, 0.1, "histogram_finalstable_test.pdf")
 
+# histogram of how unphysical the results are
+F4i_unphysical = generate_random_F4(n_generate, NF, device)
+F4f_pred = model.predict_F4(F4i_unphysical).cpu().detach().numpy()
+
+# normalize F4f_pred by the total number density
+Ntot = np.sum(F4f_pred[:,3,:,:], axis=(1,2)) # [sim]
+
+# enforce that number density cannot be less than zero
+ndens = F4f_pred[:,3,:,:] # [sim, nu/nubar, flavor]
+negative_density_error = np.minimum(ndens/Ntot[:,None,None], np.zeros_like(ndens)) # [sim, nu/nubar, flavor]
+negative_density_error = np.max(np.abs(negative_density_error), axis=(1,2))
+plot_histogram(negative_density_error, 100, 0, 0.1, "histogram_negative_density.pdf")
+print("negative density:",np.min(negative_density_error), np.max(negative_density_error))
+
+# enforce that flux factors cannot be larger than 1
+fluxfac = np.sqrt(np.sum(F4f_pred[:,0:3,:,:]**2, axis=1) / ndens**2) # [sim, nu/nubar, flavor]
+fluxfac_error = np.maximum(fluxfac, np.ones_like(fluxfac)) - np.ones_like(fluxfac) # [sim, nu/nubar, flavor]
+fluxfac_error = np.max(fluxfac_error, axis=(1,2))
+plot_histogram(fluxfac_error, 100, 0, 0.1, "histogram_fluxfac.pdf")
+print("fluxfac:",np.min(fluxfac_error), np.max(fluxfac_error))
