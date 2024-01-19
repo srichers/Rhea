@@ -4,7 +4,7 @@ from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 
-def train_model(model,
+def train_asymptotic_model(model,
                 optimizer,
                 plotter,
                 NF,
@@ -14,18 +14,13 @@ def train_model(model,
                 dataset_size,
                 print_every,
                 device,
-                do_augment_final_stable,
-                do_NSM_stable,
                 do_unphysical_check,
-                do_trivial_stable,
                 comparison_loss_fn,
                 unphysical_loss_fn,
                 F4i_train,
                 F4f_train,
                 F4i_test,
-                F4f_test,
-                F4_NSM_train,
-                F4_NSM_test):
+                F4f_test):
     print("Training dataset size:",dataset_size)
 
     # create a new plotter object of larger size if epochs is larger than the plotter object
@@ -61,12 +56,7 @@ def train_model(model,
 
         # log the test error
         p.knownData.test_loss[t],  p.knownData.test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
-        p.knownData_FS.test_loss[t],  p.knownData_FS.test_err[t]  = optimizer.test(model, F4f_test,  F4f_test,  comparison_loss_fn)
-        p.NSM.test_loss[t],  p.NSM.test_err[t]  = optimizer.test(model, F4_NSM_test,  F4_NSM_test,  comparison_loss_fn)
         p.unphysical.test_loss[t],  p.unphysical.test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
-        p.zerofluxfac.test_loss[t],  p.zerofluxfac.test_err[t]  = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
-        p.oneflavor.test_loss[t],  p.oneflavor.test_err[t]  = optimizer.test(model, F4i_1f, F4i_1f, comparison_loss_fn)
-
 
         # load in a batch of data from the dataset
         for F4i_batch, F4f_batch in dataloader:
@@ -78,25 +68,9 @@ def train_model(model,
             loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
             loss.backward()
 
-            if do_augment_final_stable:
-                loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
-                loss.backward()
-
-            if do_NSM_stable:
-                loss = optimizer.train(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)
-                loss.backward()
-
             # train on making sure the model prediction is physical
             if do_unphysical_check:
                 loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn)
-                loss.backward()
-
-            # train on making sure known stable distributions dont change
-            if do_trivial_stable:
-                loss = optimizer.train(model, F4i_0ff, F4i_0ff, comparison_loss_fn)
-                loss.backward()
-
-                loss = optimizer.train(model, F4i_1f, F4i_1f, comparison_loss_fn)
                 loss.backward()
 
             # take a step with the optimizer    
@@ -104,21 +78,13 @@ def train_model(model,
 
         # Evaluate training errors
         p.knownData.train_loss[t], p.knownData.train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
-        if do_augment_final_stable:
-            p.knownData_FS.train_loss[t], p.knownData_FS.train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)
-        if do_NSM_stable:
-            p.NSM.train_loss[t], p.NSM.train_err[t] = optimizer.test(model, F4_NSM_train, F4_NSM_train, comparison_loss_fn)    
 
         # report max error
         if((t+1)%print_every==0):
             print(f"Epoch {t+1}")
             print("Train loss:",      p.knownData.train_loss[t])
             print("Test loss:",       p.knownData.test_loss[t])
-            print("Test FS loss:",       p.knownData_FS.test_loss[t])
-            print("Test NSM loss:",       p.NSM.test_loss[t])
             print("Test unphysical loss:",       p.unphysical.test_loss[t])
-            print("Test zerofluxfac loss:",       p.zerofluxfac.test_loss[t])
-            print("Test oneflavor loss:",       p.oneflavor.test_loss[t])
             
             print()
 

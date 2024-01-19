@@ -42,7 +42,7 @@ activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-5 # 1e-3
+learning_rate = 1e-3 # 1e-3
 
 # the number of flavors should be 3
 NF = 3
@@ -117,7 +117,7 @@ print("######################")
 print("# Training the model #")
 print("######################")
 for i in range(len(dataset_size_list)):
-    model_array[i], optimizer_array[i], plotter_array[i] = train_model(
+    model_array[i], optimizer_array[i], plotter_array[i] = train_asymptotic_model(
         model_array[i],
         optimizer_array[i],
         plotter_array[i],
@@ -128,18 +128,13 @@ for i in range(len(dataset_size_list)):
         dataset_size_list[i],
         print_every,
         device,
-        do_augment_final_stable,
-        do_NSM_stable,
         do_unphysical_check,
-        do_trivial_stable,
         comparison_loss_fn,
         unphysical_loss_fn,
         F4i_train,
         F4f_train,
         F4i_test,
-        F4f_test,
-        F4_NSM_train,
-        F4_NSM_test)
+        F4f_test)
     
     # pickle the model, optimizer, and plotter
     with open("model_"+str(dataset_size_list[i])+".pkl", "wb") as f:
