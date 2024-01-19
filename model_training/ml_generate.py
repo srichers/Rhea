@@ -44,7 +44,7 @@ def generate_stable_F4_oneflavor(n_trivial_stable,NF, device):
     
     return F4i
 
-def generate_random_F4(n_unphysical_check, NF, device):
+def generate_random_F4(n_unphysical_check, NF, device, zero_weight=1):
     F4i = torch.zeros((n_unphysical_check, 4, 2, NF), device=device)
 
     # choose a random number density
@@ -60,7 +60,7 @@ def generate_random_F4(n_unphysical_check, NF, device):
     F4i[:,2,:,:] = costheta
 
     # choose a random flux factor
-    fluxfac = torch.rand(n_unphysical_check, 2, NF, device=device)
+    fluxfac = torch.rand(n_unphysical_check, 2, NF, device=device)**zero_weight
 
     # multiply the spatial flux by the flux factor times the density.
     F4i[:,0:3,:,:] = F4i[:,0:3,:,:] * fluxfac[:,None,:,:] * Ndens[:,None,:,:]
