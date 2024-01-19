@@ -38,17 +38,23 @@ class AsymptoticOptimizer(Optimizer):
             
 class StabilityOptimizer(Optimizer):
     # function to train the dataset
+    # note that the loss function MUST be BCEWithLogitsLoss
+    # Because of this, y is NOT wrapped by sigmoid
     def train(self, model, F4i, unstable, loss_fn):
         model.train()
-        unstable_pred = model.predict_unstable(F4i)
-        loss = loss_fn(unstable_pred, unstable)
+        X = model.X_from_F4(F4i)
+        y = model.forward(X)
+        loss = loss_fn(y, unstable)
         return loss
     
     # function to test the model performance
+    # note that the loss function MUST be BCEWithLogitsLoss
+    # Because of this, y is NOT wrapped by sigmoid
     def test(self, model, F4i, unstable, loss_fn):
         model.eval()
         with torch.no_grad():
-            unstable_pred = model.predict_unstable(F4i)
-            loss = loss_fn(unstable_pred, unstable)
-            error = torch.max(torch.abs(unstable_pred - unstable))
+            X = model.X_from_F4(F4i)
+            y = model.forward(X)
+            loss = loss_fn(y, unstable)
+            error = torch.max(torch.abs(torch.sigmoid(y) - unstable))
             return loss, error

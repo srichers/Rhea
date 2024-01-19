@@ -18,7 +18,7 @@ n_equatorial = 64
 zero_fluxfac_bias = 10
 
 conserve_lepton_number=True
-nhidden = 0
+nhidden = 3
 width = 256
 dropout_probability = 0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
