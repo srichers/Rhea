@@ -65,4 +65,8 @@ def generate_random_F4(n_unphysical_check, NF, device, zero_weight=1):
     # multiply the spatial flux by the flux factor times the density.
     F4i[:,0:3,:,:] = F4i[:,0:3,:,:] * fluxfac[:,None,:,:] * Ndens[:,None,:,:]
 
+    # normalize so the total number density is 1
+    ntot = torch.sum(F4i[:,3,:,:], axis=(1,2))
+    F4i = F4i / ntot[:,None,None,None]
+
     return F4i
