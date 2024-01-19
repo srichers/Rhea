@@ -1,17 +1,15 @@
 # credit to https://thinkingneuron.com/using-artificial-neural-networks-for-regression-in-python/
 # Convert the flavor transformation data to one with reduced dimensionality to make it easier to train on
 # Run from the directory containin the joint dataset
-import h5py
 import numpy as np
-from sklearn.model_selection import train_test_split
 import torch
 from torch import nn
-import ml_tools as ml
 from ml_loss import *
 from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
+from ml_read_data import *
 import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
@@ -19,23 +17,23 @@ directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","f
 NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
 do_unpickle = False
 test_size = 0.1
-epochs = 12000
+epochs = 500
 batch_size = -1
-dataset_size_list = [10,100,1000,10000, -1] # -1 means use all the data
+dataset_size_list = [10,100,1000,-1] # -1 means use all the data
 n_generate = 1000
 print_every = 10
 
 # data augmentation options
-do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
-do_augment_final_stable = True # True
+do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
+do_augment_final_stable = False # True
 do_unphysical_check = True # True - seems to help prevent crazy results
-do_trivial_stable   = True # True
+do_trivial_stable   = False # True
 do_NSM_stable = False # True
 
 # neural network options
 conserve_lepton_number=True
-nhidden = 5
-width = 2048
+nhidden = 2
+width = 128
 dropout_probability = 0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
@@ -55,114 +53,10 @@ NF = 3
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
-#===============================================#
-# read in the database from the previous script #
-#===============================================#
-print()
-print("#############################")
-print("# PREPARING TEST/TRAIN DATA #")
-print("#############################")
-F4_initial_list = []
-F4_final_list = []
-for d in directory_list:
-    f_in = h5py.File(basedir+"/input_data/"+d+"/many_sims_database.h5","r")
-    F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
-    F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
-    assert(NF == int(np.array(f_in["nf"])) )
-    f_in.close()
-    print(len(F4_initial_list[-1]),"points in",d)
-F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
-F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
-
-# normalize the data so the number densities add up to 1
-ntot = ml.ntotal(F4_initial_list)
-F4_initial_list = F4_initial_list / ntot[:,None,None,None]
-F4_final_list   = F4_final_list   / ntot[:,None,None,None]
-
-# make sure the data are good
-check_conservation(F4_initial_list, F4_final_list)
-
-# split into training and testing sets
-F4i_train, F4i_test, F4f_train, F4f_test = train_test_split(F4_initial_list, F4_final_list, test_size=test_size, random_state=42)
-
-if do_augment_permutation:
-    F4i_train = ml.augment_permutation(F4i_train)
-    F4f_train = ml.augment_permutation(F4f_train)
-    F4i_test  = ml.augment_permutation(F4i_test )
-    F4f_test  = ml.augment_permutation(F4f_test )
-
-# move the arrays over to the gpu
-F4i_train = torch.Tensor(F4i_train).to(device)
-F4f_train = torch.Tensor(F4f_train).to(device)
-F4i_test  = torch.Tensor(F4i_test ).to(device)
-F4f_test  = torch.Tensor(F4f_test ).to(device)
-print("Train:",F4i_train.shape)
-print("Test:",F4i_test.shape)
-
-#=================================================#
-# read in the stable points from the NSM snapshot #
-print()
-print("#############################")
-print("# READING NSM STABLE POINTS #")
-print("#############################")
-F4_NSM_train = None
-F4_NSM_test = None
-# note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
-# take only the y-z slice to limit the size of the data.
-f_in = h5py.File(basedir+"/input_data/model_rl0_orthonormal.h5","r")
-discriminant = np.array(f_in["crossing_discriminant"])[100,:,:]
-# n has shape [Nx,Ny,Nz]]
-ne = np.array(f_in["n_e(1|ccm)"])[0,:,:]
-na = np.array(f_in["n_a(1|ccm)"])[0,:,:]
-nx = np.array(f_in["n_x(1|ccm)"])[0,:,:]
-# f has shape [3, Nx,Ny,Nz]
-fe = np.array(f_in["fn_e(1|ccm)"])[:,0,:,:]
-fa = np.array(f_in["fn_a(1|ccm)"])[:,0,:,:]
-fx = np.array(f_in["fn_x(1|ccm)"])[:,0,:,:]
-f_in.close()
-stable_locs = np.where(discriminant<=0)
-nlocs = len(stable_locs[0])
-print(nlocs,"points")
-F4_NSM_stable = np.zeros((nlocs,4,2,NF))
-F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
-F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
-F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
-for i in range(3):
-    F4_NSM_stable[:,i,0,0  ] = fe[i][stable_locs]
-    F4_NSM_stable[:,i,1,0  ] = fa[i][stable_locs]
-    F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
-# convert into a tensor
-F4_NSM_stable = torch.tensor(F4_NSM_stable).float()
-# normalize the data so the number densities add up to 1
-ntot = ml.ntotal(F4_NSM_stable)
-F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
-# split into training and testing sets
-# don't need the final values because they are the same as the initial
-F4_NSM_train, F4_NSM_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
-if do_augment_permutation:
-    F4_NSM_train = ml.augment_permutation(F4_NSM_train)
-    F4_NSM_test  = ml.augment_permutation(F4_NSM_test )
-# move the array to the device
-F4_NSM_train = torch.Tensor(F4_NSM_train).to(device)
-F4_NSM_test  = torch.Tensor(F4_NSM_test ).to(device)
-
-#===========================#
-# read NSM simulated points #
-#===========================#
-print()
-print("################################")
-print("# READING NSM SIMULATED POINTS #")
-print("################################")
-print("these data are worthless.")
-#filename = basedir+"/input_data/Emu_many1D/"+NSM_simulated_filename
-#with h5py.File(filename,"r") as f_in:
-#    initial = np.array(f_in["F4_initial"]) # [simulationIndex, xyzt, nu/nubar, flavor]
-#    final   = np.array(f_in["F4_final"]) # [simulationIndex, xyzt, nu/nubar, flavor]
-
-## these data have 2 flavors. Convert to 3 flavors by splitting the mu/tau flavors
-#F4_NSM_simulated_initial = np.zeros((initial.shape[0],4,2,NF))
-#F4_NSM_simulated_initial[:,:,:,0]  = initial[:,:,:,0]
-#F4_NSM_simulated_initial[:,:,:,1:] = initial[:,:,:,1] / 2.
+#===============#
+# read the data #
+#===============#
+F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test = read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
 
 #=======================#
 # instantiate the model #
