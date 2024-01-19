@@ -89,3 +89,25 @@ def train_asymptotic_model(model,
             print()
 
     return model, optimizer, p
+
+
+def train_stability_model(model,
+                optimizer,
+                plotter,
+                NF,
+                epochs,
+                batch_size,
+                n_generate,
+                print_every,
+                device,
+                do_trivial_stable):
+    
+    print("Training dataset size:",n_generate)
+
+    # create a new plotter object of larger size if epochs is larger than the plotter object
+    p = Plotter(epochs)
+    p.fill_from_plotter(plotter)
+
+    loss = nn.BCEWithLogitsLoss() # contains the sigmoid built in. Don't put sigmoid in model
+
+    return model, optimizer, p

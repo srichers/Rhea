@@ -70,6 +70,11 @@ class NeuralNetwork(nn.Module):
             if module.bias is not None:
                 module.bias.data.zero_()
     
+    # Push the inputs through the neural network
+    def forward(self,x):
+        y = self.linear_activation_stack(x)
+        return y
+
     # Create an array of the dot product of each species with itself and each other species
     # Input dimensions expeced to be [sim, xyzt, nu/nubar, flavor]
     def X_from_F4(self, F4):
