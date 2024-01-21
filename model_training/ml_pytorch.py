@@ -14,15 +14,16 @@ from ml_read_data import *
 import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
-directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
+directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
 NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
 do_unpickle = False
 test_size = 0.1
 epochs = 500
 batch_size = -1
 dataset_size_list = [10,100,1000,-1] # -1 means use all the data
-n_generate = 1000
+n_generate = 10000
 print_every = 10
+generate_max_fluxfac = 0.95
 
 # data augmentation options
 do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
@@ -133,6 +134,7 @@ for i in range(len(dataset_size_list)):
         epochs,
         batch_size,
         n_generate,
+        generate_max_fluxfac,
         dataset_size_list[i],
         print_every,
         device,

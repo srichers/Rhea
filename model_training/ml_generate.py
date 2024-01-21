@@ -44,7 +44,7 @@ def generate_stable_F4_oneflavor(n_trivial_stable,NF, device):
     
     return F4i
 
-def generate_random_F4(n_generate, NF, device, zero_weight=1):
+def generate_random_F4(n_generate, NF, device, zero_weight=1, max_fluxfac=1):
     assert(n_generate >= 0)
     F4i = torch.zeros((n_generate, 4, 2, NF), device=device)
 
@@ -56,15 +56,21 @@ def generate_random_F4(n_generate, NF, device, zero_weight=1):
     # choose the flux to be in a random direction
     costheta = 2*(torch.rand(n_generate, 2, NF, device=device) - 0.5)
     phi = 2*torch.pi*torch.rand(n_generate, 2, NF, device=device)
-    F4i[:,0,:,:] = torch.sqrt(1-costheta**2) * torch.cos(phi)
-    F4i[:,1,:,:] = torch.sqrt(1-costheta**2) * torch.sin(phi)
+    sintheta = torch.sqrt(1-costheta**2)
+    F4i[:,0,:,:] = sintheta * torch.cos(phi)
+    F4i[:,1,:,:] = sintheta * torch.sin(phi)
     F4i[:,2,:,:] = costheta
+    F4i[:,3,:,:] = 1
 
     # choose a random flux factor
-    fluxfac = torch.rand(n_generate, 2, NF, device=device)**zero_weight
+    fluxfac = torch.rand(n_generate, 2, NF, device=device)*max_fluxfac
+    fluxfac = fluxfac**zero_weight
 
     # multiply the spatial flux by the flux factor times the density.
-    F4i[:,0:3,:,:] = F4i[:,0:3,:,:] * fluxfac[:,None,:,:] * Ndens[:,None,:,:]
+    F4i[:,0:3,:,:] = F4i[:,0:3,:,:] * fluxfac[:,None,:,:]
+    
+    # scale by the number density
+    F4i *= Ndens[:,None,:,:]
 
     # normalize so the total number density is 1
     ntot = torch.sum(F4i[:,3,:,:], axis=(1,2))

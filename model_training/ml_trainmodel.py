@@ -12,6 +12,7 @@ def train_asymptotic_model(model,
                 epochs,
                 batch_size,
                 n_generate,
+                generate_max_fluxfac,
                 dataset_size,
                 print_every,
                 device,
@@ -51,7 +52,7 @@ def train_asymptotic_model(model,
     for t in range(epochs_already_done, epochs):
 
         # generate randomized data and evaluate the test error
-        F4i_unphysical = generate_random_F4(n_generate, NF, device)
+        F4i_unphysical = generate_random_F4(n_generate, NF, device, max_fluxfac=generate_max_fluxfac)
 
         # log the test error
         p.data["knownData"].test_loss[t],  p.data["knownData"].test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
