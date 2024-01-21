@@ -20,13 +20,13 @@ do_unpickle = False
 test_size = 0.1
 epochs = 500
 batch_size = -1
-dataset_size_list = [10,100,1000,-1] # -1 means use all the data
+dataset_size_list = [10,100,1000,10000,-1] # -1 means use all the data
 n_generate = 10000
 print_every = 10
 generate_max_fluxfac = 0.95
 
 # data augmentation options
-do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
+do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = False # True
 do_unphysical_check = True # True - seems to help prevent crazy results
 
@@ -58,6 +58,11 @@ print(f"Using {device} device")
 # read the data #
 #===============#
 F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test = read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
+
+# adjust entries of -1 to instead have the correct size of the dataset
+for i in range(len(dataset_size_list)):
+    if dataset_size_list[i] == -1:
+        dataset_size_list[i] = F4i_train.shape[0]
 
 # test for stability under max entropy condition
 #train_crossing = has_crossing(F4i_train.cpu().detach().numpy(), NF, 64)

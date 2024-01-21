@@ -69,13 +69,11 @@ def train_asymptotic_model(model,
 
                 # train on making sure the model prediction is correct
                 loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn, True,False)
-                assert(loss==loss)
                 loss.backward()
 
                 # train on making sure the model prediction is physical
                 if do_unphysical_check:
                     loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn, True,False)
-                    assert(loss==loss)
                     loss.backward()
 
                 optimizer.optimizer.step()
@@ -88,7 +86,7 @@ def train_asymptotic_model(model,
         if((t+1)%print_every==0):
             print(f"Epoch {t+1}")
             for key in p.data.keys():
-                print(key, p.data[key].train_loss[t],  p.data[key].test_loss[t])
+                print(key, np.sqrt(p.data[key].train_loss[t]),  np.sqrt(p.data[key].test_loss[t]))
             
             print()
 
