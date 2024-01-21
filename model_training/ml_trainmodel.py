@@ -53,19 +53,22 @@ def train_asymptotic_model(model,
     #===============#
     # training loop #
     #===============#
+    # generate randomized data and evaluate the test error
+    F4i_unphysical_train = generate_random_F4(dataset_size, NF, device, max_fluxfac=generate_max_fluxfac)
+    F4i_unphysical_test = generate_random_F4(dataset_size, NF, device, max_fluxfac=generate_max_fluxfac)
+    F4i_0ff_train = generate_stable_F4_zerofluxfac(dataset_size, NF, device)
+    F4i_0ff_test = generate_stable_F4_zerofluxfac(dataset_size, NF, device)
+    F4i_1f_train = generate_stable_F4_oneflavor(dataset_size, NF, device)
+    F4i_1f_test = generate_stable_F4_oneflavor(dataset_size, NF, device)
+
     epochs_already_done = len(plotter.data["knownData"].train_loss)
     for t in range(epochs_already_done, epochs):
 
-        # generate randomized data and evaluate the test error
-        F4i_unphysical = generate_random_F4(n_generate, NF, device, max_fluxfac=generate_max_fluxfac)
-        F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
-        F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
-
         # log the test error
         p.data["knownData"].test_loss[t],  p.data["knownData"].test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn, conserve_lepton_number, bound_to_physical)
-        p.data["unphysical"].test_loss[t],  p.data["unphysical"].test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical)
-        p.data["0ff"].test_loss[t],  p.data["0ff"].test_err[t]  = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
-        p.data["1f"].test_loss[t],  p.data["1f"].test_err[t]  = optimizer.test(model, F4i_1f, F4i_1f, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+        p.data["unphysical"].test_loss[t],  p.data["unphysical"].test_err[t]  = optimizer.test(model, F4i_unphysical_test, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical)
+        p.data["0ff"].test_loss[t],  p.data["0ff"].test_err[t]  = optimizer.test(model, F4i_0ff_test, F4i_0ff_test, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+        p.data["1f"].test_loss[t],  p.data["1f"].test_err[t]  = optimizer.test(model, F4i_1f_test, F4i_1f_test, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
         p.data["finalstable"].test_loss[t],  p.data["finalstable"].test_err[t]  = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
 
         # load in a batch of data from the dataset
@@ -84,25 +87,25 @@ def train_asymptotic_model(model,
                     loss.backward()
 
                 if do_augment_1f:
-                    loss = optimizer.train(model, F4i_1f, F4i_1f, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+                    loss = optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
                     loss.backward()
 
                 if do_augment_0ff:
-                    loss = optimizer.train(model, F4i_0ff, F4i_0ff, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+                    loss = optimizer.train(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
                     loss.backward()
 
                 # train on making sure the model prediction is physical
                 if do_unphysical_check:
-                    loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical)
+                    loss = optimizer.train(model, F4i_unphysical_train, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical)
                     loss.backward()
 
                 optimizer.optimizer.step()
 
         # Evaluate training errors
         p.data["knownData"].train_loss[t], p.data["knownData"].train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn,conserve_lepton_number, bound_to_physical)
-        p.data["unphysical"].train_loss[t], p.data["unphysical"].train_err[t] = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical)
-        p.data["0ff"].train_loss[t], p.data["0ff"].train_err[t] = optimizer.test(model, F4i_0ff, F4i_0ff, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
-        p.data["1f"].train_loss[t], p.data["1f"].train_err[t] = optimizer.test(model, F4i_1f, F4i_1f, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+        p.data["unphysical"].train_loss[t], p.data["unphysical"].train_err[t] = optimizer.test(model, F4i_unphysical_train, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical)
+        p.data["0ff"].train_loss[t], p.data["0ff"].train_err[t] = optimizer.test(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+        p.data["1f"].train_loss[t], p.data["1f"].train_err[t] = optimizer.test(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
         p.data["finalstable"].train_loss[t], p.data["finalstable"].train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
 
         # report max error
@@ -122,6 +125,7 @@ def train_stability_model(model,
                 NF,
                 epochs,
                 n_generate,
+                generate_max_fluxfac,
                 print_every,
                 device,
                 n_equatorial,
@@ -135,13 +139,13 @@ def train_stability_model(model,
     p.fill_from_plotter(plotter)
 
     # set up training datasets
-    F4i_random = generate_random_F4(n_generate, NF, 'cpu', zero_weight=zero_weight)
+    F4i_random = generate_random_F4(n_generate, NF, 'cpu', zero_weight=zero_weight, max_fluxfac=generate_max_fluxfac)
     unstable_random = has_crossing(F4i_random.detach().numpy(), NF, n_equatorial)
     print("Random Stable:",np.sum(unstable_random==False))
     print("Random Unstable:",np.sum(unstable_random==True))
 
-    F4i_heavy = generate_random_F4(n_generate, NF, 'cpu', zero_weight=zero_weight)
-    F4i_heavy[:,:,:,1:] = F4i_heavy[:,:,0,1][:,:,None,None]
+    F4i_heavy = generate_random_F4(n_generate, NF, 'cpu', zero_weight=zero_weight, max_fluxfac=generate_max_fluxfac)
+    F4i_heavy[:,:,:,1:] = F4i_heavy[:,:,:,1][:,:,:,None]
     F4i_heavy = augment_permutation(F4i_heavy)
     unstable_heavy = has_crossing(F4i_heavy.detach().numpy(), NF, n_equatorial)
     print("Heavy Stable:",np.sum(unstable_random==False))

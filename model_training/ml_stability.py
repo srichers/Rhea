@@ -12,12 +12,12 @@ import pickle
 do_unpickle = False
 test_size = 0.1
 epochs = 500
-dataset_size_list = [10,100,1000] # -1 means use all the data
+dataset_size_list = [10,100,1000, 10000] # -1 means use all the data
 print_every = 10
 n_equatorial = 64
 zero_fluxfac_bias = 10
+generate_max_fluxfac = 0.95
 
-conserve_lepton_number=True
 nhidden = 3
 width = 256
 dropout_probability = 0 #0.1 # 0.5
@@ -29,7 +29,7 @@ do_trivial_stable = False
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-5 # 1e-3
+learning_rate = 1e-3 # 1e-3
 
 # the number of flavors should be 3
 NF = 3
@@ -41,11 +41,6 @@ outfilename = "model_stability"
 #========================#
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
-
-#===============#
-# training data #
-#===============#
-F4i_test = generate_random_F4(dataset_size_list[-1], NF, device)
 
 
 #=======================#
@@ -83,8 +78,7 @@ for dataset_size in dataset_size_list:
         op,
         weight_decay,
         learning_rate,
-        device,
-        conserve_lepton_number=conserve_lepton_number))
+        device))
 
 print(model_array[-1])
 
@@ -102,6 +96,7 @@ for i in range(len(dataset_size_list)):
         NF,
         epochs,
         dataset_size_list[i],
+        generate_max_fluxfac,
         print_every,
         device,
         n_equatorial,
@@ -122,6 +117,7 @@ print()
 print("########################")
 print("# Saving model to file #")
 print("########################")
+F4i_test = generate_random_F4(dataset_size_list[-1], NF, device)
 def save_model(model, outfilename, device):
     with torch.no_grad():
         print(F4i_test.shape)
