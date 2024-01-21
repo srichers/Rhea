@@ -113,7 +113,7 @@ class Plotter():
         
         plt.savefig("train_test_error.pdf",bbox_inches="tight")
 
-def plot_nue_nuebar(model, npoints, nreps,):
+def plot_nue_nuebar(model, npoints, nreps, conserve_lepton_number, restrict_to_physical):
     # plot the number of electron neutrinos when varying the number of antineutrinos
     nee_list_fid    = np.zeros((npoints,nreps))
     neebar_list_fid = np.zeros((npoints,nreps))
@@ -128,7 +128,7 @@ def plot_nue_nuebar(model, npoints, nreps,):
         F4_test[2, 1, 0] = -1/3 * ratio_list[i]
         F4_pred = torch.tensor(F4_test[None,:,:,:]).float().to(next(model.parameters()).device)
         for j in range(nreps):
-            F4_pred = model.predict_F4(F4_pred)
+            F4_pred = model.predict_F4(F4_pred, conserve_lepton_number, restrict_to_physical)
             nee_list_fid[i,j]    = F4_pred[0,3,0,0].to('cpu')
             neebar_list_fid[i,j] = F4_pred[0,3,1,0].to('cpu')
             
@@ -160,9 +160,9 @@ def plot_histogram(error, bins, xmin, xmax, filename):
 
 # apply the model to a dataset and create a histogram of the magnitudes of the error
 # F4 has dimensions [sim, xyzt, nu/nubar, flavor]
-def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, filename):
+def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, filename, conserve_lepton_number, restrict_to_physical):
     # get the predicted final F4
-    F4_pred = model.predict_F4(F4_initial)
+    F4_pred = model.predict_F4(F4_initial, conserve_lepton_number, restrict_to_physical)
 
     # calculate the error
     F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()

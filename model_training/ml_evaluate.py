@@ -25,6 +25,7 @@ do_augment_final_stable = False # True
 do_trivial_stable   = False # True
 do_NSM_stable = False # True
 conserve_lepton_number = True
+restrict_to_physical = True
 
 # the number of flavors should be 3
 NF = 3
@@ -105,11 +106,11 @@ print("N final (actual)")
 print(F4f_train[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
 
 #print("N re-predicted")
-#after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+#after = model.predict_F4(after, conserve_lepton_number, restrict_to_physical)
 #print(after[0,3])
 
 print()
@@ -133,11 +134,11 @@ print("N final (actual)")
 print(F4f_test[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
 
 #print("N re-predicted")
-#after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+#after = model.predict_F4(after, conserve_lepton_number, restrict_to_physical)
 #print(after[0,3])
 
 print()
@@ -158,18 +159,18 @@ F4_test[3, 1, 0] =  1
 F4_test[2, 0, 0] =  1/3
 F4_test[2, 1, 0] = -1/3
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 
 print()
 print("N initail")
 print(before[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
 
 print("N re-predicted")
-after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(after, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
 
 print("2 Flavor")
@@ -200,18 +201,18 @@ F4_test[3, 1, 0] =  .5
 F4_test[2, 0, 0] =  0
 F4_test[2, 1, 0] =  0
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 
 print()
 print("N initial")
 print(before[0,3])
 
 print("N predicted")
-after = model.predict_F4(before, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
 
 print("N re-predicted")
-after = model.predict_F4(after, conserve_lepton_number=conserve_lepton_number)
+after = model.predict_F4(after, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
 
 print()
@@ -227,7 +228,7 @@ print("########################")
 npoints = 11
 nreps = 20
 p.init_plot_options()
-plot_nue_nuebar(model, npoints, nreps)
+plot_nue_nuebar(model, npoints, nreps, conserve_lepton_number, restrict_to_physical)
 p.plot_error(ymin=1e-5)
 
 # plot the loss as a function of dataset size using the array of plotters
@@ -252,19 +253,19 @@ plt.savefig("dataset_size.pdf",bbox_inches="tight")
 n_generate = 10000
 F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
 F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
-error_histogram(model, F4i_train, F4f_train, 100, 0, 0.1, "histogram_train.pdf")
-error_histogram(model, F4i_test, F4f_test, 100, 0, 0.1, "histogram_test.pdf")
-error_histogram(model, F4_NSM_train, F4_NSM_train, 100, 0, 0.1, "histogram_NSM_train.pdf")
-error_histogram(model, F4_NSM_test, F4_NSM_test, 100, 0, 0.1, "histogram_NSM_test.pdf")
-error_histogram(model, F4i_0ff, F4i_0ff, 100, 0, 0.1, "histogram_0ff.pdf")
-error_histogram(model, F4i_1f, F4i_1f, 100, 0, 0.1, "histogram_1f.pdf")
-error_histogram(model, F4i_train, F4i_train, 100, 0, 0.1, "histogram_donothing.pdf")
-error_histogram(model, F4f_train, F4f_train, 100, 0, 0.1, "histogram_finalstable_train.pdf")
-error_histogram(model, F4f_test, F4f_test, 100, 0, 0.1, "histogram_finalstable_test.pdf")
+error_histogram(model, F4i_train, F4f_train, 100, 0, 0.1, "histogram_train.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4i_test, F4f_test, 100, 0, 0.1, "histogram_test.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4_NSM_train, F4_NSM_train, 100, 0, 0.1, "histogram_NSM_train.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4_NSM_test, F4_NSM_test, 100, 0, 0.1, "histogram_NSM_test.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4i_0ff, F4i_0ff, 100, 0, 0.1, "histogram_0ff.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4i_1f, F4i_1f, 100, 0, 0.1, "histogram_1f.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4i_train, F4i_train, 100, 0, 0.1, "histogram_donothing.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4f_train, F4f_train, 100, 0, 0.1, "histogram_finalstable_train.pdf", conserve_lepton_number, restrict_to_physical)
+error_histogram(model, F4f_test, F4f_test, 100, 0, 0.1, "histogram_finalstable_test.pdf", conserve_lepton_number, restrict_to_physical)
 
 # histogram of how unphysical the results are
 F4i_unphysical = generate_random_F4(n_generate, NF, device)
-F4f_pred = model.predict_F4(F4i_unphysical).cpu().detach().numpy()
+F4f_pred = model.predict_F4(F4i_unphysical,conserve_lepton_number,restrict_to_physical).cpu().detach().numpy()
 
 # normalize F4f_pred by the total number density
 Ntot = np.sum(F4f_pred[:,3,:,:], axis=(1,2)) # [sim]
@@ -278,7 +279,5 @@ print("negative density:",np.min(negative_density_error), np.max(negative_densit
 
 # enforce that flux factors cannot be larger than 1
 fluxfac = np.sqrt(np.sum(F4f_pred[:,0:3,:,:]**2, axis=1) / ndens**2) # [sim, nu/nubar, flavor]
-fluxfac_error = np.maximum(fluxfac, np.ones_like(fluxfac)) - np.ones_like(fluxfac) # [sim, nu/nubar, flavor]
-fluxfac_error = np.max(fluxfac_error, axis=(1,2))
-plot_histogram(fluxfac_error, 100, 0, 0.1, "histogram_fluxfac.pdf")
+fluxfac_error = np.maximum(fluxfac, np.ones_like(fluxfac)) - np.ones_like(fluxfac) # [si, conserve_lepton_number, restrict_to_physical)
 print("fluxfac:",np.min(fluxfac_error), np.max(fluxfac_error))
