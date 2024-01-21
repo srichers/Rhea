@@ -29,10 +29,12 @@ generate_max_fluxfac = 0.95
 do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = True # True
 do_unphysical_check = True # True - seems to help prevent crazy results
+do_augment_0ff = True
+do_augment_1f = True
 
 # neural network options
 conserve_lepton_number=True
-bound_to_physical = True
+bound_to_physical = False # causes nans in back propagation
 nhidden = 2
 width = 128
 dropout_probability = 0 #0.1 # 0.5
@@ -97,7 +99,7 @@ for dataset_size in dataset_size_list:
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-        plotter = Plotter(0,["knownData","unphysical","knownData_corrected","unphysical_corrected"])
+        plotter = Plotter(0,["knownData","unphysical","0ff","1f","finalstable"])
 
     plotter_array.append(plotter)
     model_array.append(model)
@@ -143,6 +145,10 @@ for i in range(len(dataset_size_list)):
         device,
         do_unphysical_check,
         do_augment_final_stable,
+        do_augment_1f,
+        do_augment_0ff,
+        conserve_lepton_number,
+        bound_to_physical,
         comparison_loss_fn,
         unphysical_loss_fn,
         F4i_train,
