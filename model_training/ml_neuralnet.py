@@ -189,6 +189,28 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
             F4_final[:,3,0,:] = F4_final[:,3,0,:] - 0.5*delta_Jt
             F4_final[:,3,1,:] = F4_final[:,3,1,:] + 0.5*delta_Jt
 
+            avgF4 = torch.sum(F4_final, axis=3)[:,:,:,None] / self.NF
+
+            # enforce that all four-vectors are time-like
+            # choose the branch that leads to the most positive alpha
+            a = dot4(avgF4, avgF4) # [sim, nu/nubar, flavor]
+            b = 2.*dot4(avgF4, F4_final)
+            c = dot4(F4_final, F4_final)
+            radical = b**2 - 4*a*c
+            alpha = (-b + torch.sign(a)*torch.sqrt(radical)) / (2*a)
+
+            # fix the case where a is zero
+            badlocs = torch.where(torch.abs(a/b)<1e-6)
+            alpha[badlocs] = (-c/b)[badlocs]
+
+            # find the nu/nubar and flavor indices where alpha is maximized
+            maxalpha = torch.amax(alpha, dim=(1,2)) # [sim]
+            maxalpha = torch.maximum(maxalpha, torch.zeros_like(maxalpha))
+            maxalpha[torch.where(maxalpha>0)] += 1e-6
+
+            # modify the four-vectors to be time-like
+            F4_final = (F4_final + maxalpha[:,None,None,None]*avgF4) / (maxalpha[:,None,None,None] + 1)
+
         return F4_final
 
     # get the expected output from the ML model from a pairof initial and final F4 vectors
