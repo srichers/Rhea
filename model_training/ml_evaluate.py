@@ -4,13 +4,13 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
-from torch import nn
 from ml_loss import *
 from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
 from ml_read_data import *
+from ml_tools import flux_factor
 import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
@@ -26,7 +26,7 @@ do_augment_final_stable = False # True
 do_trivial_stable   = False # True
 do_NSM_stable = False # True
 conserve_lepton_number = True
-restrict_to_physical = True
+restrict_to_physical = False #True
 
 # the number of flavors should be 3
 NF = 3
@@ -264,4 +264,6 @@ print("negative density:",np.min(negative_density_error), np.max(negative_densit
 # enforce that flux factors cannot be larger than 1
 fluxfac = np.sqrt(np.sum(F4f_pred[:,0:3,:,:]**2, axis=1) / ndens**2) # [sim, nu/nubar, flavor]
 fluxfac_error = np.maximum(fluxfac, np.ones_like(fluxfac)) - np.ones_like(fluxfac) # [si, conserve_lepton_number, restrict_to_physical)
+fluxfac_error = np.max(np.abs(fluxfac_error), axis=(1,2))
+plot_histogram(fluxfac_error, 100, 0, 0.1, "histogram_fluxfac.pdf")
 print("fluxfac:",np.min(fluxfac_error), np.max(fluxfac_error))
