@@ -16,6 +16,9 @@ def ntotal(F4):
     ntotal = torch.sum(F4[:,3], axis=(1,2)) # [sim]
     return ntotal
 
+def flux_factor(F4):
+    return torch.sqrt(torch.sum(F4[:,:3]**2, axis=1)) / F4[:,3]
+
 def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     ntot = ntotal(F4_initial_list)
 
