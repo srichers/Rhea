@@ -14,13 +14,14 @@ from ml_read_data import *
 import pickle
 
 basedir = "/mnt/scratch/srichers/ML_FFI"
-directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_twobeam","fluxfac_one_z"]
+directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
 NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
-dataset_size_list = [10,100,1000,-1] # -1 means use all the data
+dataset_size_list = [10,100,1000,10000,-1] # -1 means use all the data
 n_generate = 1000
+test_size = 0.1
 
 # data augmentation options
-do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
+do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = False # True
 do_trivial_stable   = False # True
 do_NSM_stable = False # True
@@ -39,8 +40,11 @@ print(f"Using {device} device")
 #===============#
 # read the data #
 #===============#
-test_size = 0.1
 F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test = read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
+# adjust entries of -1 to instead have the correct size of the dataset
+for i in range(len(dataset_size_list)):
+    if dataset_size_list[i] == -1:
+        dataset_size_list[i] = F4i_train.shape[0]
 
 #=======================#
 # instantiate the model #
@@ -54,7 +58,9 @@ model_array = []
 plotter_array = []
 
 for dataset_size in dataset_size_list:
-    with open("model_"+str(dataset_size)+".pkl", "rb") as f:
+    filename = "model_"+str(dataset_size)+".pkl"
+    print("Loading",filename)
+    with open(filename, "rb") as f:
         model, optimizer, plotter = pickle.load(f)
 
     plotter_array.append(plotter)
@@ -62,31 +68,10 @@ for dataset_size in dataset_size_list:
 
 print(model_array[-1])
 
-
 # use the largest dataset size for the rest of these metrics
 p = plotter_array[-1]
 model = model_array[-1]
  
-# save the model to file
-print()
-print("########################")
-print("# Saving model to file #")
-print("########################")
-outfilename = "model"
-def save_model(model, outfilename, device):
-    with torch.no_grad():
-        print(F4i_test.shape)
-
-        model.to(device)
-        X = model.X_from_F4(F4i_test.to(device))
-        traced_model = torch.jit.trace(model, X)
-        torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
-        print("Saving to",outfilename+"_"+device+".ptc")
-
-save_model(model, outfilename, "cpu")
-if device=="cuda":
-    save_model(model, outfilename, "cuda")
-
 # set model to evaluation mode
 model.eval()
 
@@ -235,7 +220,6 @@ p.plot_error(ymin=1e-5)
 train_loss = np.array([p.data["knownData"].train_loss[-1] for p in plotter_array])
 test_loss  = np.array([p.data["knownData"].test_loss[-1]  for p in plotter_array])
 xvals = np.array(dataset_size_list)
-xvals[np.where(xvals==-1)] = F4i_train.shape[0]
 
 # plot the loss as a function of dataset size
 plt.clf()
