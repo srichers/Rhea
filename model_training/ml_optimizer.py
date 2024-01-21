@@ -8,27 +8,24 @@ class Optimizer():
                  op, # Adam, SGD, RMSprop
                  weight_decay,
                  learning_rate,
-                 device,
-                 conserve_lepton_number
-                 ): 
+                 device): 
         self.NF = model.NF
         self.optimizer = op(model.parameters(), weight_decay=weight_decay, lr=learning_rate)
         self.device = device
-        self.conserve_lepton_number = conserve_lepton_number
 
 class AsymptoticOptimizer(Optimizer):
     # function to train the dataset
-    def train(self, model, F4i, F4f_true, loss_fn):
+    def train(self, model, F4i, F4f_true, loss_fn, conserve_lepton_number, restrict_to_physical):
         model.train()
-        F4f_pred = model.predict_F4(F4i, conserve_lepton_number=self.conserve_lepton_number)
+        F4f_pred = model.predict_F4(F4i, conserve_lepton_number, restrict_to_physical)
         loss = loss_fn(model, F4f_pred, F4f_true)
         return loss
 
     # function to test the model performance
-    def test(self, model, F4i, F4f_true, loss_fn):
+    def test(self, model, F4i, F4f_true, loss_fn, conserve_lepton_number, restrict_to_physical):
         model.eval()
         with torch.no_grad():
-            F4f_pred = model.predict_F4(F4i, conserve_lepton_number=self.conserve_lepton_number)
+            F4f_pred = model.predict_F4(F4i, conserve_lepton_number, restrict_to_physical)
             loss = loss_fn(model, F4f_pred, F4f_true)
             if F4f_true != None:
                 error = torch.max(torch.abs(F4f_pred - F4f_true))

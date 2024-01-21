@@ -26,7 +26,7 @@ def train_asymptotic_model(model,
     print("Training dataset size:",dataset_size)
 
     # create a new plotter object of larger size if epochs is larger than the plotter object
-    p = Plotter(epochs,["knownData","unphysical"])
+    p = Plotter(epochs,["knownData","unphysical","knownData_corrected","unphysical_corrected"])
     p.fill_from_plotter(plotter)
 
     #=====================================================#
@@ -55,29 +55,34 @@ def train_asymptotic_model(model,
         F4i_unphysical = generate_random_F4(n_generate, NF, device, max_fluxfac=generate_max_fluxfac)
 
         # log the test error
-        p.data["knownData"].test_loss[t],  p.data["knownData"].test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn)
-        p.data["unphysical"].test_loss[t],  p.data["unphysical"].test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn)
+        p.data["knownData"].test_loss[t],  p.data["knownData"].test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn, False, False)
+        p.data["unphysical"].test_loss[t],  p.data["unphysical"].test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn, False, False)
+        p.data["knownData_corrected"].test_loss[t],  p.data["knownData_corrected"].test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn, True, True)
+        p.data["unphysical_corrected"].test_loss[t],  p.data["unphysical_corrected"].test_err[t]  = optimizer.test(model, F4i_unphysical, None, unphysical_loss_fn, True,True)
 
         # load in a batch of data from the dataset
-        for F4i_batch, F4f_batch in dataloader:
+        with torch.autograd.detect_anomaly():
+            for F4i_batch, F4f_batch in dataloader:
 
-            # zero the gradients
-            optimizer.optimizer.zero_grad()
+                # zero the gradients
+                optimizer.optimizer.zero_grad()
 
-            # train on making sure the model prediction is correct
-            loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
-            loss.backward()
-
-            # train on making sure the model prediction is physical
-            if do_unphysical_check:
-                loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn)
+                # train on making sure the model prediction is correct
+                loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn, False,False)
+                assert(loss==loss)
                 loss.backward()
 
-            # take a step with the optimizer    
-            optimizer.optimizer.step()
+                # train on making sure the model prediction is physical
+                if do_unphysical_check:
+                    loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn, False,False)
+                    assert(loss==loss)
+                    loss.backward()
+
+                optimizer.optimizer.step()
 
         # Evaluate training errors
-        p.data["knownData"].train_loss[t], p.data["knownData"].train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
+        p.data["knownData"].train_loss[t], p.data["knownData"].train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn,False,False)
+        p.data["knownData_corrected"].train_loss[t], p.data["knownData_corrected"].train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn,True,True)
 
         # report max error
         if((t+1)%print_every==0):

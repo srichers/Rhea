@@ -176,7 +176,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
 
         return F4_final
 
-    def predict_F4(self, F4_initial, conserve_lepton_number=False):
+    def predict_F4(self, F4_initial, conserve_lepton_number, restrict_to_physical):
         X = self.X_from_F4(F4_initial)
         y = self.forward(X)
         F4_final = self.F4_from_y(F4_initial, y)
@@ -189,6 +189,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
             F4_final[:,3,0,:] = F4_final[:,3,0,:] - 0.5*delta_Jt
             F4_final[:,3,1,:] = F4_final[:,3,1,:] + 0.5*delta_Jt
 
+        if restrict_to_physical:
             avgF4 = torch.sum(F4_final, axis=3)[:,:,:,None] / self.NF
 
             # enforce that all four-vectors are time-like
@@ -197,11 +198,14 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
             b = 2.*dot4(avgF4, F4_final)
             c = dot4(F4_final, F4_final)
             radical = b**2 - 4*a*c
+            assert(torch.all(radical>=-1e-6))
+            radical = torch.maximum(radical, torch.zeros_like(radical))
             alpha = (-b + torch.sign(a)*torch.sqrt(radical)) / (2*a)
 
             # fix the case where a is zero
             badlocs = torch.where(torch.abs(a/b)<1e-6)
-            alpha[badlocs] = (-c/b)[badlocs]
+            if len(badlocs[0]) > 0:
+                alpha[badlocs] = (-c/b)[badlocs]
 
             # find the nu/nubar and flavor indices where alpha is maximized
             maxalpha = torch.amax(alpha, dim=(1,2)) # [sim]

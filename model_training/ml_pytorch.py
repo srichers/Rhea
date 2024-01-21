@@ -34,6 +34,7 @@ do_NSM_stable = False # True
 
 # neural network options
 conserve_lepton_number=True
+bound_to_physical = True
 nhidden = 2
 width = 128
 dropout_probability = 0 #0.1 # 0.5
@@ -93,7 +94,7 @@ for dataset_size in dataset_size_list:
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-        plotter = Plotter(0,["knownData","unphysical"])
+        plotter = Plotter(0,["knownData","unphysical","knownData_corrected","unphysical_corrected"])
 
     plotter_array.append(plotter)
     model_array.append(model)
@@ -102,8 +103,7 @@ for dataset_size in dataset_size_list:
         op,
         weight_decay,
         learning_rate,
-        device,
-        conserve_lepton_number=conserve_lepton_number))
+        device))
 
 print(model_array[-1])
 
