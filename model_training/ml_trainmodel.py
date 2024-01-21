@@ -68,13 +68,13 @@ def train_asymptotic_model(model,
                 optimizer.optimizer.zero_grad()
 
                 # train on making sure the model prediction is correct
-                loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn, False,False)
+                loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn, True,False)
                 assert(loss==loss)
                 loss.backward()
 
                 # train on making sure the model prediction is physical
                 if do_unphysical_check:
-                    loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn, False,False)
+                    loss = optimizer.train(model, F4i_unphysical, None, unphysical_loss_fn, True,False)
                     assert(loss==loss)
                     loss.backward()
 
