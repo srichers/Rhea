@@ -17,6 +17,7 @@ def train_asymptotic_model(model,
                 print_every,
                 device,
                 do_unphysical_check,
+                do_augment_final_stable,
                 comparison_loss_fn,
                 unphysical_loss_fn,
                 F4i_train,
@@ -70,6 +71,10 @@ def train_asymptotic_model(model,
                 # train on making sure the model prediction is correct
                 loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn, True,False)
                 loss.backward()
+
+                if do_augment_final_stable:
+                    loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn, True,False)
+                    loss.backward()
 
                 # train on making sure the model prediction is physical
                 if do_unphysical_check:

@@ -27,7 +27,7 @@ generate_max_fluxfac = 0.95
 
 # data augmentation options
 do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
-do_augment_final_stable = False # True
+do_augment_final_stable = True # True
 do_unphysical_check = True # True - seems to help prevent crazy results
 
 # neural network options
@@ -142,6 +142,7 @@ for i in range(len(dataset_size_list)):
         print_every,
         device,
         do_unphysical_check,
+        do_augment_final_stable,
         comparison_loss_fn,
         unphysical_loss_fn,
         F4i_train,
