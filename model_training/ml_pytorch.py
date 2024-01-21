@@ -18,7 +18,7 @@ directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fl
 NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
 do_unpickle = False
 test_size = 0.1
-epochs = 500
+epochs = 5000
 batch_size = -1
 dataset_size_list = [10,100,1000,10000,-1] # -1 means use all the data
 n_generate = 10000
@@ -36,7 +36,7 @@ do_augment_1f = True
 conserve_lepton_number=True
 bound_to_physical = False # causes nans in back propagation
 nhidden = 2
-width = 128
+width = 256
 dropout_probability = 0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
@@ -45,7 +45,7 @@ activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-3 # 1e-3
+learning_rate = 1e-4 # 1e-3
 
 # the number of flavors should be 3
 NF = 3
