@@ -146,6 +146,19 @@ def plot_nue_nuebar(model, npoints, nreps, conserve_lepton_number, restrict_to_p
     plt.axhline(1./3., color="green", linewidth=0.5)
     plt.savefig("nue_vs_nuebar.pdf",bbox_inches="tight")
 
+
+def modify_F4(F4i, F4f,d, model_stability, stability_cutoff):
+    if d=="masked" or d=="both":
+        unstable = model_stability.predict_unstable(F4i)[:,:,None,None]
+        unstable[torch.where(unstable<stability_cutoff)] = 0
+        unstable[torch.where(unstable>=stability_cutoff)] = 1
+        stable = torch.ones_like(unstable)-unstable
+        print("Stable:",torch.sum(stable).item())
+        print("Unstable:",torch.sum(unstable).item())
+        F4f = unstable*F4f + stable*F4i
+
+    return F4f
+
 def plot_histogram(error, bins, xmin, xmax, filename):
     error[np.where(error>xmax)] = xmax
     # plot the histogram
@@ -160,9 +173,12 @@ def plot_histogram(error, bins, xmin, xmax, filename):
 
 # apply the model to a dataset and create a histogram of the magnitudes of the error
 # F4 has dimensions [sim, xyzt, nu/nubar, flavor]
-def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, filename, conserve_lepton_number, restrict_to_physical):
+def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, d, filename, conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff):
     # get the predicted final F4
     F4_pred = model.predict_F4(F4_initial, conserve_lepton_number, restrict_to_physical)
+
+    # apply any relevant corrections to the distribution
+    F4_pred = modify_F4(F4_initial, F4_pred, d, model_stability, stability_cutoff)
 
     # calculate the error
     F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()
@@ -174,7 +190,7 @@ def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, filename, con
     N = F4_final[:,3,:,:].to('cpu').detach().numpy()
     N = np.sum(N, axis=(1,2))
 
-    plot_histogram(F4_error_mag/N, bins, xmin, xmax, filename)
+    plot_histogram(F4_error_mag/N, bins, xmin, xmax, d+filename)
 
         
 # visualize the network using torchviz

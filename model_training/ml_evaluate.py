@@ -10,9 +10,11 @@ from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
 from ml_read_data import *
-from ml_tools import flux_factor
+from ml_tools import flux_factor, restrict_F4_to_physical
 import pickle
 import glob
+import os
+import copy
 
 basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
@@ -30,6 +32,7 @@ dataset_size_list_stability = get_dataset_size_list("model_stability_[0-9]*.pkl"
 
 n_generate = 1000
 test_size = 0.1
+stability_cutoff = 0.4 # number between 0 and 1. If ML output is larger than this, consider unstable.
 
 # data augmentation options
 do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
@@ -61,27 +64,33 @@ print()
 print("#############################")
 print("# SETTING UP NEURAL NETWORK #")
 print("#############################")
-# set up an array of models, optimizers, and plotters for different dataset sizes
-model_array_asymptotic = []
-plotter_array_asymptotic = []
+def get_plotter_model_arrays(search_string, dataset_size_list):
+    # set up an array of models, optimizers, and plotters for different dataset sizes
+    model_array = []
+    plotter_array = []
+    for dataset_size in dataset_size_list:
+        filename = search_string+str(dataset_size)+".pkl"
+        print("Loading",filename)
+        with open(filename, "rb") as f:
+            model, optimizer, plotter = pickle.load(f)
 
-for dataset_size in dataset_size_list_asymptotic:
-    filename = "model_"+str(dataset_size)+".pkl"
-    print("Loading",filename)
-    with open(filename, "rb") as f:
-        model, optimizer, plotter = pickle.load(f)
+        plotter_array.append(plotter)
+        model_array.append(model)
+    print(model_array[-1])
+    return plotter_array, model_array
 
-    plotter_array_asymptotic.append(plotter)
-    model_array_asymptotic.append(model)
-
-print(model_array_asymptotic[-1])
+plotter_array_asymptotic, model_array_asymptotic = get_plotter_model_arrays("model_",dataset_size_list_asymptotic)
+plotter_array_stability, model_array_stability = get_plotter_model_arrays("model_stability_",dataset_size_list_stability)
 
 # use the largest dataset size for the rest of these metrics
 p_asymptotic = plotter_array_asymptotic[-1]
 model_asymptotic = model_array_asymptotic[-1]
+p_stability = plotter_array_stability[-1]
+model_stability = model_array_stability[-1]
  
 # set model to evaluation mode
-model.eval()
+model_asymptotic.eval()
+model_stability.eval()
 
 #===================================#
 # Test one point from training data #
@@ -94,17 +103,17 @@ print()
 print("N initial")
 before = F4i_train[0:1,:,:,:]
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
 
+print()
 print("N final (actual)")
 print(F4f_train[0,3])
 
+print()
 print("N predicted")
 after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
-
-#print("N re-predicted")
-#after = model.predict_F4(after, conserve_lepton_number, restrict_to_physical)
-#print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 print("loss = ",comparison_loss_fn(model_asymptotic, after, F4f_train[0:1,:,:,:]).item())
@@ -122,18 +131,21 @@ print()
 print("N initial")
 before = F4i_test[0:1,:,:,:]
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
 
+print()
 print("N final (actual)")
 print(F4f_test[0,3])
 
+print()
 print("N predicted")
 after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 print("loss = ",comparison_loss_fn(model_asymptotic, after, F4f_train[0:1,:,:,:]).item())
 print("error = ",torch.max(torch.abs(after - F4f_train[0:1,:,:,:])).item())
-check_conservation(before,after)
 
 #=====================================#
 # create test ("Fiducial" simulation) #
@@ -153,15 +165,21 @@ after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_
 print()
 print("N initail")
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
 
+print()
 print("N predicted")
 after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
+print()
 print("N re-predicted")
 after = model_asymptotic.predict_F4(after, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
+print()
 print("2 Flavor")
 before_2F = before[:,:,:,0:2]
 X = model_asymptotic.X_from_F4(before)
@@ -173,8 +191,6 @@ print("3F")
 print(after_3F[0,3])
 print("2F")
 print(after_2F[0,3])
-
-print()
 check_conservation(before,after)
 
 #=====================================#
@@ -195,14 +211,18 @@ after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_
 print()
 print("N initial")
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
 
 print("N predicted")
 after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
+
 
 print("N re-predicted")
 after = model_asymptotic.predict_F4(after, conserve_lepton_number, restrict_to_physical)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 check_conservation(before,after)
@@ -237,37 +257,45 @@ plt.xlabel("Dataset size")
 plt.ylabel("Max Component Error")
 plt.savefig("dataset_size.pdf",bbox_inches="tight")
 
-# plot the error histogram for the test data
 n_generate = 10000
 F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
 F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
-error_histogram(model_asymptotic, F4i_train, F4f_train, 100, 0, 0.1, "histogram_train.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4i_test, F4f_test, 100, 0, 0.1, "histogram_test.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4_NSM_train, F4_NSM_train, 100, 0, 0.1, "histogram_NSM_train.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4_NSM_test, F4_NSM_test, 100, 0, 0.1, "histogram_NSM_test.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4i_0ff, F4i_0ff, 100, 0, 0.1, "histogram_0ff.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4i_1f, F4i_1f, 100, 0, 0.1, "histogram_1f.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4i_train, F4i_train, 100, 0, 0.1, "histogram_donothing.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4f_train, F4f_train, 100, 0, 0.1, "histogram_finalstable_train.pdf", conserve_lepton_number, restrict_to_physical)
-error_histogram(model_asymptotic, F4f_test, F4f_test, 100, 0, 0.1, "histogram_finalstable_test.pdf", conserve_lepton_number, restrict_to_physical)
+F4i_unphysical = generate_random_F4(n_generate, NF, device, zero_weight=10, max_fluxfac=0.95)
 
-# histogram of how unphysical the results are
-F4i_unphysical = generate_random_F4(n_generate, NF, device)
-F4f_pred = model_asymptotic.predict_F4(F4i_unphysical,conserve_lepton_number,restrict_to_physical).cpu().detach().numpy()
+dirlist = ["base","corrected","masked","both"]
+for d in dirlist:
+    print()
+    print(d)
+    if not os.path.exists(d):
+        os.mkdir(d)
+    
+    restrict_to_physical = True if (d=="corrected" or d=="both") else False
 
-# normalize F4f_pred by the total number density
-Ntot = np.sum(F4f_pred[:,3,:,:], axis=(1,2)) # [sim]
+    # plot the error histogram for the test data
+    error_histogram(model_asymptotic, F4i_train, F4f_train, 100, 0, 0.1, d,"/histogram_train.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_test, F4f_test, 100, 0, 0.1, d,"/histogram_test.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4_NSM_train, F4_NSM_train, 100, 0, 0.1, d,"/histogram_NSM_train.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4_NSM_test, F4_NSM_test, 100, 0, 0.1, d,"/histogram_NSM_test.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_0ff, F4i_0ff, 100, 0, 0.1, d,"/histogram_0ff.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_1f, F4i_1f, 100, 0, 0.1, d,"/histogram_1f.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_train, F4i_train, 100, 0, 0.1, d,"/histogram_donothing.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4f_train, F4f_train, 100, 0, 0.1, d,"/histogram_finalstable_train.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4f_test, F4f_test, 100, 0, 0.1, d,"/histogram_finalstable_test.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
 
-# enforce that number density cannot be less than zero
-ndens = F4f_pred[:,3,:,:] # [sim, nu/nubar, flavor]
-negative_density_error = np.minimum(ndens/Ntot[:,None,None], np.zeros_like(ndens)) # [sim, nu/nubar, flavor]
-negative_density_error = np.max(np.abs(negative_density_error), axis=(1,2))
-plot_histogram(negative_density_error, 100, 0, 0.1, "histogram_negative_density.pdf")
-print("negative density:",np.min(negative_density_error), np.max(negative_density_error))
+    F4f_pred = model_asymptotic.predict_F4(F4i_unphysical,conserve_lepton_number,restrict_to_physical)
+    F4f_pred = modify_F4(F4i_unphysical, F4f_pred,d, model_stability, stability_cutoff)
 
-# enforce that flux factors cannot be larger than 1
-fluxfac = np.sqrt(np.sum(F4f_pred[:,0:3,:,:]**2, axis=1) / ndens**2) # [sim, nu/nubar, flavor]
-fluxfac_error = np.maximum(fluxfac, np.ones_like(fluxfac)) - np.ones_like(fluxfac) # [si, conserve_lepton_number, restrict_to_physical)
-fluxfac_error = np.max(np.abs(fluxfac_error), axis=(1,2))
-plot_histogram(fluxfac_error, 100, 0, 0.1, "histogram_fluxfac.pdf")
-print("fluxfac:",np.min(fluxfac_error), np.max(fluxfac_error))
+    # enforce that number density cannot be less than zero
+    F4f_pred = F4f_pred.cpu().detach().numpy()
+    ndens = F4f_pred[:,3,:,:] # [sim, nu/nubar, flavor]
+    negative_density_error = np.minimum(ndens, np.zeros_like(ndens)) # [sim, nu/nubar, flavor]
+    negative_density_error = np.max(np.abs(negative_density_error), axis=(1,2))
+    plot_histogram(negative_density_error, 100, 0, 0.1, d+"/histogram_negative_density.pdf")
+    print("negative density:",np.min(negative_density_error), np.max(negative_density_error))
+
+    # enforce that flux factors cannot be larger than 1
+    fluxfac = np.sqrt(np.sum(F4f_pred[:,0:3,:,:]**2, axis=1) / ndens**2) # [sim, nu/nubar, flavor]
+    fluxfac_error = np.maximum(fluxfac, np.ones_like(fluxfac)) - np.ones_like(fluxfac) # [si, conserve_lepton_number, restrict_to_physical)
+    fluxfac_error = np.max(np.abs(fluxfac_error), axis=(1,2))
+    plot_histogram(fluxfac_error, 100, 0, 0.1, d+"/histogram_fluxfac.pdf")
+    print("fluxfac:",np.min(fluxfac_error), np.max(fluxfac_error))
