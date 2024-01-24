@@ -45,7 +45,7 @@ activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-3 # 1e-3
+learning_rate = 1e-4 # 1e-3
 
 # the number of flavors should be 3
 NF = 3
