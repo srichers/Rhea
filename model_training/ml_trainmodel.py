@@ -42,11 +42,10 @@ def train_asymptotic_model(model,
     if batch_size == -1:
         batch_size = dataset_size
     assert(dataset_size <= F4i_train.shape[0])
-    assert(batch_size <= dataset_size)
     F4i_train = F4i_train[:dataset_size]
     F4f_train = F4f_train[:dataset_size]
     dataset = torch.utils.data.TensorDataset(F4i_train, F4f_train)
-    batch_size = max(batch_size, len(dataset))
+    batch_size = min(batch_size, len(dataset))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print("batchsize=",batch_size)
 
