@@ -34,7 +34,7 @@ learning_rate = 1e-4 # 1e-3
 # the number of flavors should be 3
 NF = 3
 
-outfilename = "model_stability"
+outfilename = "model_stability_"
 
 #========================#
 # use a GPU if available #
@@ -126,7 +126,7 @@ def save_model(model, outfilename, device):
         X = model.X_from_F4(F4i_test.to(device))
         traced_model = torch.jit.trace(model, X)
         torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
-        print("Saving to",outfilename+"_"+device+".ptc")
+        print("Saving to",outfilename+device+".ptc")
 
 save_model(model, outfilename, "cpu")
 if device=="cuda":
