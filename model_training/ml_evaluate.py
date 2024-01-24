@@ -241,21 +241,25 @@ plot_nue_nuebar(model_asymptotic, npoints, nreps, conserve_lepton_number, restri
 p_asymptotic.plot_error(ymin=1e-5)
 
 # plot the loss as a function of dataset size using the array of plotters
-train_loss = np.array([p.data["knownData"].train_loss[-1] for p in plotter_array_asymptotic])
-test_loss  = np.array([p.data["knownData"].test_loss[-1]  for p in plotter_array_asymptotic])
-xvals = np.array(dataset_size_list_asymptotic)
+def plot_dataset_size(plotter_array, dataset_size_list, quantity, outfilename):
+    train_loss = np.array([p.data[quantity].train_loss[-1] for p in plotter_array])
+    test_loss  = np.array([p.data[quantity].test_loss[-1]  for p in plotter_array])
+    xvals = np.array(dataset_size_list)
 
-# plot the loss as a function of dataset size
-plt.clf()
-fig,ax=plt.subplots(1,1)
-ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
-ax.minorticks_on()
-plt.plot(xvals, np.sqrt(train_loss), label="train")
-plt.plot(xvals, np.sqrt(test_loss),  label="test")
-plt.legend(frameon=False)
-plt.xlabel("Dataset size")
-plt.ylabel("Max Component Error")
-plt.savefig("dataset_size.pdf",bbox_inches="tight")
+    # plot the loss as a function of dataset size
+    plt.clf()
+    fig,ax=plt.subplots(1,1)
+    ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
+    ax.minorticks_on()
+    plt.plot(xvals, np.sqrt(train_loss), label="train")
+    plt.plot(xvals, np.sqrt(test_loss),  label="test")
+    plt.legend(frameon=False)
+    plt.xlabel("Dataset size")
+    plt.ylabel("Max Component Error")
+    plt.savefig(outfilename+"_"+quantity+".pdf",bbox_inches="tight")
+
+plot_dataset_size(plotter_array_asymptotic, dataset_size_list_asymptotic, "knownData","dataset_size_asymptotic")
+plot_dataset_size(plotter_array_stability, dataset_size_list_stability, "random","dataset_size_stability")
 
 n_generate = 10000
 F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
