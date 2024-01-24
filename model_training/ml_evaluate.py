@@ -15,6 +15,8 @@ import pickle
 import glob
 import os
 import copy
+from torchmetrics.classification import BinaryPrecisionRecallCurve
+from torcheval.metrics import BinaryF1Score, BinaryNormalizedEntropy, BinaryConfusionMatrix
 
 basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
@@ -32,7 +34,10 @@ dataset_size_list_stability = get_dataset_size_list("model_stability_[0-9]*.pkl"
 
 n_generate = 1000
 test_size = 0.1
-stability_cutoff = 0.4 # number between 0 and 1. If ML output is larger than this, consider unstable.
+stability_cutoff = 0.5 # number between 0 and 1. If ML output is larger than this, consider unstable.
+generate_max_fluxfac = 0.95
+zero_weight = 10
+n_equatorial = 64
 
 # data augmentation options
 do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
@@ -91,6 +96,54 @@ model_stability = model_array_stability[-1]
 # set model to evaluation mode
 model_asymptotic.eval()
 model_stability.eval()
+
+#=============================#
+# make precision recall curve #
+#=============================#
+print()
+print("##########################")
+print("# Precision recall curve #")
+print("##########################")
+F4i_random = generate_random_F4(n_generate, NF, 'cpu', zero_weight=zero_weight, max_fluxfac=generate_max_fluxfac)
+unstable_random = torch.tensor(has_crossing(F4i_random.detach().numpy(), NF, n_equatorial), device=device).to(torch.long)
+print("Random Stable:",torch.sum(unstable_random==False).item())
+print("Random Unstable:",torch.sum(unstable_random==True).item())
+F4i_random = F4i_random.to(device)
+unstable_pred = model_stability.predict_unstable(F4i_random)
+print("Unstable pred:",torch.min(unstable_pred).item(), torch.max(unstable_pred).item())
+pr_curve = BinaryPrecisionRecallCurve(thresholds=101).to(device)
+pr_curve.update(unstable_pred, unstable_random)
+#precision, recall, thresholds = pr_curve(unstable_pred, unstable_random)
+
+plt.clf()
+fig,ax=plt.subplots(1,1)
+pr_curve.plot(score=True, ax=ax)
+#ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
+#ax.minorticks_on()
+#plt.plot(thresholds, precision, label="Precision")
+#plt.plot(thresholds, recall,  label="Recall")
+#plt.legend(frameon=False)
+#plt.xlabel("Threshold")
+plt.savefig("precision_recall.pdf",bbox_inches="tight")
+
+# empty dimension was introduced for compatibility w/ loss functions. Here it's just clunky
+metric = BinaryF1Score(threshold=stability_cutoff)
+metric.update(unstable_pred[:,0], unstable_random[:,0])
+print()
+print("Binary F1 Score:",metric.compute().item())
+
+metric = BinaryNormalizedEntropy()
+metric.update(unstable_pred[:,0], unstable_random[:,0].to(torch.float))
+print("Normalized cross entropy:",metric.compute().item())
+
+metric = BinaryConfusionMatrix(threshold=stability_cutoff, normalize="all")
+metric.update(unstable_pred[:,0], unstable_random[:,0])
+confusion_matrix = metric.compute()
+print("True positive:",confusion_matrix[0,0])
+print("False negative:",confusion_matrix[0,1])
+print("False positive:",confusion_matrix[1,0])
+print("True negative:",confusion_matrix[1,1])
+exit()
 
 #===================================#
 # Test one point from training data #
