@@ -75,6 +75,11 @@ def has_crossing(F4i, NF, nphi_equator):
     # evaluate the flux factor for each species
     Fmag = np.sqrt(np.sum(F4i[:,0:3,:,:]**2, axis=1))
     Fhat = F4i[:,0:3,:,:] / Fmag[:,None,:,:] # [sim, xyz, nu/nubar, flavor]
+    badlocs = np.where(Fmag<1e-6)
+    Fhat[:,0][badlocs] = 0
+    Fhat[:,1][badlocs] = 0
+    Fhat[:,2][badlocs] = 1
+    assert(np.all(Fhat==Fhat))
 
     # calculate flux factor
     fluxfac = Fmag / F4i[:,3,:,:]
@@ -105,7 +110,9 @@ def has_crossing(F4i, NF, nphi_equator):
         for j in range(NF):
             costheta[:,i,j,:] = np.sum(xyz[None,:,:] * Fhat[:,:,i,j,None], axis=1)
     costheta[badlocs] = 0
-    assert(np.all(costheta>=-1) and np.all(costheta<=1))
+    assert(np.all(np.abs(costheta)<1+1e-6))
+    costheta[np.where(costheta>1)] =  1
+    costheta[np.where(costheta<1)] = -1
 
     # Evaluate the distribution for each species
     f = np.zeros((nsims,2,NF,ndirections))
