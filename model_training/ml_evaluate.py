@@ -146,8 +146,6 @@ print("True negative:",confusion_matrix[1,1])
 print("Precision:", confusion_matrix[0,0]/torch.sum(confusion_matrix[:,0]))
 print("Recall:", confusion_matrix[0,0] / torch.sum(confusion_matrix[0,:]))
 
-exit()
-
 #===================================#
 # Test one point from training data #
 #===================================#
@@ -294,7 +292,9 @@ npoints = 11
 nreps = 20
 p_asymptotic.init_plot_options()
 plot_nue_nuebar(model_asymptotic, npoints, nreps, conserve_lepton_number, restrict_to_physical)
-p_asymptotic.plot_error(ymin=1e-5)
+p_asymptotic.plot_error("train_test_error_asymptotic.pdf", ymin=1e-5)
+p_stability.init_plot_options()
+p_stability.plot_error("train_test_error_stability.pdf")
 
 # plot the loss as a function of dataset size using the array of plotters
 def plot_dataset_size(plotter_array, dataset_size_list, quantity, outfilename):

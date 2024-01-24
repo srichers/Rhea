@@ -81,7 +81,7 @@ class Plotter():
         ax.semilogy(x, p.train_err, label="train_maxerr", color="blue", linewidth=0.5)
         ax.semilogy(x, p.test_err,  label="test_maxerr",  color="black", linewidth=0.5)
 
-    def plot_error(self, ymin=0, ymax=0):
+    def plot_error(self, filename, ymin=0, ymax=0):
         plt.clf()
         nplots = len(self.data)
         fig,axes=plt.subplots(1,nplots, sharey=True, sharex=True)
@@ -90,7 +90,8 @@ class Plotter():
             ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
             ax.minorticks_on()
 
-        epochs = len(self.data["knownData"].train_err)
+        samplekey = list(self.data.keys())[0]
+        epochs = len(self.data[samplekey].train_err)
         x = range(epochs)
         
         for i,name in enumerate(self.data.keys()):
@@ -111,7 +112,7 @@ class Plotter():
         for ax in axes.flatten():
             ax.set_ylim(ymin,ymax)
         
-        plt.savefig("train_test_error.pdf",bbox_inches="tight")
+        plt.savefig(filename,bbox_inches="tight")
 
 def plot_nue_nuebar(model, npoints, nreps, conserve_lepton_number, restrict_to_physical):
     # plot the number of electron neutrinos when varying the number of antineutrinos
