@@ -75,3 +75,31 @@ def augment_permutation(F4_list):
             
     return F4_augmented
 
+def restrict_F4_to_physical(F4_final):
+    NF = F4_final.shape[-1]
+    avgF4 = torch.sum(F4_final, axis=3)[:,:,:,None] / NF
+
+    # enforce that all four-vectors are time-like
+    # choose the branch that leads to the most positive alpha
+    a = dot4(avgF4, avgF4) # [sim, nu/nubar, flavor]
+    b = 2.*dot4(avgF4, F4_final)
+    c = dot4(F4_final, F4_final)
+    radical = b**2 - 4*a*c
+    assert(torch.all(radical>=-1e-6))
+    radical = torch.maximum(radical, torch.zeros_like(radical))
+    alpha = (-b + torch.sign(a)*torch.sqrt(radical)) / (2*a)
+
+    # fix the case where a is zero
+    badlocs = torch.where(torch.abs(a/b)<1e-6)
+    if len(badlocs[0]) > 0:
+        alpha[badlocs] = (-c/b)[badlocs]
+
+    # find the nu/nubar and flavor indices where alpha is maximized
+    maxalpha = torch.amax(alpha, dim=(1,2)) # [sim]
+    maxalpha = torch.maximum(maxalpha, torch.zeros_like(maxalpha))
+    maxalpha[torch.where(maxalpha>0)] += 1e-6
+
+    # modify the four-vectors to be time-like
+    F4_final = (F4_final + maxalpha[:,None,None,None]*avgF4) / (maxalpha[:,None,None,None] + 1)
+
+    return F4_final
