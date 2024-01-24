@@ -35,8 +35,8 @@ do_augment_1f = True
 # neural network options
 conserve_lepton_number=True
 bound_to_physical = False # causes nans in back propagation
-nhidden = 2
-width = 256
+nhidden = 5
+width = 1024
 dropout_probability = 0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
@@ -45,7 +45,7 @@ activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-4 # 1e-3
+learning_rate = 1e-3 # 1e-3
 
 # the number of flavors should be 3
 NF = 3
