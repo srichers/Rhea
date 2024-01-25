@@ -28,6 +28,7 @@ def get_Z(fluxfac):
 
 # compute the value of the distribution at a given costheta
 # n is the total number density
+# all inputs have dimensions [sim, mu]
 def distribution(n, Z, costheta):
     assert(np.all(Z >= 0))
     badlocs = np.where(Z<1e-4)
@@ -75,18 +76,16 @@ def has_crossing(F4i, NF, nphi_equator):
     # evaluate the flux factor for each species
     Fmag = np.sqrt(np.sum(F4i[:,0:3,:,:]**2, axis=1))
     Fhat = F4i[:,0:3,:,:] / Fmag[:,None,:,:] # [sim, xyz, nu/nubar, flavor]
-    badlocs = np.where(Fmag<1e-6)
-    Fhat[:,0][badlocs] = 0
-    Fhat[:,1][badlocs] = 0
-    Fhat[:,2][badlocs] = 1
-    assert(np.all(Fhat==Fhat))
-
-    # calculate flux factor
     fluxfac = Fmag / F4i[:,3,:,:]
 
     # avoid nans by setting fluxfac to zero when F4i is zero
-    badlocs = np.where(Fmag/F4i[:,3,:,:] < 1e-6)
-    fluxfac[badlocs] = 0
+    badlocs = np.where(Fmag/np.sum(F4i[:,3,:,:],axis=(1,2))[:,None,None] < 1e-6)
+    if len(badlocs)>0:
+        Fhat[:,0][badlocs] = 0
+        Fhat[:,1][badlocs] = 0
+        Fhat[:,2][badlocs] = 1
+        fluxfac[badlocs] = 0
+    assert(np.all(Fhat==Fhat))
 
     # avoid nans by setting flux factor of 1 within machine precision to 1
     assert(np.all(fluxfac<=1+1e-6))
@@ -112,7 +111,7 @@ def has_crossing(F4i, NF, nphi_equator):
     costheta[badlocs] = 0
     assert(np.all(np.abs(costheta)<1+1e-6))
     costheta[np.where(costheta>1)] =  1
-    costheta[np.where(costheta<1)] = -1
+    costheta[np.where(costheta<-1)] = -1
 
     # Evaluate the distribution for each species
     f = np.zeros((nsims,2,NF,ndirections))
@@ -160,4 +159,4 @@ if __name__ == "__main__":
     F4i[0,0,1,0] = -0.5
     print("should be true:", has_crossing(F4i.detach().numpy(), 3, 64))
 
-        
+
