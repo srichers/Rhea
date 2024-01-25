@@ -13,9 +13,9 @@ from ml_maxentropy import *
 from ml_read_data import *
 import pickle
 
-basedir = "/mnt/scratch/srichers/ML_FFI"
 directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
-NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
+#basedir = "/mnt/scratch/srichers/ML_FFI"
+basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
 do_unpickle = False
 test_size = 0.1
 epochs = 5000
@@ -55,6 +55,7 @@ NF = 3
 #========================#
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
+print(torch.cuda.get_device_name(0))
 
 #===============#
 # read the data #

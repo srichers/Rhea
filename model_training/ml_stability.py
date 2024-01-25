@@ -11,8 +11,8 @@ import pickle
 
 do_unpickle = False
 test_size = 0.1
-epochs = 500
-dataset_size_list = [10,100,1000, 10000] # -1 means use all the data
+epochs = 5000
+dataset_size_list = [10,100,1000, 10000, -1] # -1 means use all the data
 print_every = 10
 n_equatorial = 64
 zero_fluxfac_bias = 10
@@ -29,7 +29,7 @@ do_trivial_stable = False
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-3 # 1e-3
+learning_rate = 1e-4 # 1e-3
 
 # the number of flavors should be 3
 NF = 3
