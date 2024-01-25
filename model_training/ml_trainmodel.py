@@ -144,7 +144,7 @@ def train_stability_model(model,
     print("Random Unstable:",np.sum(unstable_random==True))
 
     F4i_heavy = generate_random_F4(n_generate, NF, 'cpu', zero_weight=zero_weight, max_fluxfac=generate_max_fluxfac)
-    F4i_heavy[:,:,:,1:] = F4i_heavy[:,:,:,1][:,:,:,None]
+    F4i_heavy[:,:,:,1:] = torch.mean(F4i_heavy[:,:,:,1:], dim=3)[:,:,:,None]
     F4i_heavy = augment_permutation(F4i_heavy)
     unstable_heavy = has_crossing(F4i_heavy.detach().numpy(), NF, n_equatorial)
     print("Heavy Stable:",np.sum(unstable_random==False))
@@ -157,9 +157,9 @@ def train_stability_model(model,
     unstable_1f = torch.zeros((F4i_1f.shape[0],1), device=device)
 
     # move data to device
-    F4i_random = torch.tensor(F4i_random).float().to(device)
+    F4i_random = F4i_random.float().to(device)
     unstable_random = torch.tensor(unstable_random).to(device)
-    F4i_heavy = torch.tensor(F4i_heavy).float().to(device)
+    F4i_heavy = F4i_heavy.float().to(device)
     unstable_heavy = torch.tensor(unstable_heavy).to(device)
 
     #===============#

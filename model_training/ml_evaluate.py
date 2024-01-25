@@ -13,7 +13,7 @@ from ml_read_data import *
 from ml_tools import flux_factor
 import pickle
 
-basedir = "/mnt/scratch/srichers/ML_FFI"
+basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
 directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
 NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
 dataset_size_list = [10,100,1000,10000,38172] # -1 means use all the data
