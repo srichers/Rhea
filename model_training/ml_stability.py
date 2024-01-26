@@ -12,7 +12,7 @@ import pickle
 do_unpickle = False
 test_size = 0.1
 epochs = 5000
-dataset_size_list = [10,100,1000, 10000, -1] # -1 means use all the data
+dataset_size_list = [10,100,1000] # -1 means use all the data
 print_every = 10
 n_equatorial = 64
 zero_fluxfac_bias = 10
