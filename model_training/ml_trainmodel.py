@@ -126,6 +126,7 @@ def train_asymptotic_model(model,
 
 def train_stability_model(model,
                 optimizer,
+                scheduler,
                 plotter,
                 NF,
                 epochs,
@@ -205,11 +206,16 @@ def train_stability_model(model,
         p.data["0ff"].train_loss[t], p.data["0ff"].train_err[t] = optimizer.test(model, F4i_0ff, unstable_0ff, loss_function)
         p.data["1f"].train_loss[t], p.data["1f"].train_err[t] = optimizer.test(model, F4i_1f, unstable_1f, loss_function)
 
+        # update the learning rate
+        netloss = p.data["random"].train_loss[t] + p.data["heavy"].train_loss[t] + p.data["0ff"].train_loss[t] + p.data["1f"].train_loss[t]
+        scheduler.step(netloss)
+
         # report max error
         if((t+1)%print_every==0):
             print(f"Epoch {t+1}")
+            print("lr =",scheduler._last_lr)
             for key in p.data.keys():
                 print(key, p.data[key].train_loss[t],  p.data[key].test_loss[t])            
             print()
 
-    return model, optimizer, p
+    return model, optimizer, scheduler, p

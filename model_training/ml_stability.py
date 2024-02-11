@@ -8,6 +8,7 @@ from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
 import pickle
+import torch.optim
 
 do_unpickle = False
 test_size = 0.1
@@ -29,7 +30,9 @@ do_trivial_stable = False
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-4 # 1e-3
+learning_rate = 1e-2 # 1e-3
+lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau
+patience = 50
 
 # the number of flavors should be 3
 NF = 3
@@ -54,6 +57,7 @@ print("#############################")
 model_array = []
 optimizer_array = []
 plotter_array = []
+scheduler_array = []
 
 for dataset_size in dataset_size_list:
     if do_unpickle:
@@ -79,6 +83,7 @@ for dataset_size in dataset_size_list:
         weight_decay,
         learning_rate,
         device))
+    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, patience=patience))
 
 print(model_array[-1])
 
@@ -89,9 +94,10 @@ print("# Training the model #")
 print("######################")
 # BCEWithLogistsLoss contains the sigmoid built in. Don't put sigmoid in model):
 for i in range(len(dataset_size_list)):
-    model_array[i], optimizer_array[i], plotter_array[i] = train_stability_model(
+    model_array[i], optimizer_array[i], scheduler_array[i], plotter_array[i] = train_stability_model(
         model_array[i],
         optimizer_array[i],
+        scheduler_array[i],
         plotter_array[i],
         NF,
         epochs,
