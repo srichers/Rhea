@@ -96,7 +96,6 @@ class Plotter():
         
         for i,name in enumerate(self.data.keys()):
             self.plot_error_single_frame(axes[i], x, self.data[name], name)
-            axes[i].legend(frameon=False,fontsize=8)
         axes[0].legend(frameon=False,fontsize=8)
 
         axes[0].set_xlabel("Epoch")
