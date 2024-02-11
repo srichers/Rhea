@@ -48,6 +48,7 @@ op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
 learning_rate = 1e-3 # 1e-3
 lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau
+patience = 50
 
 # the number of flavors should be 3
 NF = 3
@@ -113,7 +114,7 @@ for dataset_size in dataset_size_list:
         weight_decay,
         learning_rate,
         device))
-    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer))
+    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, patience=patience))
 
 print(model_array[-1])
 
