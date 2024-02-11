@@ -12,6 +12,7 @@ from ml_trainmodel import *
 from ml_maxentropy import *
 from ml_read_data import *
 import pickle
+import torch.optim
 
 directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
 #basedir = "/mnt/scratch/srichers/ML_FFI"
@@ -45,7 +46,8 @@ activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-4 # 1e-3
+learning_rate = 1e-3 # 1e-3
+lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau
 
 # the number of flavors should be 3
 NF = 3
@@ -85,6 +87,7 @@ print("#############################")
 model_array = []
 optimizer_array = []
 plotter_array = []
+scheduler_array = []
 
 for dataset_size in dataset_size_list:
     if do_unpickle:
@@ -110,6 +113,7 @@ for dataset_size in dataset_size_list:
         weight_decay,
         learning_rate,
         device))
+    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer))
 
 print(model_array[-1])
 
@@ -132,9 +136,10 @@ print("######################")
 print("# Training the model #")
 print("######################")
 for i in range(len(dataset_size_list)):
-    model_array[i], optimizer_array[i], plotter_array[i] = train_asymptotic_model(
+    model_array[i], optimizer_array[i], scheduler_array[i], plotter_array[i] = train_asymptotic_model(
         model_array[i],
         optimizer_array[i],
+        scheduler_array[i],
         plotter_array[i],
         NF,
         epochs,

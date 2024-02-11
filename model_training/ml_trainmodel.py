@@ -7,6 +7,7 @@ from ml_maxentropy import *
 
 def train_asymptotic_model(model,
                 optimizer,
+                scheduler,
                 plotter,
                 NF,
                 epochs,
@@ -70,6 +71,10 @@ def train_asymptotic_model(model,
         p.data["1f"].test_loss[t],  p.data["1f"].test_err[t]  = optimizer.test(model, F4i_1f_test, F4i_1f_test, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
         p.data["finalstable"].test_loss[t],  p.data["finalstable"].test_err[t]  = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
 
+        # update the learning rate
+        netloss = p.data["knownData"].test_loss[t] + p.data["unphysical"].test_loss[t] + p.data["0ff"].test_loss[t] + p.data["1f"].test_loss[t] + p.data["finalstable"].test_loss[t]
+        scheduler.step(netloss)
+
         # load in a batch of data from the dataset
         if True: #with torch.autograd.detect_anomaly():
             for F4i_batch, F4f_batch in dataloader:
@@ -110,12 +115,13 @@ def train_asymptotic_model(model,
         # report max error
         if((t+1)%print_every==0):
             print(f"Epoch {t+1}")
+            print("lr =",scheduler._last_lr)
             for key in p.data.keys():
                 print(key, np.sqrt(p.data[key].train_loss[t]),  np.sqrt(p.data[key].test_loss[t]))
             
             print()
 
-    return model, optimizer, p
+    return model, optimizer, scheduler, p
 
 
 def train_stability_model(model,
