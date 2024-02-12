@@ -265,7 +265,7 @@ after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_
 print()
 print("N initial")
 print(before[0,3])
-print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 0)")
 
 print("N predicted")
 after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
