@@ -54,15 +54,17 @@ def train_asymptotic_model(model,
     # training loop #
     #===============#
     # generate randomized data and evaluate the test error
-    F4i_unphysical_train = generate_random_F4(dataset_size, NF, device, max_fluxfac=generate_max_fluxfac)
-    F4i_unphysical_test = generate_random_F4(dataset_size, NF, device, max_fluxfac=generate_max_fluxfac)
-    F4i_0ff_train = generate_stable_F4_zerofluxfac(dataset_size, NF, device)
-    F4i_0ff_test = generate_stable_F4_zerofluxfac(dataset_size, NF, device)
-    F4i_1f_train = generate_stable_F4_oneflavor(dataset_size, NF, device)
-    F4i_1f_test = generate_stable_F4_oneflavor(dataset_size, NF, device)
+    F4i_unphysical_test = generate_random_F4(n_generate, NF, device, max_fluxfac=generate_max_fluxfac)
+    F4i_0ff_train = generate_stable_F4_zerofluxfac(n_generate, NF, device)
+    F4i_0ff_test = generate_stable_F4_zerofluxfac(n_generate, NF, device)
+    F4i_1f_train = generate_stable_F4_oneflavor(n_generate, NF, device)
+    F4i_1f_test = generate_stable_F4_oneflavor(n_generate, NF, device)
 
     epochs_already_done = len(plotter.data["knownData"].train_loss)
     for t in range(epochs_already_done, epochs):
+
+        # generate more unphysical test data
+        F4i_unphysical_train = generate_random_F4(n_generate*10, NF, device, max_fluxfac=generate_max_fluxfac)
 
         # log the test error
         p.data["knownData"].test_loss[t],  p.data["knownData"].test_err[t]  = optimizer.test(model, F4i_test,  F4f_test,  comparison_loss_fn, conserve_lepton_number, bound_to_physical)
@@ -87,16 +89,16 @@ def train_asymptotic_model(model,
                     loss.backward()
 
                 if do_augment_1f:
-                    loss = optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+                    loss = optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical) * 100
                     loss.backward()
 
                 if do_augment_0ff:
-                    loss = optimizer.train(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
+                    loss = optimizer.train(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical) * 100
                     loss.backward()
 
                 # train on making sure the model prediction is physical
                 if do_unphysical_check:
-                    loss = optimizer.train(model, F4i_unphysical_train, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical)
+                    loss = optimizer.train(model, F4i_unphysical_train, None, unphysical_loss_fn, conserve_lepton_number, bound_to_physical) * 100
                     loss.backward()
 
                 optimizer.optimizer.step()
@@ -109,7 +111,7 @@ def train_asymptotic_model(model,
         p.data["finalstable"].train_loss[t], p.data["finalstable"].train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn, conserve_lepton_number, bound_to_physical)
 
         # update the learning rate
-        netloss = p.data["knownData"].train_loss[t] + p.data["unphysical"].train_loss[t] + p.data["0ff"].train_loss[t] + p.data["1f"].train_loss[t] + p.data["finalstable"].train_loss[t]
+        netloss = p.data["knownData"].train_loss[t] + p.data["unphysical"].train_loss[t]*100 + p.data["0ff"].train_loss[t]*100 + p.data["1f"].train_loss[t]*100 + p.data["finalstable"].train_loss[t]
         scheduler.step(netloss)
 
         # report max error

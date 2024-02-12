@@ -19,9 +19,9 @@ directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fl
 basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
 do_unpickle = False
 test_size = 0.1
-epochs = 5000
+epochs = 10000
 batch_size = -1
-dataset_size_list = [10,100,1000,10000,-1] # -1 means use all the data
+dataset_size_list = [-1]#[10,100,1000,10000,-1] # -1 means use all the data
 n_generate = 10000
 print_every = 10
 generate_max_fluxfac = 0.95
@@ -36,20 +36,20 @@ do_augment_1f = True
 # neural network options
 conserve_lepton_number=True
 bound_to_physical = False # causes nans in back propagation
-nhidden = 5
+nhidden = 3
 width = 1024
-dropout_probability = 0 #0.1 # 0.5
+dropout_probability = 0.0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
-weight_decay = 0
+weight_decay = 0 #1e-5
 learning_rate = 1e-3 # 1e-3
 lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau
-patience = 50
-cooldown = 50
+patience = 100
+cooldown = 0
 factor = 0.5
 
 # the number of flavors should be 3
