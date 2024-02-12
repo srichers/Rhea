@@ -13,28 +13,26 @@ import torch.optim
 do_unpickle = False
 test_size = 0.1
 epochs = 5000
-dataset_size_list = [10,100,1000] # -1 means use all the data
+dataset_size_list = [1000] #[10,100,1000] # -1 means use all the data
 print_every = 10
 n_equatorial = 64
 zero_fluxfac_bias = 10
 generate_max_fluxfac = 0.95
 
 nhidden = 3
-width = 256
+width = 512
 dropout_probability = 0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
-do_trivial_stable = False
 
 # optimizer options
 op = torch.optim.Adam # Adam, SGD, RMSprop
 weight_decay = 0
-learning_rate = 1e-2 # 1e-3
-lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau
-patience = 50
-cooldown = 50
-factor = 0.5
+learning_rate = 1e-3 # 1e-3
+lr_scheduler = torch.optim.lr_scheduler.ExponentialLR
+gamma = 0.999
+last_epoch = -1
 
 # the number of flavors should be 3
 NF = 3
@@ -85,7 +83,7 @@ for dataset_size in dataset_size_list:
         weight_decay,
         learning_rate,
         device))
-    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, patience=patience, factor=factor, cooldown=cooldown))
+    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, gamma=gamma, last_epoch=last_epoch))#patience=patience, factor=factor, cooldown=cooldown))
 
 print(model_array[-1])
 

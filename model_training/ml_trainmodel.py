@@ -190,8 +190,8 @@ def train_stability_model(model,
         loss = optimizer.train(model, F4i_random, unstable_random, loss_function)
         loss.backward()
 
-        loss = optimizer.train(model, F4i_heavy, unstable_heavy, loss_function)
-        loss.backward()
+        #loss = optimizer.train(model, F4i_heavy, unstable_heavy, loss_function)
+        #loss.backward()
 
         loss = optimizer.train(model, F4i_0ff, unstable_0ff, loss_function)
         loss.backward()
@@ -210,7 +210,7 @@ def train_stability_model(model,
 
         # update the learning rate
         netloss = p.data["random"].train_loss[t] + p.data["heavy"].train_loss[t] + p.data["0ff"].train_loss[t] + p.data["1f"].train_loss[t]
-        scheduler.step(netloss)
+        scheduler.step()#netloss)
 
         # report max error
         if((t+1)%print_every==0):
