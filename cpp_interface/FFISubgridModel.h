@@ -160,12 +160,16 @@ class FFISubgridModel{
     // a and b indicate flavor
     torch::Tensor F4_final = torch::einsum("niajb,nmjb->nmia", {y, F4_initial});
 
+    // make sure the result is physical
+    F4_final = restrict_to_physical(F4_final);
+
     return F4_final;
   }
 
   // ensure that the four-vectors are time-like and have positive density
+  // F4_final has shape [sim, xyzt, nu/nubar, flavor]
   torch::Tensor restrict_to_physical(const torch::Tensor& F4_final){
-    torch::Tensor avgF4 = torch::sum(F4_final, {3}).index({Slice(), Slice(), Slice(), Slice()}) / NF; // [:,:,:,None]
+    torch::Tensor avgF4 = torch::sum(F4_final, {3}).index({Slice(), Slice(), Slice(), None}) / NF; // [:,:,:,None]
 
     // enforce that all four-vectors are time-like
     // choose the branch that leads to the most positive alpha
@@ -186,7 +190,9 @@ class FFISubgridModel{
     maxalpha = torch::maximum(maxalpha, torch::zeros_like(maxalpha));
 
     // modify the four-vectors to be time-like
-    F4_final = (F4_final + maxalpha.index({Slice(),Slice(),Slice(),Slice()})*avgF4) / (maxalpha.index({Slice(),Slice(),Slice(),Slice()}) + 1);
+    torch::Tensor result = (F4_final + maxalpha.index({Slice(),None,None,None})*avgF4) / (maxalpha.index({Slice(),None,None,None}) + 1);
+
+    return result;
   }
 
 };
