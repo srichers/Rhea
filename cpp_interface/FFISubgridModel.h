@@ -163,4 +163,30 @@ class FFISubgridModel{
     return F4_final;
   }
 
+  // ensure that the four-vectors are time-like and have positive density
+  torch::Tensor restrict_to_physical(const torch::Tensor& F4_final){
+    torch::Tensor avgF4 = torch::sum(F4_final, {3}).index({Slice(), Slice(), Slice(), Slice()}) / NF; // [:,:,:,None]
+
+    // enforce that all four-vectors are time-like
+    // choose the branch that leads to the most positive alpha
+    torch::Tensor a = dot4_Minkowski(avgF4, avgF4); // [sim, nu/nubar, flavor];
+    torch::Tensor b = 2.*dot4_Minkowski(avgF4, F4_final);
+    torch::Tensor c = dot4_Minkowski(F4_final, F4_final);
+    torch::Tensor radical = b*b - 4*a*c;
+    assert(torch::all(radical>=-1e-6).item<bool>());
+    radical = torch::maximum(radical, torch::zeros_like(radical));
+    torch::Tensor alpha = (-b + torch::sign(a)*torch::sqrt(radical)) / (2*a);
+
+    // fix the case where a is zero
+    torch::where(torch::abs(a/b)<1e-6, (-c/b), alpha);
+
+    // find the nu/nubar and flavor indices where alpha is maximized
+    torch::Tensor maxalpha = torch::amax(alpha, {1,2}); // [sim]
+    maxalpha += 1e-6;
+    maxalpha = torch::maximum(maxalpha, torch::zeros_like(maxalpha));
+
+    // modify the four-vectors to be time-like
+    F4_final = (F4_final + maxalpha.index({Slice(),Slice(),Slice(),Slice()})*avgF4) / (maxalpha.index({Slice(),Slice(),Slice(),Slice()}) + 1);
+  }
+
 };
