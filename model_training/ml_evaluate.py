@@ -14,12 +14,11 @@ from ml_tools import flux_factor, restrict_F4_to_physical
 import pickle
 import glob
 import os
-import copy
 from torchmetrics.classification import BinaryPrecisionRecallCurve
 from torcheval.metrics import BinaryF1Score, BinaryNormalizedEntropy, BinaryConfusionMatrix
 
 basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
-directory_list = ["manyflavor_twobeam", "manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
+#basedir = "/mnt/scratch/srichers/ML_FFI"
 NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
 
 def get_dataset_size_list(search_string):
@@ -40,9 +39,7 @@ zero_weight = 10
 n_equatorial = 64
 
 # data augmentation options
-do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
-conserve_lepton_number = True
-restrict_to_physical = False #True
+do_augment_permutation=True
 
 # the number of flavors should be 3
 NF = 3
@@ -56,7 +53,10 @@ print(f"Using {device} device")
 #===============#
 # read the data #
 #===============#
-F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test = read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
+# unpickle the data
+with open("train_test_datasets.pkl","rb") as f:
+    F4i_train, F4i_test, F4f_train, F4f_test = pickle.load(f)
+F4_NSM_stable = read_NSM_stable_data(NF, basedir, device, do_augment_permutation)
 # adjust entries of -1 to instead have the correct size of the dataset
 for i in range(len(dataset_size_list_asymptotic)):
     if dataset_size_list_asymptotic[i] == -1:
@@ -117,7 +117,6 @@ precision, recall, thresholds = pr_curve(unstable_pred.to('cpu'), unstable_rando
 
 plt.clf()
 fig,ax=plt.subplots(1,1)
-pr_curve.plot(score=True, ax=ax)
 ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
 ax.minorticks_on()
 plt.plot(thresholds, precision[:-1], label="Precision")
@@ -165,7 +164,7 @@ print(F4f_train[0,3])
 
 print()
 print("N predicted")
-after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(before)
 print(after[0,3])
 print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
@@ -193,7 +192,7 @@ print(F4f_test[0,3])
 
 print()
 print("N predicted")
-after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(before)
 print(after[0,3])
 print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
@@ -214,7 +213,7 @@ F4_test[3, 1, 0] =  1
 F4_test[2, 0, 0] =  1/3
 F4_test[2, 1, 0] = -1/3
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(before)
 
 print()
 print("N initail")
@@ -223,13 +222,13 @@ print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 
 
 print()
 print("N predicted")
-after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(before)
 print(after[0,3])
 print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 print("N re-predicted")
-after = model_asymptotic.predict_F4(after, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(after)
 print(after[0,3])
 print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
@@ -260,7 +259,7 @@ F4_test[3, 1, 0] =  .5
 F4_test[2, 0, 0] =  0
 F4_test[2, 1, 0] =  0
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(before)
 
 print()
 print("N initial")
@@ -268,13 +267,13 @@ print(before[0,3])
 print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 0)")
 
 print("N predicted")
-after = model_asymptotic.predict_F4(before, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(before)
 print(after[0,3])
 print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 
 print("N re-predicted")
-after = model_asymptotic.predict_F4(after, conserve_lepton_number, restrict_to_physical)
+after = model_asymptotic.predict_F4(after)
 print(after[0,3])
 print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
@@ -291,7 +290,7 @@ print("########################")
 npoints = 11
 nreps = 20
 p_asymptotic.init_plot_options()
-plot_nue_nuebar(model_asymptotic, npoints, nreps, conserve_lepton_number, restrict_to_physical)
+plot_nue_nuebar(model_asymptotic, npoints, nreps)
 p_asymptotic.plot_error("train_test_error_asymptotic.pdf", ymin=1e-5)
 p_stability.init_plot_options()
 p_stability.plot_error("train_test_error_stability.pdf", ymin=1e-5)
@@ -329,21 +328,18 @@ for d in dirlist:
     if not os.path.exists(d):
         os.mkdir(d)
     
-    restrict_to_physical = True if (d=="corrected" or d=="both") else False
-
     # plot the error histogram for the test data
-    error_histogram(model_asymptotic, F4i_train, F4f_train, 100, 0, 0.1, d,"/histogram_train.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4i_test, F4f_test, 100, 0, 0.1, d,"/histogram_test.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4_NSM_train, F4_NSM_train, 100, 0, 0.1, d,"/histogram_NSM_train.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4_NSM_test, F4_NSM_test, 100, 0, 0.1, d,"/histogram_NSM_test.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4i_0ff, F4i_0ff, 100, 0, 0.1, d,"/histogram_0ff.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4i_1f, F4i_1f, 100, 0, 0.1, d,"/histogram_1f.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4i_train, F4i_train, 100, 0, 0.1, d,"/histogram_donothing.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4f_train, F4f_train, 100, 0, 0.1, d,"/histogram_finalstable_train.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
-    error_histogram(model_asymptotic, F4f_test, F4f_test, 100, 0, 0.1, d,"/histogram_finalstable_test.pdf", conserve_lepton_number, restrict_to_physical, model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_train, F4f_train, 100, 0, 0.1, d,"/histogram_train.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_test, F4f_test, 100, 0, 0.1, d,"/histogram_test.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4_NSM_stable, F4_NSM_stable, 100, 0, 0.1, d,"/histogram_NSM_stable.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_0ff, F4i_0ff, 100, 0, 0.1, d,"/histogram_0ff.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_1f, F4i_1f, 100, 0, 0.1, d,"/histogram_1f.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_train, F4i_train, 100, 0, 0.1, d,"/histogram_donothing.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4f_train, F4f_train, 100, 0, 0.1, d,"/histogram_finalstable_train.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4f_test, F4f_test, 100, 0, 0.1, d,"/histogram_finalstable_test.pdf", model_stability, stability_cutoff)
 
-    F4f_pred = model_asymptotic.predict_F4(F4i_unphysical,conserve_lepton_number,restrict_to_physical)
-    F4f_pred = modify_F4(F4i_unphysical, F4f_pred,d, model_stability, stability_cutoff)
+    F4f_pred = model_asymptotic.predict_F4(F4i_unphysical)
+    F4f_pred = modify_F4(F4i_unphysical, F4f_pred,d, model_asymptotic, model_stability, stability_cutoff)
 
     # enforce that number density cannot be less than zero
     F4f_pred = F4f_pred.cpu().detach().numpy()

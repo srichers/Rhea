@@ -8,8 +8,9 @@ from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
 from ml_trainmodel import *
+import pickle
 
-def read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation):
+def read_test_train_data(NF, basedir, directory_list, test_size, device, do_augment_permutation):
     #===============================================#
     # read in the database from the previous script #
     #===============================================#
@@ -53,6 +54,10 @@ def read_data(NF, basedir, directory_list, test_size, device, do_augment_permuta
         F4i_test  = ml.augment_permutation(F4i_test )
         F4f_test  = ml.augment_permutation(F4f_test )
 
+    # pickle the train and test datasets
+    with open("train_test_datasets.pkl","wb") as f:
+        pickle.dump([F4i_train, F4i_test, F4f_train, F4f_test],f)
+
     # move the arrays over to the gpu
     F4i_train = torch.Tensor(F4i_train).to(device)
     F4f_train = torch.Tensor(F4f_train).to(device)
@@ -61,14 +66,16 @@ def read_data(NF, basedir, directory_list, test_size, device, do_augment_permuta
     print("Train:",F4i_train.shape)
     print("Test:",F4i_test.shape)
 
-    #=================================================#
-    # read in the stable points from the NSM snapshot #
+    return F4i_train, F4i_test, F4f_train, F4f_test
+
+#=================================================#
+# read in the stable points from the NSM snapshot #
+#=================================================#
+def read_NSM_stable_data(NF, basedir, device, do_augment_permutation):
     print()
     print("#############################")
     print("# READING NSM STABLE POINTS #")
     print("#############################")
-    F4_NSM_train = None
-    F4_NSM_test = None
     # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
     # take only the y-z slice to limit the size of the data.
     f_in = h5py.File(basedir+"/input_data/model_rl0_orthonormal.h5","r")
@@ -100,12 +107,10 @@ def read_data(NF, basedir, directory_list, test_size, device, do_augment_permuta
     F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
     # split into training and testing sets
     # don't need the final values because they are the same as the initial
-    F4_NSM_train, F4_NSM_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
     if do_augment_permutation:
-        F4_NSM_train = ml.augment_permutation(F4_NSM_train)
-        F4_NSM_test  = ml.augment_permutation(F4_NSM_test )
-    # move the array to the device
-    F4_NSM_train = torch.Tensor(F4_NSM_train).to(device)
-    F4_NSM_test  = torch.Tensor(F4_NSM_test ).to(device)
+        F4_NSM_stable = ml.augment_permutation(F4_NSM_stable)
 
-    return F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test
+    # move the array to the device
+    F4_NSM_stable = torch.Tensor(F4_NSM_stable).to(device)
+
+    return F4_NSM_stable

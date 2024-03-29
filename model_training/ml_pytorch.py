@@ -34,8 +34,6 @@ do_augment_0ff = True
 do_augment_1f = True
 
 # neural network options
-conserve_lepton_number=True
-bound_to_physical = False # causes nans in back propagation
 nhidden = 3
 width = 1024
 dropout_probability = 0.0 #0.1 # 0.5
@@ -65,7 +63,7 @@ print(torch.cuda.get_device_name(0))
 #===============#
 # read the data #
 #===============#
-F4i_train, F4i_test, F4f_train, F4f_test, F4_NSM_train, F4_NSM_test = read_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
+F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
 
 # adjust entries of -1 to instead have the correct size of the dataset
 for i in range(len(dataset_size_list)):
@@ -156,8 +154,6 @@ for i in range(len(dataset_size_list)):
         do_augment_final_stable,
         do_augment_1f,
         do_augment_0ff,
-        conserve_lepton_number,
-        bound_to_physical,
         comparison_loss_fn,
         unphysical_loss_fn,
         F4i_train,
