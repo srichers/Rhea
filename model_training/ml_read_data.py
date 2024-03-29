@@ -58,14 +58,6 @@ def read_test_train_data(NF, basedir, directory_list, test_size, device, do_augm
     with open("train_test_datasets.pkl","wb") as f:
         pickle.dump([F4i_train, F4i_test, F4f_train, F4f_test],f)
 
-    # move the arrays over to the gpu
-    F4i_train = torch.Tensor(F4i_train).to(device)
-    F4f_train = torch.Tensor(F4f_train).to(device)
-    F4i_test  = torch.Tensor(F4i_test ).to(device)
-    F4f_test  = torch.Tensor(F4f_test ).to(device)
-    print("Train:",F4i_train.shape)
-    print("Test:",F4i_test.shape)
-
     return F4i_train, F4i_test, F4f_train, F4f_test
 
 #=================================================#
