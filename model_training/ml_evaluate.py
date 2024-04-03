@@ -339,7 +339,7 @@ for d in dirlist:
     error_histogram(model_asymptotic, F4f_test, F4f_test, 100, 0, 0.1, d,"/histogram_finalstable_test.pdf", model_stability, stability_cutoff)
 
     F4f_pred = model_asymptotic.predict_F4(F4i_unphysical)
-    F4f_pred = modify_F4(F4i_unphysical, F4f_pred,d, model_asymptotic, model_stability, stability_cutoff)
+    F4f_pred = modify_F4(F4i_unphysical, F4f_pred,d, model_stability, stability_cutoff)
 
     # enforce that number density cannot be less than zero
     F4f_pred = F4f_pred.cpu().detach().numpy()
