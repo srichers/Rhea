@@ -14,12 +14,13 @@ from ml_read_data import *
 import pickle
 import torch.optim
 
-directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
-basedir = "/mnt/scratch/srichers/ML_FFI"
+#basedir = "/mnt/scratch/NSM_ML/ML_models/input_data/"
 #basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
+#directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
+directory_list = ["/mnt/scratch/NSM_ML/ML_models/input_data"]
 do_unpickle = False
 test_size = 0.1
-epochs = 20000
+epochs = 100#20000
 batch_size = -1
 dataset_size_list = [10,100,1000,10000,-1] # -1 means use all the data
 n_generate = 10000
@@ -67,7 +68,7 @@ if do_unpickle:
     with open("train_test_datasets.pkl", "rb") as f:
         F4i_train, F4i_test, F4f_train, F4f_test = pickle.load(f)
 else:
-    F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(NF, basedir, directory_list, test_size, device, do_augment_permutation)
+    F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(NF, directory_list, test_size, device, do_augment_permutation)
 
 # move the arrays over to the gpu
 F4i_train = torch.Tensor(F4i_train).to(device)

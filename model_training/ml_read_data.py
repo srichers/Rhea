@@ -10,7 +10,7 @@ from ml_plot import *
 from ml_trainmodel import *
 import pickle
 
-def read_test_train_data(NF, basedir, directory_list, test_size, device, do_augment_permutation):
+def read_test_train_data(NF, directory_list, test_size, device, do_augment_permutation):
     #===============================================#
     # read in the database from the previous script #
     #===============================================#
@@ -21,7 +21,7 @@ def read_test_train_data(NF, basedir, directory_list, test_size, device, do_augm
     F4_initial_list = []
     F4_final_list = []
     for d in directory_list:
-        f_in = h5py.File(basedir+"/input_data/"+d+"/many_sims_database.h5","r")
+        f_in = h5py.File(d+"/many_sims_database.h5","r")
         F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
         F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
         assert(NF == int(np.array(f_in["nf"])) )

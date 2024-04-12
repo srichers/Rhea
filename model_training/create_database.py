@@ -13,9 +13,10 @@ nproc = 128
 average_start_tsat = 2 # start averaging at 2*tsat
 average_min_tsat = 3 # require time up to at least 3*tsat
 problematic_stddev_val = 0.01
+violation_limit = 1e-5
 #problematic_final_val = 20
 
-basedir = basedir = "/mnt/scratch/srichers/ML_FFI/input_data/"
+basedir = "/mnt/scratch/NSM_ML/ML_models/input_data/"
 directory_list =["manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z","fluxfac_one_twobeam","manyflavor_twobeam"]
 
 # get the list of files to process
@@ -91,6 +92,28 @@ def growth_properties(data):
             
     return imax, growthRate
 
+def bad_data(F4_initial, F4_final, F4_final_stddev):
+    Ntot_initial = np.sum(F4_initial[3,:,:],axis=(0,1))
+
+    relative_stddev = np.max(F4_final_stddev/Ntot_initial)
+    if np.any(relative_stddev>problematic_stddev_val):
+        print("   Warning: large standard deviation",relative_stddev)
+        return True
+    
+    F_violation = np.max(np.abs(np.sum(F4_initial-F4_final, axis=2))) / Ntot_initial
+    if F_violation > violation_limit:
+        print("   Warning: large F violation",F_violation)
+        return True
+
+    ELN_initial = F4_initial[3,0,:]-F4_initial[3,1,:]
+    ELN_final   =   F4_final[3,0,:]-  F4_final[3,1,:]
+    ELN_violation = np.max(np.abs(ELN_final-ELN_initial)) / Ntot_initial
+    if ELN_violation > violation_limit:
+        print("   Warning: large ELN violation",ELN_violation)
+        return True
+
+    return False
+
 #===========================================#
 # get the final moments of the distribution #
 #===========================================#
@@ -125,8 +148,7 @@ def final_properties(imax, growthRate, data, dz):
         F4_final        = np.average(F4[:,:,:,i0:i1], axis=(3))
         F4_final_stddev = np.std(    F4[:,:,:,i0:i1], axis=(3))
 
-        if np.any(F4_final_stddev>problematic_stddev_val*Ntot):# or np.any(np.abs(F4[:,:,:,-1]-F4_final)>problematic_final_val*F4_final_stddev):
-            print("   Warning: large standard deviation",np.max(F4_final_stddev/Ntot))#, np.max(np.abs(F4[:,:,:,-1]-F4_final)/F4_final_stddev))
+        if bad_data(F4_initial, F4_final, F4_final_stddev):
             F4_initial *= np.NAN
             F4_final_stddev *= np.NAN
             F4_final *= np.NAN
