@@ -1,20 +1,22 @@
 # Given a full set of simulations sorted into [a-z]*10/reduced0D.h5, extract a database of the FFI growth rate and saturation properties
 # Run from within a single RUN directory
 import os
-import copy
 import h5py
-import glob
 import re
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 from multiprocessing import Pool
 
 # INPUTS
-do_plot = False
 growthrate_minfac = 1e-3
 growthrate_maxfac = 1e-1
 nproc = 128
+average_start_tsat = 2 # start averaging at 2*tsat
+average_min_tsat = 3 # require time up to at least 3*tsat
+problematic_stddev_val = 0.01
+#problematic_final_val = 20
+
+basedir = basedir = "/mnt/scratch/srichers/ML_FFI/input_data/"
+directory_list =["manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z","fluxfac_one_twobeam","manyflavor_twobeam"]
 
 # get the list of files to process
 def simulation_is_finished(dirname):
@@ -23,42 +25,32 @@ def simulation_is_finished(dirname):
     else:
         return False
 
-dirlist = sorted([ f.path for f in os.scandir(".") if f.is_dir() ])
-finished_list = [f for f in dirlist if simulation_is_finished(f)]
-print(len(dirlist),"directories")
 
-nsims = len(finished_list)
-print(nsims,"finished simulations")
+def get_dirlist(basedir):
+    dirlist = sorted([ f.path for f in os.scandir(basedir) if f.is_dir() ])
+    finished_list = [f for f in dirlist if simulation_is_finished(f)]
+    print(basedir)
+    print("   ",len(dirlist),"directories")
 
-# get the number of flavors
-data = h5py.File(finished_list[0]+"/reduced0D.h5","r")
-if "N22(1|ccm)" in data.keys(): nf = 3
-else: nf = 2
-data.close()
-print(str(nf) + " flavors")
+    nsims = len(finished_list)
+    print("   ",nsims,"finished simulations")
 
+    # get the number of flavors
+    data = h5py.File(finished_list[0]+"/reduced0D.h5","r")
+    if "N22(1|ccm)" in data.keys(): nf = 3
+    else: nf = 2
+    data.close()
+    print("   ",str(nf) + " flavors")
 
+    return finished_list, nf
 
-#==============#
-# plot options #
-#==============#
-if(do_plot):
-    mpl.rcParams['font.size'] = 22
-    mpl.rcParams['font.family'] = 'serif'
-    mpl.rc('text', usetex=True)
-    mpl.rcParams['xtick.major.size'] = 7
-    mpl.rcParams['xtick.major.width'] = 2
-    mpl.rcParams['xtick.major.pad'] = 8
-    mpl.rcParams['xtick.minor.size'] = 4
-    mpl.rcParams['xtick.minor.width'] = 2
-    mpl.rcParams['ytick.major.size'] = 7
-    mpl.rcParams['ytick.major.width'] = 2
-    mpl.rcParams['ytick.minor.size'] = 4
-    mpl.rcParams['ytick.minor.width'] = 2
-    mpl.rcParams['axes.linewidth'] = 2
-    fig,axes=plt.subplots(1,3, figsize=(16,8))
-    plt.subplots_adjust(wspace=0, hspace=0)
-    fig.align_labels()
+# get the list of finished simulations
+finished_list = []
+for d in directory_list:
+    flist, nf = get_dirlist(basedir+d)
+    finished_list += flist
+print("Total finished list length:",len(finished_list))
+finished_list = finished_list
 
 #========================#
 # get the grid cell size #
@@ -96,11 +88,6 @@ def growth_properties(data):
         i0 = locs[0]
         i1 = locs[-1]
         growthRate = np.log(N_offdiag_mag[i1]/N_offdiag_mag[i0]) / (t[i1]-t[i0])
-
-        if(t[-1]>3*t[imax] and do_plot):
-            axes[0].semilogy(t/t[imax], N_offdiag_mag/maxOffDiag, color="gray")
-            axes[0].scatter([t[i1]/t[imax]], [N_offdiag_mag[i1]/maxOffDiag], color="gray")
-            axes[0].scatter([t[i0]/t[imax]], [N_offdiag_mag[i0]/maxOffDiag], color="gray")
             
     return imax, growthRate
 
@@ -121,22 +108,30 @@ def final_properties(imax, growthRate, data, dz):
                 F4[ixyzt,isuffix,flavor,:] = np.array(data[xyzt+str(flavor)+str(flavor)+suffix+"(1|ccm)"])
 
     # get the time interval over which to average
+    Ntot = np.sum(F4[3,:,:,0],axis=(0,1))
     F4_initial = F4[:,:,:,0]
-    F4_final = F4_initial
-    F4_final_stddev = np.zeros_like(F4_final)
+    F4_final = F4_initial * np.NAN
+    F4_final_stddev = F4_initial * np.NAN
     tmax = t[imax]
     tend = t[-1]
-    if tend > 2*tmax and growthRate>0:
-        i0 = np.argmin(np.abs(t-2*tmax))
-        F4_final        = np.average(F4[:,:,:,i0:-1], axis=(3))
-        F4_final_stddev = np.std(    F4[:,:,:,i0:-1], axis=(3))
 
-    if do_plot:
-        Navg = F4[3,:,0,:]
-        axes[1].plot(t/tmax, Navg[0,:]/Navg[0,0], color="gray")
-        axes[2].plot(t/tmax, Navg[1,:]/Navg[1,0], color="gray")
+    xplot = t/tmax
+    y0plot = F4[3,0,0,:] / F4[3,0,0,0]
+    y1plot = np.array(data["N_offdiag_mag(1|ccm)"]) / Ntot
+    
+    if tend > average_min_tsat*tmax and growthRate>0:
+        i0 = np.argmin(np.abs(t-average_start_tsat*tmax))
+        i1 = -1 #np.argmin(np.abs(t-average_min_tsat*tmax))
+        F4_final        = np.average(F4[:,:,:,i0:i1], axis=(3))
+        F4_final_stddev = np.std(    F4[:,:,:,i0:i1], axis=(3))
 
-    return F4_initial, F4_final, F4_final_stddev
+        if np.any(F4_final_stddev>problematic_stddev_val*Ntot):# or np.any(np.abs(F4[:,:,:,-1]-F4_final)>problematic_final_val*F4_final_stddev):
+            print("   Warning: large standard deviation",np.max(F4_final_stddev/Ntot))#, np.max(np.abs(F4[:,:,:,-1]-F4_final)/F4_final_stddev))
+            F4_initial *= np.NAN
+            F4_final_stddev *= np.NAN
+            F4_final *= np.NAN
+
+    return F4_initial, F4_final, F4_final_stddev, xplot, y0plot, y1plot
 
 
 def analyze_file(d):
@@ -151,13 +146,13 @@ def analyze_file(d):
     imax, growthRate = growth_properties(data)
     
     # get the final state
-    F4_initial, F4_final, F4_final_stddev = final_properties(imax, growthRate, data, dz)
+    F4_initial, F4_final, F4_final_stddev, xplot, y0plot, y1plot = final_properties(imax, growthRate, data, dz)
     
     # close the data file
     data.close()
 
     # return data
-    return growthRate, F4_initial, F4_final, F4_final_stddev
+    return growthRate, F4_initial, F4_final, F4_final_stddev, xplot, y0plot, y1plot
     
 #=================#
 # LOOP OVER FILES #
@@ -173,24 +168,25 @@ growthRateList    = np.array([r[0] for r in results])
 F4InitialList     = np.array([r[1] for r in results])
 F4FinalList       = np.array([r[2] for r in results])
 F4FinalStddevList = np.array([r[3] for r in results])
+xplotList         = np.array([r[4] for r in results])
+y0plotList        = np.array([r[5] for r in results])
+y1plotList        = np.array([r[6] for r in results])
 
-if do_plot:
-    ax2 = axes[2].twinx()
-    ax2.tick_params(axis='both',which="both", direction="in",top=True,right=True)
-    ax2.minorticks_on()
-    ax2.set_ylabel(r"$N/N(0)$")
-    for ax in axes:
-        ax.set_xlabel(r"$t/t_\mathrm{peak}$")
-        ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
-        ax.minorticks_on()
-    for ax in axes[1:]:
-        for label in ax.get_yticklabels():
-            label.set_visible(False)
-        ax.set_ylim(0,1)
-    ax2.set_ylim(0,1)
-    axes[0].set_ylabel(r"$\bar{N}_{e\mu}/\bar{N}_{e\mu,\mathrm{max}}$")
-    plt.savefig("instability_comparison.pdf",bbox_inches='tight')
-        
+# count the number of good results, defined by F4_final not being nan
+print("Total number of input simulations:",F4FinalList.shape[0])
+goodlocs = np.where(F4FinalList[:,0,0,0]==F4FinalList[:,0,0,0])
+print("Number of good results:",len(goodlocs[0]))
+
+# select only the good points for the dataset
+print("Number of points before selection:",growthRateList.shape[0])
+growthRateList    = growthRateList[goodlocs]
+F4InitialList     = F4InitialList[goodlocs,:,:,:]
+F4FinalList       = F4FinalList[goodlocs,:,:,:]
+F4FinalStddevList = F4FinalStddevList[goodlocs,:,:,:]
+xplotList         = xplotList[goodlocs,:]
+y0plotList        = y0plotList[goodlocs,:]
+y1plotList        = y1plotList[goodlocs,:]
+print("Number of points after selection:",growthRateList.shape[0])
 
 # Write data to hdf5 file
 output = h5py.File("many_sims_database.h5","w")
@@ -199,5 +195,8 @@ output["growthRate(1|s)"] = growthRateList
 output["F4_final(1|ccm)"] = F4FinalList
 output["F4_final_stddev(1|ccm)"] = F4FinalStddevList
 output["F4_initial(1|ccm)"] = F4InitialList
+output["xplot"] = xplotList
+output["y0plot"] = y0plotList
+output["y1plot"] = y1plotList
 output.close()
 print()
