@@ -16,41 +16,33 @@ problematic_stddev_val = 0.05
 violation_limit = 1e-5
 #problematic_final_val = 20
 
-basedir = "/mnt/scratch/NSM_ML/ML_models/"
-directory_list =[basedir+"input_data_ME",
-                 basedir+"old_input_data_ME",]
-
 # get the list of files to process
 def simulation_is_finished(dirname):
-    if "finalized" in open(dirname+"/output.txt").readlines()[-1]:
+    file_to_check = dirname+"/output.txt"
+    if os.path.exists(file_to_check) and "finalized" in open(file_to_check).readlines()[-1]:
         return True
     else:
         return False
 
 
-def get_dirlist(d):
-    dirlist = sorted([ f.path for f in os.scandir(d) if f.is_dir() ])
-    finished_list = [f for f in dirlist if simulation_is_finished(f)]
-    print(d)
-    print("   ",len(dirlist),"directories")
+#=============================#
+# get the list of directories #
+#=============================#
+dirlist = sorted([ f.path for f in os.scandir(".") if f.is_dir() ])
+finished_list = [f for f in dirlist if simulation_is_finished(f)]
+print(len(dirlist),"directories")
 
-    nsims = len(finished_list)
-    print("   ",nsims,"finished simulations")
+nsims = len(finished_list)
+print(nsims,"finished simulations")
 
-    # get the number of flavors
-    data = h5py.File(finished_list[0]+"/reduced0D.h5","r")
-    if "N22(1|ccm)" in data.keys(): nf = 3
-    else: nf = 2
-    data.close()
-    print("   ",str(nf) + " flavors")
-
-    return finished_list, nf
+# get the number of flavors
+data = h5py.File(finished_list[0]+"/reduced0D.h5","r")
+if "N22(1|ccm)" in data.keys(): nf = 3
+else: nf = 2
+data.close()
+print(str(nf) + " flavors")
 
 # get the list of finished simulations
-finished_list = []
-for d in directory_list:
-    flist, nf = get_dirlist(d)
-    finished_list += flist
 print("Total finished list length:",len(finished_list))
 #finished_list = finished_list[:10]
 
@@ -61,9 +53,9 @@ def cell_size(dirname):
     f = open(dirname+"/inputs","r")
     lines = f.readlines()
     for line in lines:
-        if "Lz" in line:
+        if line[:2] == "Lz":
             Lz = float(line.split("=")[1])
-        if "ncell" in line:
+        if line[:5] == "ncell":
             nz = int(re.split("[, \)]", line)[-2])
     f.close()
     return Lz/nz
