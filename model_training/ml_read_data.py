@@ -70,7 +70,7 @@ def read_NSM_stable_data(NF, basedir, device, do_augment_permutation):
     print("#############################")
     # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
     # take only the y-z slice to limit the size of the data.
-    f_in = h5py.File(basedir+"/input_data/model_rl0_orthonormal.h5","r")
+    f_in = h5py.File(basedir+"/model_rl0_orthonormal.h5","r")
     discriminant = np.array(f_in["crossing_discriminant"])[100,:,:]
     # n has shape [Nx,Ny,Nz]]
     ne = np.array(f_in["n_e(1|ccm)"])[0,:,:]

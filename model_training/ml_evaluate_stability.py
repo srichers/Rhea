@@ -1,3 +1,6 @@
+# This is an older version of the evaluation script that includes using a second ML model that predicts if the distribution is unstable
+# I left it in so that in case a binary decision model is needed in the future I can refer to it.
+
 # credit to https://thinkingneuron.com/using-artificial-neural-networks-for-regression-in-python/
 # Convert the flavor transformation data to one with reduced dimensionality to make it easier to train on
 # Run from the directory containin the joint dataset
@@ -17,7 +20,9 @@ import os
 from torchmetrics.classification import BinaryPrecisionRecallCurve
 from torcheval.metrics import BinaryF1Score, BinaryNormalizedEntropy, BinaryConfusionMatrix
 
-basedir = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData"
+basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
+#basedir = "/mnt/scratch/srichers/ML_FFI"
+NSM_simulated_filename = "many_sims_database_RUN_lowres_sqrt2_RUN_standard.h5"
 
 def get_dataset_size_list(search_string):
     filename_list = glob.glob(search_string)
@@ -83,13 +88,65 @@ def get_plotter_model_arrays(search_string, dataset_size_list):
     return plotter_array, model_array
 
 plotter_array_asymptotic, model_array_asymptotic = get_plotter_model_arrays("model_",dataset_size_list_asymptotic)
+plotter_array_stability, model_array_stability = get_plotter_model_arrays("model_stability_",dataset_size_list_stability)
 
 # use the largest dataset size for the rest of these metrics
 p_asymptotic = plotter_array_asymptotic[-1]
 model_asymptotic = model_array_asymptotic[-1]
+p_stability = plotter_array_stability[-1]
+model_stability = model_array_stability[-1]
  
 # set model to evaluation mode
 model_asymptotic.eval()
+model_stability.eval()
+
+#=============================#
+# make precision recall curve #
+#=============================#
+print()
+print("##########################")
+print("# Precision recall curve #")
+print("##########################")
+F4i_random = generate_random_F4(n_generate, NF, 'cpu', zero_weight=zero_weight, max_fluxfac=generate_max_fluxfac)
+unstable_random = torch.tensor(has_crossing(F4i_random.detach().numpy(), NF, n_equatorial), device=device).to(torch.long)
+print("Random Stable:",torch.sum(unstable_random==False).item())
+print("Random Unstable:",torch.sum(unstable_random==True).item())
+F4i_random = F4i_random.to(device)
+unstable_pred = model_stability.predict_unstable(F4i_random)
+print("Unstable pred:",torch.min(unstable_pred).item(), torch.max(unstable_pred).item())
+pr_curve = BinaryPrecisionRecallCurve(thresholds=101).to('cpu')
+#pr_curve.update(unstable_pred, unstable_random)
+precision, recall, thresholds = pr_curve(unstable_pred.to('cpu'), unstable_random.to('cpu'))
+
+plt.clf()
+fig,ax=plt.subplots(1,1)
+ax.tick_params(axis='both',which="both", direction="in",top=True,right=True)
+ax.minorticks_on()
+plt.plot(thresholds, precision[:-1], label="Precision")
+plt.plot(thresholds, recall[:-1],  label="Recall")
+plt.legend(frameon=False)
+plt.xlabel("Threshold")
+plt.savefig("precision_recall.pdf",bbox_inches="tight")
+
+# empty dimension was introduced for compatibility w/ loss functions. Here it's just clunky
+metric = BinaryF1Score(threshold=stability_cutoff)
+metric.update(unstable_pred[:,0], unstable_random[:,0])
+print()
+print("Binary F1 Score:",metric.compute().item())
+
+metric = BinaryNormalizedEntropy()
+metric.update(unstable_pred[:,0], unstable_random[:,0].to(torch.float))
+print("Normalized cross entropy:",metric.compute().item())
+
+metric = BinaryConfusionMatrix(threshold=stability_cutoff, normalize="all")
+metric.update(unstable_pred[:,0], unstable_random[:,0])
+confusion_matrix = metric.compute()
+print("True positive:",confusion_matrix[0,0])
+print("False negative:",confusion_matrix[0,1])
+print("False positive:",confusion_matrix[1,0])
+print("True negative:",confusion_matrix[1,1])
+print("Precision:", confusion_matrix[0,0]/torch.sum(confusion_matrix[:,0]))
+print("Recall:", confusion_matrix[0,0] / torch.sum(confusion_matrix[0,:]))
 
 #===================================#
 # Test one point from training data #
@@ -102,6 +159,7 @@ print()
 print("N initial")
 before = F4i_train[0:1,:,:,:]
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
 
 print()
 print("N final (actual)")
@@ -111,6 +169,7 @@ print()
 print("N predicted")
 after = model_asymptotic.predict_F4(before)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 print("loss = ",comparison_loss_fn(model_asymptotic, after, F4f_train[0:1,:,:,:]).item())
@@ -128,6 +187,7 @@ print()
 print("N initial")
 before = F4i_test[0:1,:,:,:]
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
 
 print()
 print("N final (actual)")
@@ -137,6 +197,7 @@ print()
 print("N predicted")
 after = model_asymptotic.predict_F4(before)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 print("loss = ",comparison_loss_fn(model_asymptotic, after, F4f_train[0:1,:,:,:]).item())
@@ -160,16 +221,19 @@ after = model_asymptotic.predict_F4(before)
 print()
 print("N initail")
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 1)")
 
 print()
 print("N predicted")
 after = model_asymptotic.predict_F4(before)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 print("N re-predicted")
 after = model_asymptotic.predict_F4(after)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 print("2 Flavor")
@@ -203,15 +267,18 @@ after = model_asymptotic.predict_F4(before)
 print()
 print("N initial")
 print(before[0,3])
+print("unstable = ",model_stability.predict_unstable(before).item(),"(should be 0)")
 
 print("N predicted")
 after = model_asymptotic.predict_F4(before)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 
 print("N re-predicted")
 after = model_asymptotic.predict_F4(after)
 print(after[0,3])
+print("unstable = ",model_stability.predict_unstable(after).item(),"(should be 0)")
 
 print()
 check_conservation(before,after)
@@ -228,6 +295,8 @@ nreps = 20
 p_asymptotic.init_plot_options()
 plot_nue_nuebar(model_asymptotic, npoints, nreps)
 p_asymptotic.plot_error("train_test_error_asymptotic.pdf", ymin=1e-5)
+p_stability.init_plot_options()
+p_stability.plot_error("train_test_error_stability.pdf", ymin=1e-5)
 
 # plot the loss as a function of dataset size using the array of plotters
 def plot_dataset_size(plotter_array, dataset_size_list, quantity, outfilename):
@@ -248,34 +317,32 @@ def plot_dataset_size(plotter_array, dataset_size_list, quantity, outfilename):
     plt.savefig(outfilename+"_"+quantity+".pdf",bbox_inches="tight")
 
 plot_dataset_size(plotter_array_asymptotic, dataset_size_list_asymptotic, "knownData","dataset_size_asymptotic")
+plot_dataset_size(plotter_array_stability, dataset_size_list_stability, "random","dataset_size_stability")
 
 n_generate = 10000
 F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
 F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
 F4i_unphysical = generate_random_F4(n_generate, NF, device, zero_weight=10, max_fluxfac=0.95)
 
-dirlist = ["base","corrected"]
+dirlist = ["base","corrected","masked","both"]
 for d in dirlist:
     print()
     print(d)
     if not os.path.exists(d):
         os.mkdir(d)
-
-    do_restrict_to_physical = True if d=="corrected" else False
     
     # plot the error histogram for the test data
-    error_histogram(model_asymptotic, F4i_train,     F4f_train,     100, 0, 0.1, do_restrict_to_physical,d+"/histogram_train.pdf")
-    error_histogram(model_asymptotic, F4i_test,      F4f_test,      100, 0, 0.1, do_restrict_to_physical,d+"/histogram_test.pdf")
-    error_histogram(model_asymptotic, F4_NSM_stable, F4_NSM_stable, 100, 0, 0.1, do_restrict_to_physical,d+"/histogram_NSM_stable.pdf")
-    error_histogram(model_asymptotic, F4i_0ff,       F4i_0ff,       100, 0, 0.1, do_restrict_to_physical,d+"/histogram_0ff.pdf")
-    error_histogram(model_asymptotic, F4i_1f,        F4i_1f,        100, 0, 0.1, do_restrict_to_physical,d+"/histogram_1f.pdf")
-    error_histogram(model_asymptotic, F4i_train,     F4i_train,     100, 0, 0.1, do_restrict_to_physical,d+"/histogram_donothing.pdf")
-    error_histogram(model_asymptotic, F4f_train,     F4f_train,     100, 0, 0.1, do_restrict_to_physical,d+"/histogram_finalstable_train.pdf")
-    error_histogram(model_asymptotic, F4f_test,      F4f_test,      100, 0, 0.1, do_restrict_to_physical,d+"/histogram_finalstable_test.pdf")
+    error_histogram(model_asymptotic, F4i_train, F4f_train, 100, 0, 0.1, d,"/histogram_train.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_test, F4f_test, 100, 0, 0.1, d,"/histogram_test.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4_NSM_stable, F4_NSM_stable, 100, 0, 0.1, d,"/histogram_NSM_stable.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_0ff, F4i_0ff, 100, 0, 0.1, d,"/histogram_0ff.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_1f, F4i_1f, 100, 0, 0.1, d,"/histogram_1f.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4i_train, F4i_train, 100, 0, 0.1, d,"/histogram_donothing.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4f_train, F4f_train, 100, 0, 0.1, d,"/histogram_finalstable_train.pdf", model_stability, stability_cutoff)
+    error_histogram(model_asymptotic, F4f_test, F4f_test, 100, 0, 0.1, d,"/histogram_finalstable_test.pdf", model_stability, stability_cutoff)
 
     F4f_pred = model_asymptotic.predict_F4(F4i_unphysical)
-    if do_restrict_to_physical:
-        F4f_pred = ml_tools.restrict_F4_to_physical(F4f_pred)
+    F4f_pred = modify_F4(F4i_unphysical, F4f_pred,d, model_stability, stability_cutoff)
 
     # enforce that number density cannot be less than zero
     F4f_pred = F4f_pred.cpu().detach().numpy()

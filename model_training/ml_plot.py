@@ -148,21 +148,6 @@ def plot_nue_nuebar(model, npoints, nreps):
     plt.savefig("nue_vs_nuebar.pdf",bbox_inches="tight")
 
 
-def modify_F4(F4i, F4f,d, model_stability, stability_cutoff):
-    if d=="masked" or d=="both":
-        unstable = model_stability.predict_unstable(F4i)[:,:,None,None]
-        unstable[torch.where(unstable<stability_cutoff)] = 0
-        unstable[torch.where(unstable>=stability_cutoff)] = 1
-        stable = torch.ones_like(unstable)-unstable
-        print("Stable:",torch.sum(stable).item())
-        print("Unstable:",torch.sum(unstable).item())
-        F4f = unstable*F4f + stable*F4i
-
-    if d=="physical" or d=="both":
-        F4f = ml_tools.restrict_F4_to_physical(F4f)
-
-    return F4f
-
 def plot_histogram(error, bins, xmin, xmax, filename):
     error[np.where(error>xmax)] = xmax
     # plot the histogram
@@ -177,13 +162,14 @@ def plot_histogram(error, bins, xmin, xmax, filename):
 
 # apply the model to a dataset and create a histogram of the magnitudes of the error
 # F4 has dimensions [sim, xyzt, nu/nubar, flavor]
-def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, d, filename, model_stability, stability_cutoff):
+def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, do_restrict_to_physical, filename):
 
     # get the predicted final F4
     F4_pred = model.predict_F4(F4_initial)
 
     # apply any relevant corrections to the distribution
-    F4_pred = modify_F4(F4_initial, F4_pred, d, model_stability, stability_cutoff)
+    if do_restrict_to_physical:
+        F4_pred = ml_tools.restrict_F4_to_physical(F4_pred)
 
     # calculate the error
     F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()
@@ -195,7 +181,7 @@ def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, d, filename, 
     N = F4_final[:,3,:,:].to('cpu').detach().numpy()
     N = np.sum(N, axis=(1,2))
 
-    plot_histogram(F4_error_mag/N, bins, xmin, xmax, d+filename)
+    plot_histogram(F4_error_mag/N, bins, xmin, xmax, filename)
 
         
 # visualize the network using torchviz
