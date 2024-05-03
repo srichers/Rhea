@@ -9,15 +9,16 @@ from multiprocessing import Pool
 # INPUTS
 growthrate_minfac = 1e-3
 growthrate_maxfac = 1e-1
-nproc = 128
+nproc = 32
 average_start_tsat = 2 # start averaging at 2*tsat
 average_min_tsat = 3 # require time up to at least 3*tsat
-problematic_stddev_val = 0.01
+problematic_stddev_val = 0.05
 violation_limit = 1e-5
 #problematic_final_val = 20
 
-basedir = "/mnt/scratch/NSM_ML/ML_models/input_data/"
-directory_list =["manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z","fluxfac_one_twobeam","manyflavor_twobeam"]
+basedir = "/mnt/scratch/NSM_ML/ML_models/"
+directory_list =[basedir+"input_data_ME",
+                 basedir+"old_input_data_ME",]
 
 # get the list of files to process
 def simulation_is_finished(dirname):
@@ -27,10 +28,10 @@ def simulation_is_finished(dirname):
         return False
 
 
-def get_dirlist(basedir):
-    dirlist = sorted([ f.path for f in os.scandir(basedir) if f.is_dir() ])
+def get_dirlist(d):
+    dirlist = sorted([ f.path for f in os.scandir(d) if f.is_dir() ])
     finished_list = [f for f in dirlist if simulation_is_finished(f)]
-    print(basedir)
+    print(d)
     print("   ",len(dirlist),"directories")
 
     nsims = len(finished_list)
@@ -48,10 +49,10 @@ def get_dirlist(basedir):
 # get the list of finished simulations
 finished_list = []
 for d in directory_list:
-    flist, nf = get_dirlist(basedir+d)
+    flist, nf = get_dirlist(d)
     finished_list += flist
 print("Total finished list length:",len(finished_list))
-finished_list = finished_list
+#finished_list = finished_list[:10]
 
 #========================#
 # get the grid cell size #
@@ -169,7 +170,7 @@ def analyze_file(d):
     
     # get the final state
     F4_initial, F4_final, F4_final_stddev, xplot, y0plot, y1plot = final_properties(imax, growthRate, data, dz)
-    
+
     # close the data file
     data.close()
 
@@ -196,8 +197,8 @@ y1plotList        = np.array([r[6] for r in results])
 
 # count the number of good results, defined by F4_final not being nan
 print("Total number of input simulations:",F4FinalList.shape[0])
-goodlocs = np.where(F4FinalList[:,0,0,0]==F4FinalList[:,0,0,0])
-print("Number of good results:",len(goodlocs[0]))
+goodlocs = np.where(F4FinalList[:,0,0,0]==F4FinalList[:,0,0,0])[0]
+print("Number of good results:",len(goodlocs))
 
 # select only the good points for the dataset
 print("Number of points before selection:",growthRateList.shape[0])
