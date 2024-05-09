@@ -12,8 +12,8 @@ def generate_stable_F4_zerofluxfac(n_trivial_stable, NF, device):
     F4i[:,3,:,:] = torch.rand(n_trivial_stable, 2, NF, device=device)
 
     # normalize
-    ntot = torch.sum(F4i[:,3,:,:])
-    F4i /= ntot
+    ntot = torch.sum(F4i[:,3,:,:], axis=(1,2))
+    F4i /= ntot[:,None,None,None]
     
     return F4i
 

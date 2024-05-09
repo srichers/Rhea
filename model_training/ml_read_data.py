@@ -10,7 +10,7 @@ from ml_plot import *
 from ml_trainmodel import *
 import pickle
 
-def read_test_train_data(NF, directory_list, test_size, device, do_augment_permutation):
+def read_test_train_data(NF, database_list, test_size, device, do_augment_permutation):
     #===============================================#
     # read in the database from the previous script #
     #===============================================#
@@ -20,13 +20,14 @@ def read_test_train_data(NF, directory_list, test_size, device, do_augment_permu
     print("#############################")
     F4_initial_list = []
     F4_final_list = []
-    for d in directory_list:
-        f_in = h5py.File(d+"/many_sims_database.h5","r")
+    for d in database_list:
+        print("Reading:",d)
+        f_in = h5py.File(d,"r")
         F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
         F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
         assert(NF == int(np.array(f_in["nf"])) )
         f_in.close()
-        print(len(F4_initial_list[-1]),"points in",d)
+        print("    ",len(F4_initial_list[-1]),"points in",d)
     F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
     F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
 
@@ -63,23 +64,24 @@ def read_test_train_data(NF, directory_list, test_size, device, do_augment_permu
 #=================================================#
 # read in the stable points from the NSM snapshot #
 #=================================================#
-def read_NSM_stable_data(NF, basedir, device, do_augment_permutation):
+def read_NSM_stable_data(NF, filename, device, do_augment_permutation):
     print()
     print("#############################")
     print("# READING NSM STABLE POINTS #")
     print("#############################")
     # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
     # take only the y-z slice to limit the size of the data.
-    f_in = h5py.File(basedir+"/model_rl0_orthonormal.h5","r")
-    discriminant = np.array(f_in["crossing_discriminant"])[100,:,:]
+    xslice = 100
+    f_in = h5py.File(filename,"r")
+    discriminant = np.array(f_in["crossing_discriminant"])[xslice,:,:]
     # n has shape [Nx,Ny,Nz]]
-    ne = np.array(f_in["n_e(1|ccm)"])[0,:,:]
-    na = np.array(f_in["n_a(1|ccm)"])[0,:,:]
-    nx = np.array(f_in["n_x(1|ccm)"])[0,:,:]
+    ne = np.array(f_in["n_e(1|ccm)"])[xslice,:,:]
+    na = np.array(f_in["n_a(1|ccm)"])[xslice,:,:]
+    nx = np.array(f_in["n_x(1|ccm)"])[xslice,:,:]
     # f has shape [3, Nx,Ny,Nz]
-    fe = np.array(f_in["fn_e(1|ccm)"])[:,0,:,:]
-    fa = np.array(f_in["fn_a(1|ccm)"])[:,0,:,:]
-    fx = np.array(f_in["fn_x(1|ccm)"])[:,0,:,:]
+    fe = np.array(f_in["fn_e(1|ccm)"])[:,xslice,:,:]
+    fa = np.array(f_in["fn_a(1|ccm)"])[:,xslice,:,:]
+    fx = np.array(f_in["fn_x(1|ccm)"])[:,xslice,:,:]
     f_in.close()
     stable_locs = np.where(discriminant<=0)
     nlocs = len(stable_locs[0])
@@ -97,7 +99,7 @@ def read_NSM_stable_data(NF, basedir, device, do_augment_permutation):
     # normalize the data so the number densities add up to 1
     ntot = ml.ntotal(F4_NSM_stable)
     F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
-    # split into training and testing sets
+
     # don't need the final values because they are the same as the initial
     if do_augment_permutation:
         F4_NSM_stable = ml.augment_permutation(F4_NSM_stable)

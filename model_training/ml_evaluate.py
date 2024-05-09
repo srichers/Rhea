@@ -17,7 +17,7 @@ import os
 from torchmetrics.classification import BinaryPrecisionRecallCurve
 from torcheval.metrics import BinaryF1Score, BinaryNormalizedEntropy, BinaryConfusionMatrix
 
-basedir = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData"
+NSM_stable_filename = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
 
 def get_dataset_size_list(search_string):
     filename_list = glob.glob(search_string)
@@ -27,7 +27,6 @@ def get_dataset_size_list(search_string):
         dataset_size_list.append(int(filename.split("_")[-1].split(".")[0]))
     return sorted(dataset_size_list)
 dataset_size_list_asymptotic = get_dataset_size_list("model_[0-9]*.pkl")
-dataset_size_list_stability = get_dataset_size_list("model_stability_[0-9]*.pkl")
 
 n_generate = 1000
 test_size = 0.1
@@ -54,11 +53,16 @@ print(f"Using {device} device")
 # unpickle the data
 with open("train_test_datasets.pkl","rb") as f:
     F4i_train, F4i_test, F4f_train, F4f_test = pickle.load(f)
-F4_NSM_stable = read_NSM_stable_data(NF, basedir, device, do_augment_permutation)
+F4_NSM_stable = read_NSM_stable_data(NF, NSM_stable_filename, device, do_augment_permutation)
 # adjust entries of -1 to instead have the correct size of the dataset
 for i in range(len(dataset_size_list_asymptotic)):
     if dataset_size_list_asymptotic[i] == -1:
         dataset_size_list_asymptotic[i] = F4i_train.shape[0]
+
+# verify that all of the F4_NSM_stable data is stable
+#print("verifying stability")
+#unstable = has_crossing(F4_NSM_stable.cpu().detach().numpy(), NF, n_equatorial).squeeze()
+#assert(np.all(unstable==False))
 
 #=======================#
 # instantiate the model #
@@ -254,6 +258,14 @@ F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, NF, device)
 F4i_1f = generate_stable_F4_oneflavor(n_generate, NF, device)
 F4i_unphysical = generate_random_F4(n_generate, NF, device, zero_weight=10, max_fluxfac=0.95)
 
+# set up datasets of stable distributions based on the max entropy stability condition
+unstable_random = has_crossing(F4i_unphysical.detach().cpu().numpy(), NF, n_equatorial).squeeze()
+F4_random_stable = F4i_unphysical[unstable_random==False]
+F4_random_stable = augment_permutation(F4_random_stable)
+F4_random_stable = F4_random_stable.float().to(device)
+print("random Stable:",np.sum(unstable_random==False))
+print("random Unstable:",np.sum(unstable_random==True))
+
 dirlist = ["base","corrected"]
 for d in dirlist:
     print()
@@ -269,6 +281,7 @@ for d in dirlist:
     error_histogram(model_asymptotic, F4_NSM_stable, F4_NSM_stable, 100, 0, 0.1, do_restrict_to_physical,d+"/histogram_NSM_stable.pdf")
     error_histogram(model_asymptotic, F4i_0ff,       F4i_0ff,       100, 0, 0.1, do_restrict_to_physical,d+"/histogram_0ff.pdf")
     error_histogram(model_asymptotic, F4i_1f,        F4i_1f,        100, 0, 0.1, do_restrict_to_physical,d+"/histogram_1f.pdf")
+    error_histogram(model_asymptotic, F4_random_stable, F4_random_stable, 100, 0, 0.1, do_restrict_to_physical,d+"/histogram_random_stable.pdf")
     error_histogram(model_asymptotic, F4i_train,     F4i_train,     100, 0, 0.1, do_restrict_to_physical,d+"/histogram_donothing.pdf")
     error_histogram(model_asymptotic, F4f_train,     F4f_train,     100, 0, 0.1, do_restrict_to_physical,d+"/histogram_finalstable_train.pdf")
     error_histogram(model_asymptotic, F4f_test,      F4f_test,      100, 0, 0.1, do_restrict_to_physical,d+"/histogram_finalstable_test.pdf")

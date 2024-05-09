@@ -13,30 +13,40 @@ from ml_maxentropy import *
 from ml_read_data import *
 import pickle
 import torch.optim
+import torch.autograd.profiler as profiler
 
-#basedir = "/mnt/scratch/NSM_ML/ML_models/input_data/"
-#basedir = "/lustre/isaac/scratch/slagergr/ML_FFI"
-#directory_list = ["manyflavor_twobeam","manyflavor_twobeam_z", "fluxfac_one","fluxfac_one_z"] # "fluxfac_one_twobeam",
-#directory_list = ["/mnt/scratch/NSM_ML/ML_models/input_data_ME", "/mnt/scratch/NSM_ML/ML_models/old_input_data_ME"]
+database_list = [
+    #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam/many_sims_database.h5",
+    #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one/many_sims_database.h5",
+    #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_twobeam/many_sims_database.h5",
+    #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_z/many_sims_database.h5",
+    #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam_z/many_sims_database.h5",
+    "/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_6beam/many_sims_database.h5"
+]
+NSM_stable_filename = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
 do_unpickle = False
 test_size = 0.1
-epochs = 2000
+epochs = 5000
 batch_size = -1
-dataset_size_list = [10, 100,1000, -1] # -1 means use all the data
+dataset_size_list = [-1] # -1 means use all the data
 n_generate = 5000
 print_every = 10
 generate_max_fluxfac = 0.95
+ME_stability_zero_weight = 10
+ME_stability_n_equatorial = 64
 
 # data augmentation options
 do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
-do_augment_final_stable = True # True
+do_augment_final_stable = False # True
 do_unphysical_check = True # True - seems to help prevent crazy results
 do_augment_0ff = True
 do_augment_1f = True
+do_augment_random_stable = True
+do_augment_NSM_stable = True
 
 # neural network options
 nhidden = 3
-width = 512
+width = 1024
 dropout_probability = 0.0 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
@@ -68,7 +78,10 @@ if do_unpickle:
     with open("train_test_datasets.pkl", "rb") as f:
         F4i_train, F4i_test, F4f_train, F4f_test = pickle.load(f)
 else:
-    F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(NF, ["."], test_size, device, do_augment_permutation)
+    F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(NF, database_list, test_size, device, do_augment_permutation)
+
+F4_NSM_stable = read_NSM_stable_data(NF, NSM_stable_filename, device, do_augment_permutation)
+F4_NSM_stable_train, F4_NSM_stable_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
 
 # move the arrays over to the gpu
 F4i_train = torch.Tensor(F4i_train).to(device)
@@ -82,13 +95,6 @@ print("Test:",F4i_test.shape)
 for i in range(len(dataset_size_list)):
     if dataset_size_list[i] == -1:
         dataset_size_list[i] = F4i_train.shape[0]
-
-# test for stability under max entropy condition
-#train_crossing = has_crossing(F4i_train.cpu().detach().numpy(), NF, 64)
-
-# count the number of stable simulations
-#print("stable:",np.sum(train_crossing==False))
-#print("unstable:",np.sum(train_crossing==True))
 
 #=======================#
 # instantiate the model #
@@ -117,7 +123,7 @@ for dataset_size in dataset_size_list:
                       dropout_probability,
                       activation,
                       do_batchnorm).to(device)
-        plotter = Plotter(0,["knownData","unphysical","0ff","1f","finalstable"])
+        plotter = Plotter(0,["knownData","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
 
     plotter_array.append(plotter)
     model_array.append(model)
@@ -130,25 +136,13 @@ for dataset_size in dataset_size_list:
     scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, patience=patience, cooldown=cooldown, factor=factor))
 
 print(model_array[-1])
-
-
-#=============================================================#
-# check that we can obtain a value for y using pseudoinverses #
-#=============================================================#
-print()
-print("#################################################")
-print("# CHECKING PSEUDOINVERSE METHOD FOR OBTAINING Y #")
-print("#################################################")
-y_list = model.y_from_F4(F4i_train, F4f_train)
-test = model.F4_from_y(F4i_train, y_list)
-error = torch.max(torch.abs(test-F4f_train)).item()
-print("max reconstruction error:",error)
-assert(error < 1e-3)
+print("number of parameters:", sum(p.numel() for p in model_array[-1].parameters()))
 
 print()
 print("######################")
 print("# Training the model #")
 print("######################")
+#with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
 for i in range(len(dataset_size_list)):
     model_array[i], optimizer_array[i], scheduler_array[i], plotter_array[i] = train_asymptotic_model(
         model_array[i],
@@ -167,17 +161,25 @@ for i in range(len(dataset_size_list)):
         do_augment_final_stable,
         do_augment_1f,
         do_augment_0ff,
+        do_augment_random_stable,
+        do_augment_NSM_stable,
+        ME_stability_zero_weight,
+        ME_stability_n_equatorial,
         comparison_loss_fn,
         unphysical_loss_fn,
         F4i_train,
         F4f_train,
         F4i_test,
-        F4f_test)
-    
+        F4f_test,
+        F4_NSM_stable_train,
+        F4_NSM_stable_test)
+
     # pickle the model, optimizer, and plotter
     with open("model_"+str(dataset_size_list[i])+".pkl", "wb") as f:
         pickle.dump([model_array[i], optimizer_array[i], plotter_array[i]], f)
 
+#print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cpu_time_total'))
+        
 # use the largest dataset size for the rest of these metrics
 p = plotter_array[-1]
 model = model_array[-1]

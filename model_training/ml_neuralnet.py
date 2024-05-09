@@ -182,15 +182,3 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         F4_final = self.F4_from_y(F4_initial, y)
 
         return F4_final
-
-    # get the expected output from the ML model from a pairof initial and final F4 vectors
-    # input dimensions expected to be [sim, xyzt, nu/nubar, flavor]
-    def y_from_F4(self, F4_initial, F4_final):
-        # calculate transformation matrix
-        nsims = F4_initial.shape[0]
-        F4i_flat = F4_initial.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
-        F4f_flat = F4_final.reshape(  (nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
-        y = torch.matmul(torch.linalg.pinv(F4i_flat), F4f_flat) # [sim, species, species]
-        y = torch.transpose(y,1,2).reshape(nsims,2,self.NF,2,self.NF) # [sim, nu/nubar, species, nu/nubar, species]
-
-        return y

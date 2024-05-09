@@ -21,16 +21,22 @@ def train_asymptotic_model(model,
                 do_augment_final_stable,
                 do_augment_1f,
                 do_augment_0ff,
+                do_augment_random_stable,
+                do_augment_NSM_stable,
+                ME_stability_zero_weight,
+                ME_stability_n_equatorial,
                 comparison_loss_fn,
                 unphysical_loss_fn,
                 F4i_train,
                 F4f_train,
                 F4i_test,
-                F4f_test):
+                F4f_test,
+                F4_NSM_stable_train,
+                F4_NSM_stable_test):
     print("Training dataset size:",dataset_size)
 
     # create a new plotter object of larger size if epochs is larger than the plotter object
-    p = Plotter(epochs,["knownData","unphysical","0ff","1f","finalstable"])
+    p = Plotter(epochs,["knownData","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
     p.fill_from_plotter(plotter)
 
     #=====================================================#
@@ -45,7 +51,7 @@ def train_asymptotic_model(model,
     F4f_train = F4f_train[:dataset_size]
     dataset = torch.utils.data.TensorDataset(F4i_train, F4f_train)
     batch_size = min(batch_size, len(dataset))
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    #dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     print("batchsize=",batch_size)
 
     #===============#
@@ -57,6 +63,20 @@ def train_asymptotic_model(model,
     F4i_0ff_test = generate_stable_F4_zerofluxfac(n_generate, NF, device)
     F4i_1f_train = generate_stable_F4_oneflavor(n_generate, NF, device)
     F4i_1f_test = generate_stable_F4_oneflavor(n_generate, NF, device)
+
+    # set up datasets of stable distributions based on the max entropy stability condition
+    F4i_random = generate_random_F4(n_generate, NF, 'cpu', zero_weight=ME_stability_zero_weight, max_fluxfac=generate_max_fluxfac)
+    unstable_random = has_crossing(F4i_random.detach().numpy(), NF, ME_stability_n_equatorial).squeeze()
+    print("random Stable:",np.sum(unstable_random==False))
+    print("random Unstable:",np.sum(unstable_random==True))
+    F4_random_stable = F4i_random[unstable_random==False]
+    F4_random_stable = augment_permutation(F4_random_stable)
+    F4_random_stable = F4_random_stable.float().to(device)
+
+    # split into a test and train set
+    ntotal = F4_random_stable.shape[0]
+    F4_random_stable_train = F4_random_stable[ntotal//2:]
+    F4_random_stable_test = F4_random_stable[:ntotal//2]
 
     epochs_already_done = len(plotter.data["knownData"].train_loss)
     for t in range(epochs_already_done, epochs):
@@ -70,36 +90,48 @@ def train_asymptotic_model(model,
         p.data["0ff"].test_loss[t],  p.data["0ff"].test_err[t]  = optimizer.test(model, F4i_0ff_test, F4i_0ff_test, comparison_loss_fn)
         p.data["1f"].test_loss[t],  p.data["1f"].test_err[t]  = optimizer.test(model, F4i_1f_test, F4i_1f_test, comparison_loss_fn)
         p.data["finalstable"].test_loss[t],  p.data["finalstable"].test_err[t]  = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)
+        p.data["randomstable"].test_loss[t],  p.data["randomstable"].test_err[t]  = optimizer.test(model, F4_random_stable_test, F4_random_stable_test, comparison_loss_fn)
+        p.data["NSM_stable"].test_loss[t],  p.data["NSM_stable"].test_err[t]  = optimizer.test(model, F4_NSM_stable_test, F4_NSM_stable_test, comparison_loss_fn)
 
         # load in a batch of data from the dataset
-        if True: #with torch.autograd.detect_anomaly():
-            for F4i_batch, F4f_batch in dataloader:
+        #if True: #with torch.autograd.detect_anomaly():
+        #    for F4i_batch, F4f_batch in dataloader:
+        F4i_batch = F4i_train
+        F4f_batch = F4f_train
 
-                # zero the gradients
-                optimizer.optimizer.zero_grad()
+        # zero the gradients
+        optimizer.optimizer.zero_grad()
 
-                # train on making sure the model prediction is correct
-                loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
-                loss.backward()
+        # train on making sure the model prediction is correct
+        loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
+        loss.backward()
+        
+        if do_augment_final_stable:
+            loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
+            loss.backward()
+            
+        if do_augment_1f:
+            loss = optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn)
+            loss.backward()
+            
+        if do_augment_0ff:
+            loss = optimizer.train(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn)
+            loss.backward()
 
-                if do_augment_final_stable:
-                    loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
-                    loss.backward()
+        if do_augment_random_stable:
+            loss = optimizer.train(model, F4_random_stable_train, F4_random_stable_train, comparison_loss_fn)
+            loss.backward()
 
-                if do_augment_1f:
-                    loss = optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn) * 100
-                    loss.backward()
-
-                if do_augment_0ff:
-                    loss = optimizer.train(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn) * 100
-                    loss.backward()
-
-                # train on making sure the model prediction is physical
-                if do_unphysical_check:
-                    loss = optimizer.train(model, F4i_unphysical_train, None, unphysical_loss_fn) * 100
-                    loss.backward()
-
-                optimizer.optimizer.step()
+        if do_augment_NSM_stable:
+            loss = optimizer.train(model, F4_NSM_stable_train, F4_NSM_stable_train, comparison_loss_fn)
+            loss.backward()
+            
+        # train on making sure the model prediction is physical
+        if do_unphysical_check:
+            loss = optimizer.train(model, F4i_unphysical_train, None, unphysical_loss_fn) * 100
+            loss.backward()
+            
+        optimizer.optimizer.step()
 
         # Evaluate training errors
         p.data["knownData"].train_loss[t], p.data["knownData"].train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
@@ -107,6 +139,8 @@ def train_asymptotic_model(model,
         p.data["0ff"].train_loss[t], p.data["0ff"].train_err[t] = optimizer.test(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn)
         p.data["1f"].train_loss[t], p.data["1f"].train_err[t] = optimizer.test(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn)
         p.data["finalstable"].train_loss[t], p.data["finalstable"].train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)
+        p.data["randomstable"].train_loss[t], p.data["randomstable"].train_err[t] = optimizer.test(model, F4_random_stable_train, F4_random_stable_train, comparison_loss_fn)
+        p.data["NSM_stable"].train_loss[t], p.data["NSM_stable"].train_err[t] = optimizer.test(model, F4_NSM_stable_train, F4_NSM_stable_train, comparison_loss_fn)
 
         # update the learning rate
         netloss = p.data["knownData"].train_loss[t] + p.data["unphysical"].train_loss[t]*100 + p.data["0ff"].train_loss[t]*100 + p.data["1f"].train_loss[t]*100 + p.data["finalstable"].train_loss[t]
