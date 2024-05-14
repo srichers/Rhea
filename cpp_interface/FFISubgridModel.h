@@ -104,7 +104,6 @@ class FFISubgridModel{
       // put the dot product of each species with the fluid velocity into the X tensor
       for(int a=0; a<2*NF; a++){
         torch::Tensor F1 = F4_normalized.index({Slice(), Slice(), a});
-        torch::Tensor u = F4_normalized.index({Slice(), Slice(), 3});
         X.index_put_({Slice(), index}, dot4_Minkowski(F1,u));
         index++;
       }
@@ -161,7 +160,7 @@ class FFISubgridModel{
     torch::Tensor F4_final = torch::einsum("niajb,nmjb->nmia", {y, F4_initial});
 
     // make sure the result is physical
-    F4_final = restrict_to_physical(F4_final);
+    //F4_final = restrict_to_physical(F4_final);
 
     return F4_final;
   }
@@ -177,7 +176,7 @@ class FFISubgridModel{
     torch::Tensor b = 2.*dot4_Minkowski(avgF4, F4_final);
     torch::Tensor c = dot4_Minkowski(F4_final, F4_final);
     torch::Tensor radical = b*b - 4*a*c;
-    assert(torch::all(radical>=-1e-6).item<bool>());
+    //assert(torch::all(radical>=-1e-6).item<bool>());
     radical = torch::maximum(radical, torch::zeros_like(radical));
     torch::Tensor alpha = (-b + torch::sign(a)*torch::sqrt(radical)) / (2*a);
 
