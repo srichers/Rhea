@@ -104,33 +104,27 @@ def train_asymptotic_model(model,
 
         # train on making sure the model prediction is correct
         loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
-        loss.backward()
         
         if do_augment_final_stable:
-            loss = optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
-            loss.backward()
+            loss = loss + optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
             
         if do_augment_1f:
-            loss = optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn)
-            loss.backward()
+            loss = loss + optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn)
             
         if do_augment_0ff:
-            loss = optimizer.train(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn)
-            loss.backward()
+            loss = loss + optimizer.train(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn)
 
         if do_augment_random_stable:
-            loss = optimizer.train(model, F4_random_stable_train, F4_random_stable_train, comparison_loss_fn)
-            loss.backward()
+            loss = loss + optimizer.train(model, F4_random_stable_train, F4_random_stable_train, comparison_loss_fn)
 
         if do_augment_NSM_stable:
-            loss = optimizer.train(model, F4_NSM_stable_train, F4_NSM_stable_train, comparison_loss_fn)
-            loss.backward()
+            loss = loss + optimizer.train(model, F4_NSM_stable_train, F4_NSM_stable_train, comparison_loss_fn)
             
         # train on making sure the model prediction is physical
         if do_unphysical_check:
-            loss = optimizer.train(model, F4i_unphysical_train, None, unphysical_loss_fn) * 100
-            loss.backward()
+            loss = loss + optimizer.train(model, F4i_unphysical_train, None, unphysical_loss_fn) * 100
             
+        loss.backward()
         optimizer.optimizer.step()
 
         # Evaluate training errors
@@ -153,7 +147,7 @@ def train_asymptotic_model(model,
             for key in p.data.keys():
                 print(key, np.sqrt(p.data[key].train_loss[t]),  np.sqrt(p.data[key].test_loss[t]))
             
-            print()
+            print("", flush=True)
 
     return model, optimizer, scheduler, p
 

@@ -21,15 +21,16 @@ database_list = [
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_twobeam/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_z/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam_z/many_sims_database.h5",
-    "/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_6beam/many_sims_database.h5"
+    "/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_6beam/many_sims_database.h5",
+    "/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
 ]
 NSM_stable_filename = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
 do_unpickle = False
 test_size = 0.1
-epochs = 5000
+epochs = 20000
 batch_size = -1
 dataset_size_list = [-1] # -1 means use all the data
-n_generate = 5000
+n_generate = 7500
 print_every = 10
 generate_max_fluxfac = 0.95
 ME_stability_zero_weight = 10
@@ -46,8 +47,8 @@ do_augment_NSM_stable = True
 
 # neural network options
 nhidden = 3
-width = 1024
-dropout_probability = 0.0 #0.1 # 0.5
+width = 1536
+dropout_probability = 0.1 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
