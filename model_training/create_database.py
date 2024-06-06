@@ -4,6 +4,7 @@ import os
 import h5py
 import re
 import numpy as np
+from scipy.signal import argrelextrema
 from multiprocessing import Pool
 
 # INPUTS
@@ -69,7 +70,14 @@ def growth_properties(data):
     N_offdiag_mag = np.array(data["N_offdiag_mag(1|ccm)"])
 
     # get the time of the peak
-    imax = np.argmax(N_offdiag_mag)
+    flag = True                                                                # Flag to prevent any errors if the following method fails
+    indexes = np.concatenate([[0],argrelextrema(N_offdiag_mag,np.greater)[0]]) # Take all the indexes at which there is a local maxima, as well as the first point in the data
+    for i in range(len(indexes)-1):                                            # Loops over all the indexes to check if there are two adjacent points that have a difference of three orders of magnitude
+        if abs(round((np.log10(amp[indexes[i]]/amp[indexes[i+1]])))) >= 3:
+            imax = indexes[i+1]
+            flag = False
+    if flag == True:                                                           # If there previous method does not work, the following is used
+        imax = np.argmax(N_offdiag_mag)
 
     # get the growth rate
     minOffDiag = N_offdiag_mag[0] #np.min(Nbar_offdiag_mag)
