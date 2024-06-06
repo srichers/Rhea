@@ -76,7 +76,7 @@ def growth_properties(data):
         if abs(round((np.log10(amp[indexes[i]]/amp[indexes[i+1]])))) >= 3:
             imax = indexes[i+1]
             flag = False
-    if flag == True:                                                           # If there previous method does not work, the following is used
+    if flag == True:                                                           # If the previous method does not work, the following is used
         imax = np.argmax(N_offdiag_mag)
 
     # get the growth rate
