@@ -162,7 +162,7 @@ before = torch.Tensor(F4_test[None,:,:,:]).to(device)
 after = model_asymptotic.predict_F4(before)
 
 print()
-print("N initail")
+print("N initial")
 print(before[0,3])
 
 print()
@@ -188,6 +188,57 @@ print(after_3F[0,3])
 print("2F")
 print(after_2F[0,3])
 check_conservation(before,after)
+
+print()
+print("#########################")
+print("# Testing the NSM1 case #")
+print("#########################")
+F4_test = np.zeros((4,2,NF)) # [xyzt, nu/nubar, flavor]
+
+F4_test[0, 0, 0] =  0.0974
+F4_test[1, 0, 0] =  0.0421
+F4_test[2, 0, 0] =  -0.1343
+F4_test[3, 0, 0] =  14.22e32
+
+F4_test[0, 1, 0] = 0.0723
+F4_test[1, 1, 0] = 0.0313
+F4_test[2, 1, 0] = -0.3446
+F4_test[3, 1, 0] =  19.15e32
+
+F4_test[0, :, 1:] = -0.0216
+F4_test[1, :, 1:] = 0.0743
+F4_test[2, :, 1:] = -0.5354
+F4_test[3, :, 1:] = 19.65e32/4.
+before = torch.Tensor(F4_test[None,:,:,:]).to(device)
+after = model_asymptotic.predict_F4(before)
+
+print()
+print("N initial")
+print(before[0,3])
+
+print()
+print("N predicted")
+after = model_asymptotic.predict_F4(before)
+print(after[0,3])
+
+print()
+print("N re-predicted")
+after = model_asymptotic.predict_F4(after)
+print(after[0,3])
+
+print()
+print("Emu expected:")
+print("[[[ 7.64375814e-02  3.97575192e-02  1.23841745e-02]")
+print("[ 5.72762474e-02  3.22184364e-02  7.65071452e-03]]")
+print("")
+print(" [[ 4.36780086e-02  6.05246388e-02  6.77405394e-02]")
+print("  [ 3.18509891e-02  5.72619715e-02  6.56920392e-02]]")
+print("")
+print(" [[-3.33201733e-01 -2.13291599e-01 -3.68908362e-01]")
+print("  [-4.83817623e-01 -2.85258423e-01 -4.03983122e-01]]")
+print("")
+print(" [[ 9.95460068e+32  7.85471511e+32  6.23293031e+32]")
+print("  [ 1.48812960e+33  7.85471511e+32  6.23293016e+32]]]")
 
 #=====================================#
 # create test ("Zero FF" simulation) #
