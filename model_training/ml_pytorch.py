@@ -47,20 +47,23 @@ do_augment_NSM_stable = True
 
 # neural network options
 nhidden = 3
-width = 1536
+width = 1024
 dropout_probability = 0.1 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
-op = torch.optim.Adam # Adam, SGD, RMSprop
-weight_decay = 0 #1e-5
+op = torch.optim.AdamW # Adam, SGD, RMSprop
+amsgrad = False
+weight_decay = 1e-2 #1e-5
 learning_rate = 1e-3 # 1e-3
+fused = True
 lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau
 patience = 100
-cooldown = 0
+cooldown = 100
 factor = 0.5
+min_lr = 1e-5
 
 # the number of flavors should be 3
 NF = 3
@@ -130,11 +133,9 @@ for dataset_size in dataset_size_list:
     model_array.append(model)
     optimizer_array.append(AsymptoticOptimizer(
         model_array[-1],
-        op,
-        weight_decay,
-        learning_rate,
+        op(model.parameters(), weight_decay=weight_decay, lr=learning_rate, amsgrad=amsgrad, fused=fused),
         device))
-    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, patience=patience, cooldown=cooldown, factor=factor))
+    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, patience=patience, cooldown=cooldown, factor=factor, min_lr=min_lr)) # 
 
 print(model_array[-1])
 print("number of parameters:", sum(p.numel() for p in model_array[-1].parameters()))

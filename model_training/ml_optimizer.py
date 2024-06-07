@@ -6,11 +6,9 @@ from ml_generate import *
 class Optimizer():
     def __init__(self, model,
                  op, # Adam, SGD, RMSprop
-                 weight_decay,
-                 learning_rate,
                  device): 
         self.NF = model.NF
-        self.optimizer = op(model.parameters(), weight_decay=weight_decay, lr=learning_rate)
+        self.optimizer = op
         self.device = device
 
 class AsymptoticOptimizer(Optimizer):
@@ -28,6 +26,7 @@ class AsymptoticOptimizer(Optimizer):
             F4f_pred = model.predict_F4(F4i)
             loss = loss_fn(model, F4f_pred, F4f_true)
             if F4f_true != None:
+                # calculate the total number density in each simulation. Assume that all input data has been normalized.
                 error = torch.max(torch.abs(F4f_pred - F4f_true))
             else:
                 error = None
