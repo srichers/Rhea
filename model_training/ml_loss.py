@@ -1,5 +1,6 @@
 import torch
 
+# with mean, this is equivalent to torch.sum(diff**2) / F4f_pred.numel()
 def comparison_loss_fn(model, F4_pred, F4_true):
     return torch.nn.MSELoss(reduction='mean')(F4_pred, F4_true)
 
