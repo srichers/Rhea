@@ -174,15 +174,22 @@ def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, do_restrict_t
     # calculate the error
     F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()
 
-    # calculate the magnitude of the error
-    F4_error_mag = np.max(np.abs(F4_error), axis=(1,2,3))
-
     # calculate the total number density in each simulation
     N = F4_final[:,3,:,:].to('cpu').detach().numpy()
     N = np.sum(N, axis=(1,2))
 
-    plot_histogram(F4_error_mag/N, bins, xmin, xmax, filename)
+    # calculate the magnitude of the error
+    F4_error_mag = np.max(np.abs(F4_error), axis=(1,2,3))/N
 
+    # plot the error
+    plot_histogram(F4_error_mag, bins, xmin, xmax, filename)
+
+    # print the max error and loss
+    print()
+    print(filename)
+    print("max error:", np.max(F4_error_mag))
+    print("sqrt(MSEloss):", np.sqrt( np.sum(F4_error**2)/F4_error.size) )
+    
         
 # visualize the network using torchviz
 #y = model(X_train)
