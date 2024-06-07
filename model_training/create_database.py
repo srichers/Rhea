@@ -213,5 +213,6 @@ output["F4_initial(1|ccm)"] = F4InitialList
 output["xplot"] = xplotList
 output["y0plot"] = y0plotList
 output["y1plot"] = y1plotList
+output["directorynames"] = np.array(finished_list, dtype=object)[goodlocs]
 output.close()
 print()
