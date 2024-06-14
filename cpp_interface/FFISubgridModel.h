@@ -24,9 +24,9 @@ class FFISubgridModel{
   // Four dot-product //
   //==================//
   // input dimensions: [# grid cells, xyzt]
-  torch::Tensor dot4_Minkowski(const torch::Tensor& v1, const torch::Tensor& v2){
+  auto dot4_Minkowski(const auto& v1, const auto& v2){
     // time component is negative
-    torch::Tensor result = -v1.index({Slice(),3}) * v2.index({Slice(),3});
+    auto result = -v1.index({Slice(),3}) * v2.index({Slice(),3});
 
     // spatial components are positive
     for(int i=0; i<3; i++){
@@ -72,6 +72,13 @@ class FFISubgridModel{
   // 25: Fmubar.u
   // 26: Ftaubar.u
   torch::Tensor X_from_F4_Minkowski(const torch::Tensor F4){
+    
+    auto options =
+      torch::TensorOptions()
+      .device(F4.device())
+      .requires_grad(false)
+      .dtype(torch::kFloat32);
+
     int nsims = F4.size(0);
 
     // calculate the total number density based on the t component of the four-vector
@@ -83,7 +90,7 @@ class FFISubgridModel{
     torch::Tensor F4_normalized = F4.reshape({nsims,4,2*NF}) / ndens_total.reshape({nsims,1,1});
 
     // create the X tensor
-    torch::Tensor X = torch::zeros({nsims, NX}, torch::dtype(torch::kFloat32));
+    torch::Tensor X = torch::zeros({nsims, NX}, options);
     int index = 0;
 
     // put the dot product of each species with each other species into the X tensor
@@ -98,7 +105,7 @@ class FFISubgridModel{
 
     if(do_fdotu){
       // the fluid velocity just has a 1 in the t component
-      torch::Tensor u = torch::zeros({nsims,4});
+      torch::Tensor u = torch::zeros({nsims,4}, options);
       u.index_put_({Slice(), 3}, 1.0);
 
       // put the dot product of each species with the fluid velocity into the X tensor
@@ -117,9 +124,10 @@ class FFISubgridModel{
   //===================================//
   // Load the serialized pytorch model //
   //===================================//
-  FFISubgridModel(std::string filename){
+  FFISubgridModel(std::string filename, auto device){
     // Deserialize the ScriptModule from a file using torch::jit::load().
     model = torch::jit::load(filename.c_str());
+    model.to(device);
 
     // set the model to evaluation mode
     model.eval();
@@ -130,7 +138,8 @@ class FFISubgridModel{
   // the dimensions of X are [# grid cells, NX]
   // the dimensions of y are [# grid cells, 2,NF,2,NF]
   torch::Tensor predict_y(const torch::Tensor& X){
-    return model.forward({X}).toTensor();
+    auto result = model.forward({X}).toTensor().to(X.device());
+    return result;    
   }
 
   // convert a 3-flavor y tensor to a 2-flavor y tensor
