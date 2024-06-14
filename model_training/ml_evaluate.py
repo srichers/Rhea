@@ -18,6 +18,7 @@ from torchmetrics.classification import BinaryPrecisionRecallCurve
 from torcheval.metrics import BinaryF1Score, BinaryNormalizedEntropy, BinaryConfusionMatrix
 
 NSM_stable_filename = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
+NSM_unstable_filename = "/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
 
 def get_dataset_size_list(search_string):
     filename_list = glob.glob(search_string)
@@ -59,6 +60,7 @@ for i in range(len(dataset_size_list_asymptotic)):
     if dataset_size_list_asymptotic[i] == -1:
         dataset_size_list_asymptotic[i] = F4i_train.shape[0]
 
+#F4i_NSMunstable, _, F4f_NSMunstable, _ = read_test_train_data(NF, [NSM_unstable_filename], test_size=10, device=device, do_augment_permutation=False)
 # verify that all of the F4_NSM_stable data is stable
 #print("verifying stability")
 #unstable = has_crossing(F4_NSM_stable.cpu().detach().numpy(), NF, n_equatorial).squeeze()
@@ -195,20 +197,20 @@ print("# Testing the NSM1 case #")
 print("#########################")
 F4_test = np.zeros((4,2,NF)) # [xyzt, nu/nubar, flavor]
 
-F4_test[0, 0, 0] =  0.0974
-F4_test[1, 0, 0] =  0.0421
-F4_test[2, 0, 0] =  -0.1343
 F4_test[3, 0, 0] =  14.22e32
+F4_test[0, 0, 0] =  0.0974 * F4_test[3, 0, 0]
+F4_test[1, 0, 0] =  0.0421 * F4_test[3, 0, 0]
+F4_test[2, 0, 0] =  -0.1343 * F4_test[3, 0, 0]
 
-F4_test[0, 1, 0] = 0.0723
-F4_test[1, 1, 0] = 0.0313
-F4_test[2, 1, 0] = -0.3446
 F4_test[3, 1, 0] =  19.15e32
+F4_test[0, 1, 0] = 0.0723 * F4_test[3, 1, 0]
+F4_test[1, 1, 0] = 0.0313 * F4_test[3, 1, 0]
+F4_test[2, 1, 0] = -0.3446 * F4_test[3, 1, 0]
 
-F4_test[0, :, 1:] = -0.0216
-F4_test[1, :, 1:] = 0.0743
-F4_test[2, :, 1:] = -0.5354
 F4_test[3, :, 1:] = 19.65e32/4.
+F4_test[0, :, 1:] = -0.0216 * F4_test[3, 0, 1]
+F4_test[1, :, 1:] = 0.0743 * F4_test[3, 0, 1]
+F4_test[2, :, 1:] = -0.5354 * F4_test[3, 0, 1]
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
 after = model_asymptotic.predict_F4(before)
 
@@ -336,7 +338,8 @@ for d in dirlist:
     error_histogram(model_asymptotic, F4i_train,     F4i_train,     100, 0, 0.1, do_restrict_to_physical,d+"/histogram_donothing.pdf")
     error_histogram(model_asymptotic, F4f_train,     F4f_train,     100, 0, 0.1, do_restrict_to_physical,d+"/histogram_finalstable_train.pdf")
     error_histogram(model_asymptotic, F4f_test,      F4f_test,      100, 0, 0.1, do_restrict_to_physical,d+"/histogram_finalstable_test.pdf")
-
+    #error_histogram(model_asymptotic, F4i_NSMunstable, F4f_NSMunstable, 100, 0, 0.1, do_restrict_to_physical, d+"/histogram_NSM_unstable.pdf")
+    
     F4f_pred = model_asymptotic.predict_F4(F4i_unphysical)
     if do_restrict_to_physical:
         F4f_pred = ml_tools.restrict_F4_to_physical(F4f_pred)
