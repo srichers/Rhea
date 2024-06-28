@@ -35,6 +35,7 @@ stability_cutoff = 0.5 # number between 0 and 1. If ML output is larger than thi
 generate_max_fluxfac = 0.95
 zero_weight = 10
 n_equatorial = 64
+average_heavies_in_final_state = True
 
 # data augmentation options
 do_augment_permutation=True
@@ -55,6 +56,16 @@ print(f"Using {device} device")
 with open("train_test_datasets.pkl","rb") as f:
     F4i_train, F4i_test, F4f_train, F4f_test = pickle.load(f)
 F4_NSM_stable = read_NSM_stable_data(NF, NSM_stable_filename, device, do_augment_permutation)
+
+# [simulationIndex, xyzt, nu/nubar, flavor]
+if average_heavies_in_final_state:
+    assert(do_augment_permutation==False)
+    assert(torch.allclose( torch.mean(F4i_train[:,:,:,1:], dim=3), F4i_train[:,:,:,1] ))
+    assert(torch.allclose( torch.mean( F4i_test[:,:,:,1:], dim=3), F4i_test[:,:,:,1] ))
+    F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3)[:,:,:,None]
+    F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3)[:,:,:,None]    
+
+
 # adjust entries of -1 to instead have the correct size of the dataset
 for i in range(len(dataset_size_list_asymptotic)):
     if dataset_size_list_asymptotic[i] == -1:

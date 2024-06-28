@@ -21,8 +21,8 @@ database_list = [
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_twobeam/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_z/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam_z/many_sims_database.h5",
-    "/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_6beam/many_sims_database.h5",
-    "/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
+    "/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_32beam_effective2flavor/many_sims_database.h5",
+    #"/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
 ]
 NSM_stable_filename = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
 do_unpickle = False
@@ -35,9 +35,10 @@ print_every = 10
 generate_max_fluxfac = 0.95
 ME_stability_zero_weight = 10
 ME_stability_n_equatorial = 64
+average_heavies_in_final_state = True
 
 # data augmentation options
-do_augment_permutation=True # this is the most expensive option to make true, and seems to make things worse...
+do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
 do_augment_final_stable = False # True
 do_unphysical_check = True # True - seems to help prevent crazy results
 do_augment_0ff = True
@@ -84,6 +85,14 @@ if do_unpickle:
 else:
     F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(NF, database_list, test_size, device, do_augment_permutation)
 
+# [simulationIndex, xyzt, nu/nubar, flavor]
+if average_heavies_in_final_state:
+    assert(do_augment_permutation==False)
+    assert(torch.allclose( torch.mean(F4i_train[:,:,:,1:], dim=3), F4i_train[:,:,:,1] ))
+    assert(torch.allclose( torch.mean( F4i_test[:,:,:,1:], dim=3), F4i_test[:,:,:,1] ))
+    F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3)[:,:,:,None]
+    F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3)[:,:,:,None]
+    
 F4_NSM_stable = read_NSM_stable_data(NF, NSM_stable_filename, device, do_augment_permutation)
 F4_NSM_stable_train, F4_NSM_stable_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
 
