@@ -8,6 +8,7 @@ from scipy.signal import argrelextrema
 from multiprocessing import Pool
 
 # INPUTS
+file_format = "hdf5" # "hdf5" or "dat"
 growthrate_minfac = 1e-3
 growthrate_maxfac = 1e-1
 nproc = 32
@@ -163,7 +164,17 @@ def analyze_file(d):
     dz = cell_size(d)
     
     # open the data file
-    data = h5py.File(d+"/reduced0D.h5","r")
+    if file_format = "hdf5":
+        data = h5py.File(d+"/reduced0D.h5","r")
+    elif file_format = "dat":
+        with open(d+"/reduced0D.dat","r") as f:
+            headers = f.readline().split()
+            keys = [h.split(":")[1] for h in headers]
+        input_data = np.genfromtxt(d+"/reduced0D.dat",skip_header=1).transpose()
+
+        data = {}
+        for i,k in enumerate(keys):
+            data[k] = input_data[i]
 
     # get the growth rate
     imax, growthRate = growth_properties(data)
@@ -172,7 +183,8 @@ def analyze_file(d):
     F4_initial, F4_final, F4_final_stddev, xplot, y0plot, y1plot = final_properties(imax, growthRate, data, dz)
 
     # close the data file
-    data.close()
+    if file)format = "hdf5":
+        data.close()
 
     # return data
     return growthRate, F4_initial, F4_final, F4_final_stddev, xplot, y0plot, y1plot
