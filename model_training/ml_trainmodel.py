@@ -85,13 +85,13 @@ def train_asymptotic_model(model,
         F4i_unphysical_train = generate_random_F4(n_generate*10, NF, device, max_fluxfac=generate_max_fluxfac)
 
         # log the test error
-        p.data["knownData"].test_loss[t],  p.data["knownData"].test_err[t]  = optimizer.test(model, F4i_test,  F4f_test, comparison_loss_fn)
-        p.data["unphysical"].test_loss[t],  p.data["unphysical"].test_err[t]  = optimizer.test(model, F4i_unphysical_test, None, unphysical_loss_fn)
-        p.data["0ff"].test_loss[t],  p.data["0ff"].test_err[t]  = optimizer.test(model, F4i_0ff_test, F4i_0ff_test, comparison_loss_fn)
-        p.data["1f"].test_loss[t],  p.data["1f"].test_err[t]  = optimizer.test(model, F4i_1f_test, F4i_1f_test, comparison_loss_fn)
-        p.data["finalstable"].test_loss[t],  p.data["finalstable"].test_err[t]  = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)
+        p.data["knownData"   ].test_loss[t],  p.data["knownData"   ].test_err[t]  = optimizer.test(model, F4i_test             , F4f_test             , comparison_loss_fn)
+        p.data["unphysical"  ].test_loss[t],  p.data["unphysical"  ].test_err[t]  = optimizer.test(model, F4i_unphysical_test  , None                 , unphysical_loss_fn)
+        p.data["0ff"         ].test_loss[t],  p.data["0ff"         ].test_err[t]  = optimizer.test(model, F4i_0ff_test         , F4i_0ff_test         , comparison_loss_fn)
+        p.data["1f"          ].test_loss[t],  p.data["1f"          ].test_err[t]  = optimizer.test(model, F4i_1f_test          , F4i_1f_test          , comparison_loss_fn)
+        p.data["finalstable" ].test_loss[t],  p.data["finalstable" ].test_err[t]  = optimizer.test(model, F4f_train            , F4f_train            , comparison_loss_fn)
         p.data["randomstable"].test_loss[t],  p.data["randomstable"].test_err[t]  = optimizer.test(model, F4_random_stable_test, F4_random_stable_test, comparison_loss_fn)
-        p.data["NSM_stable"].test_loss[t],  p.data["NSM_stable"].test_err[t]  = optimizer.test(model, F4_NSM_stable_test, F4_NSM_stable_test, comparison_loss_fn)
+        p.data["NSM_stable"  ].test_loss[t],  p.data["NSM_stable"  ].test_err[t]  = optimizer.test(model, F4_NSM_stable_test   , F4_NSM_stable_test   , comparison_loss_fn)
 
         # zero the gradients
         optimizer.optimizer.zero_grad()
@@ -126,13 +126,13 @@ def train_asymptotic_model(model,
         optimizer.optimizer.step()
 
         # Evaluate training errors
-        p.data["knownData"].train_loss[t], p.data["knownData"].train_err[t] = optimizer.test(model, F4i_train, F4f_train, comparison_loss_fn)
-        p.data["unphysical"].train_loss[t], p.data["unphysical"].train_err[t] = optimizer.test(model, F4i_unphysical_train, None, unphysical_loss_fn)
-        p.data["0ff"].train_loss[t], p.data["0ff"].train_err[t] = optimizer.test(model, F4i_0ff_train, F4i_0ff_train, comparison_loss_fn)
-        p.data["1f"].train_loss[t], p.data["1f"].train_err[t] = optimizer.test(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn)
-        p.data["finalstable"].train_loss[t], p.data["finalstable"].train_err[t] = optimizer.test(model, F4f_train, F4f_train, comparison_loss_fn)
+        p.data["knownData"   ].train_loss[t], p.data["knownData"   ].train_err[t] = optimizer.test(model, F4i_train             , F4f_train             , comparison_loss_fn)
+        p.data["unphysical"  ].train_loss[t], p.data["unphysical"  ].train_err[t] = optimizer.test(model, F4i_unphysical_train  , None                  , unphysical_loss_fn)
+        p.data["0ff"         ].train_loss[t], p.data["0ff"         ].train_err[t] = optimizer.test(model, F4i_0ff_train         , F4i_0ff_train         , comparison_loss_fn)
+        p.data["1f"          ].train_loss[t], p.data["1f"          ].train_err[t] = optimizer.test(model, F4i_1f_train          , F4i_1f_train          , comparison_loss_fn)
+        p.data["finalstable" ].train_loss[t], p.data["finalstable" ].train_err[t] = optimizer.test(model, F4f_train             , F4f_train             , comparison_loss_fn)
         p.data["randomstable"].train_loss[t], p.data["randomstable"].train_err[t] = optimizer.test(model, F4_random_stable_train, F4_random_stable_train, comparison_loss_fn)
-        p.data["NSM_stable"].train_loss[t], p.data["NSM_stable"].train_err[t] = optimizer.test(model, F4_NSM_stable_train, F4_NSM_stable_train, comparison_loss_fn)
+        p.data["NSM_stable"  ].train_loss[t], p.data["NSM_stable"  ].train_err[t] = optimizer.test(model, F4_NSM_stable_train   , F4_NSM_stable_train   , comparison_loss_fn)
 
         # update the learning rate
         netloss = p.data["knownData"].train_loss[t] + p.data["unphysical"].train_loss[t]*100 + p.data["0ff"].train_loss[t]*100 + p.data["1f"].train_loss[t]*100 + p.data["finalstable"].train_loss[t]
