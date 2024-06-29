@@ -93,20 +93,14 @@ def train_asymptotic_model(model,
         p.data["randomstable"].test_loss[t],  p.data["randomstable"].test_err[t]  = optimizer.test(model, F4_random_stable_test, F4_random_stable_test, comparison_loss_fn)
         p.data["NSM_stable"].test_loss[t],  p.data["NSM_stable"].test_err[t]  = optimizer.test(model, F4_NSM_stable_test, F4_NSM_stable_test, comparison_loss_fn)
 
-        # load in a batch of data from the dataset
-        #if True: #with torch.autograd.detect_anomaly():
-        #    for F4i_batch, F4f_batch in dataloader:
-        F4i_batch = F4i_train
-        F4f_batch = F4f_train
-
         # zero the gradients
         optimizer.optimizer.zero_grad()
 
         # train on making sure the model prediction is correct
-        loss = optimizer.train(model, F4i_batch, F4f_batch, comparison_loss_fn)
+        loss = optimizer.train(model, F4i_train, F4f_train, comparison_loss_fn)
         
         if do_augment_final_stable:
-            loss = loss + optimizer.train(model, F4f_batch, F4f_batch, comparison_loss_fn)
+            loss = loss + optimizer.train(model, F4f_train, F4f_train, comparison_loss_fn)
             
         if do_augment_1f:
             loss = loss + optimizer.train(model, F4i_1f_train, F4i_1f_train, comparison_loss_fn)
