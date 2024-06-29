@@ -71,7 +71,15 @@ class NeuralNetwork(nn.Module):
                 module.bias.data.zero_()
     
     # Push the inputs through the neural network
-    def forward(self,x):
+    def forward(self,x, mode):
+        # use the appropriate network structure depending on training vs testing
+        if mode=="eval":
+            self.eval()
+        elif mode=="train":
+            self.train()
+        else:
+            assert(False)
+
         y = self.linear_activation_stack(x)
         return y
 
@@ -110,13 +118,6 @@ class NeuralNetwork(nn.Module):
         
         assert(index==self.NX)
         return X
-    
-    # return the y value
-    def predict_unstable(self, F4_initial):
-        X = self.X_from_F4(F4_initial)
-        y = torch.sigmoid(self.forward(X))
-        return y
-
 
 class AsymptoticNeuralNetwork(NeuralNetwork):
     def __init__(self, NF, final_layer,
@@ -176,7 +177,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
 
         return F4_final
 
-    def predict_F4(self, F4_initial):
+    def predict_F4(self, F4_initial, mode):
         X = self.X_from_F4(F4_initial)
         y = self.forward(X)
         F4_final = self.F4_from_y(F4_initial, y)
