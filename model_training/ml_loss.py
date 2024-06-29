@@ -1,10 +1,10 @@
 import torch
 
 # with mean, this is equivalent to torch.sum(diff**2) / F4f_pred.numel()
-def comparison_loss_fn(model, F4_pred, F4_true):
+def comparison_loss_fn(F4_pred, F4_true):
     return torch.nn.MSELoss(reduction='mean')(F4_pred, F4_true)
 
-def unphysical_loss_fn(model, F4f_pred, F4f_true):
+def unphysical_loss_fn(F4f_pred, F4f_true):
     assert(F4f_true == None)
 
     # enforce that number density cannot be less than zero

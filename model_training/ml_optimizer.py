@@ -16,7 +16,7 @@ class AsymptoticOptimizer(Optimizer):
     def train(self, model, F4i, F4f_true, loss_fn):
         model.train()
         F4f_pred = model.predict_F4(F4i)
-        loss = loss_fn(model, F4f_pred, F4f_true)
+        loss = loss_fn(F4f_pred, F4f_true)
         return loss
 
     # function to test the model performance
@@ -24,7 +24,7 @@ class AsymptoticOptimizer(Optimizer):
         model.eval()
         with torch.no_grad():
             F4f_pred = model.predict_F4(F4i)
-            loss = loss_fn(model, F4f_pred, F4f_true)
+            loss = loss_fn(F4f_pred, F4f_true)
             if F4f_true != None:
                 # calculate the total number density in each simulation. Assume that all input data has been normalized.
                 error = torch.max(torch.abs(F4f_pred - F4f_true))
