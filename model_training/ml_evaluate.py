@@ -31,7 +31,6 @@ dataset_size_list_asymptotic = get_dataset_size_list("model_[0-9]*.pkl")
 
 n_generate = 1000
 test_size = 0.1
-stability_cutoff = 0.5 # number between 0 and 1. If ML output is larger than this, consider unstable.
 generate_max_fluxfac = 0.95
 zero_weight = 10
 n_equatorial = 64

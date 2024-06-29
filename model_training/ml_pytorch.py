@@ -48,8 +48,8 @@ do_augment_NSM_stable = True
 
 # neural network options
 nhidden = 3
-width = 1024
-dropout_probability = 0.1 #0.1 # 0.5
+width = 128
+dropout_probability = 0.5 #0.1 # 0.5
 do_batchnorm = False # False - Seems to make things worse
 do_fdotu = True
 activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
@@ -140,7 +140,7 @@ for dataset_size in dataset_size_list:
 
     plotter_array.append(plotter)
     model_array.append(model)
-    optimizer_array.append(AsymptoticOptimizer(
+    optimizer_array.append(Optimizer(
         model_array[-1],
         op(model.parameters(), weight_decay=weight_decay, lr=learning_rate, amsgrad=amsgrad, fused=fused),
         device))

@@ -11,14 +11,6 @@ class Optimizer():
         self.optimizer = op
         self.device = device
 
-class AsymptoticOptimizer(Optimizer):
-    # function to train the dataset
-    def train(self, model, F4i, F4f_true, loss_fn):
-        model.train()
-        F4f_pred = model.predict_F4(F4i)
-        loss = loss_fn(F4f_pred, F4f_true)
-        return loss
-
     # function to test the model performance
     def test(self, model, F4i, F4f_true, loss_fn):
         model.eval()
