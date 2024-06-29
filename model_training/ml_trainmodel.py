@@ -96,8 +96,12 @@ def train_asymptotic_model(model,
         # zero the gradients
         optimizer.optimizer.zero_grad()
 
+        # set the model to training mode
+        model.train()
+
         # train on making sure the model prediction is correct
-        loss = optimizer.train(model, F4i_train, F4f_train, comparison_loss_fn)
+        F4f_pred = model.predict_F4(F4i_train)
+        loss = comparison_loss_fn(F4f_pred, F4f_train)
         
         if do_augment_final_stable:
             loss = loss + optimizer.train(model, F4f_train, F4f_train, comparison_loss_fn)
