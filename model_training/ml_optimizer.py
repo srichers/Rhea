@@ -31,26 +31,3 @@ class AsymptoticOptimizer(Optimizer):
             else:
                 error = None
             return loss, error
-            
-class StabilityOptimizer(Optimizer):
-    # function to train the dataset
-    # note that the loss function MUST be BCEWithLogitsLoss
-    # Because of this, y is NOT wrapped by sigmoid
-    def train(self, model, F4i, unstable, loss_fn):
-        model.train()
-        X = model.X_from_F4(F4i)
-        y = model.forward(X)
-        loss = loss_fn(y, unstable)
-        return loss
-    
-    # function to test the model performance
-    # note that the loss function MUST be BCEWithLogitsLoss
-    # Because of this, y is NOT wrapped by sigmoid
-    def test(self, model, F4i, unstable, loss_fn):
-        model.eval()
-        with torch.no_grad():
-            X = model.X_from_F4(F4i)
-            y = model.forward(X)
-            loss = loss_fn(y, unstable)
-            error = torch.max(torch.abs(torch.sigmoid(y) - unstable))
-            return loss, error
