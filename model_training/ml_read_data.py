@@ -10,7 +10,7 @@ from ml_plot import *
 from ml_trainmodel import *
 import pickle
 
-def read_test_train_data(NF, database_list, test_size, device, do_augment_permutation):
+def read_test_train_data(parms):
     #===============================================#
     # read in the database from the previous script #
     #===============================================#
@@ -20,16 +20,16 @@ def read_test_train_data(NF, database_list, test_size, device, do_augment_permut
     print("#############################")
     F4_initial_list = []
     F4_final_list = []
-    for d in database_list:
+    for d in parms["database_list"]:
         print("Reading:",d)
         f_in = h5py.File(d,"r")
         F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
         F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
-        assert(NF == int(np.array(f_in["nf"])) )
+        assert(parms["NF"] == int(np.array(f_in["nf"])) )
         f_in.close()
         print("    ",len(F4_initial_list[-1]),"points in",d)
-    F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=device).float()
-    F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=device).float()
+    F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=parms["device"]).float()
+    F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=parms["device"]).float()
 
     # fix slightly negative energy densities
     ntot = ml.ntotal(F4_initial_list)
@@ -47,9 +47,9 @@ def read_test_train_data(NF, database_list, test_size, device, do_augment_permut
     check_conservation(F4_initial_list, F4_final_list)
 
     # split into training and testing sets
-    F4i_train, F4i_test, F4f_train, F4f_test = train_test_split(F4_initial_list, F4_final_list, test_size=test_size, random_state=42)
+    F4i_train, F4i_test, F4f_train, F4f_test = train_test_split(F4_initial_list, F4_final_list, test_size=parms["test_size"], random_state=42)
 
-    if do_augment_permutation:
+    if parms["do_augment_permutation"]:
         F4i_train = ml.augment_permutation(F4i_train)
         F4f_train = ml.augment_permutation(F4f_train)
         F4i_test  = ml.augment_permutation(F4i_test )
@@ -64,7 +64,7 @@ def read_test_train_data(NF, database_list, test_size, device, do_augment_permut
 #=================================================#
 # read in the stable points from the NSM snapshot #
 #=================================================#
-def read_NSM_stable_data(NF, filename, device, do_augment_permutation):
+def read_NSM_stable_data(parms):
     print()
     print("#############################")
     print("# READING NSM STABLE POINTS #")
@@ -72,7 +72,7 @@ def read_NSM_stable_data(NF, filename, device, do_augment_permutation):
     # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
     # take only the y-z slice to limit the size of the data.
     xslice = 100
-    f_in = h5py.File(filename,"r")
+    f_in = h5py.File(parms["NSM_stable_filename"],"r")
     discriminant = np.array(f_in["crossing_discriminant"])[xslice,:,:]
     # n has shape [Nx,Ny,Nz]]
     ne = np.array(f_in["n_e(1|ccm)"])[xslice,:,:]
@@ -86,7 +86,7 @@ def read_NSM_stable_data(NF, filename, device, do_augment_permutation):
     stable_locs = np.where(discriminant<=0)
     nlocs = len(stable_locs[0])
     print(nlocs,"points")
-    F4_NSM_stable = np.zeros((nlocs,4,2,NF))
+    F4_NSM_stable = np.zeros((nlocs,4,2,parms["NF"]))
     F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
     F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
     F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
@@ -101,10 +101,10 @@ def read_NSM_stable_data(NF, filename, device, do_augment_permutation):
     F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
 
     # don't need the final values because they are the same as the initial
-    if do_augment_permutation:
+    if parms["do_augment_permutation"]:
         F4_NSM_stable = ml.augment_permutation(F4_NSM_stable)
 
     # move the array to the device
-    F4_NSM_stable = torch.Tensor(F4_NSM_stable).to(device)
+    F4_NSM_stable = torch.Tensor(F4_NSM_stable).to(parms["device"])
 
     return F4_NSM_stable

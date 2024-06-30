@@ -4,40 +4,34 @@ from ml_tools import dot4, restrict_F4_to_physical
 
 # define the NN model
 class NeuralNetwork(nn.Module):
-    def __init__(self, NF, Ny, final_layer,
-                 do_fdotu,
-                 nhidden,
-                 width,
-                 dropout_probability,
-                 activation,
-                 do_batchnorm):
+    def __init__(self, parms, Ny, final_layer):
         super().__init__()
 
         # store input arguments
-        self.NF = NF
+        self.NF = parms["NF"]
 
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
-        self.do_fdotu = do_fdotu
+        self.do_fdotu = parms["do_fdotu"]
         self.NX = self.NF * (1 + 2*self.NF)
-        if do_fdotu:
+        if self.do_fdotu:
             self.NX += 2*self.NF
         self.Ny = Ny
 
         # append a full layer including linear, activation, and batchnorm
         def append_full_layer(modules, in_dim, out_dim):
             modules.append(nn.Linear(in_dim, out_dim))
-            if do_batchnorm:
+            if parms["do_batchnorm"]:
                 modules.append(nn.BatchNorm1d(out_dim))
-            modules.append(activation())
-            if dropout_probability > 0:
-                modules.append(nn.Dropout(dropout_probability))
+            modules.append(parms["activation"]())
+            if parms["dropout_probability"] > 0:
+                modules.append(nn.Dropout(parms["dropout_probability"]))
             return modules
 
 
         # put together the layers of the neural network
         modules = []
-        if nhidden==0:
+        if parms["nhidden"]==0:
 
             # just stupid linear regression
             modules.append(nn.Linear(self.NX, self.Ny))
@@ -45,14 +39,14 @@ class NeuralNetwork(nn.Module):
         else:
 
             # set up input layer
-            modules = append_full_layer(modules, self.NX, width)
+            modules = append_full_layer(modules, self.NX, parms["width"])
 
             # set up hidden layers
-            for i in range(nhidden):
-                modules = append_full_layer(modules, width, width)
+            for i in range(parms["nhidden"]):
+                modules = append_full_layer(modules, parms["width"], parms["width"])
 
             # set up final layer
-            modules.append(nn.Linear(width, self.Ny))
+            modules.append(nn.Linear(parms["width"], self.Ny))
 
         # apply tanh to limit outputs to be from -1 to 1 to limit the amount of craziness possible
         if final_layer != None:
@@ -120,22 +114,10 @@ class NeuralNetwork(nn.Module):
         return X
 
 class AsymptoticNeuralNetwork(NeuralNetwork):
-    def __init__(self, NF, final_layer,
-                 do_fdotu,
-                 nhidden,
-                 width,
-                 dropout_probability,
-                 activation,
-                 do_batchnorm):
+    def __init__(self, parms, final_layer):
         
-        self.Ny = (2*NF)**2
-        super().__init__(NF, self.Ny, final_layer,
-                         do_fdotu,
-                         nhidden,
-                         width,
-                         dropout_probability,
-                         activation,
-                         do_batchnorm)
+        self.Ny = (2*parms["NF"])**2
+        super().__init__(parms, self.Ny, final_layer)
 
     # convert the 3-flavor matrix into an effective 2-flavor matrix
     # input and output are indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]

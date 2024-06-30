@@ -15,99 +15,101 @@ import pickle
 import torch.optim
 import torch.autograd.profiler as profiler
 
-database_list = [
+# create a list of options
+parms = {}
+
+parms["database_list"] = [
     #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_twobeam/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_z/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam_z/many_sims_database.h5",
     "/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_32beam_effective2flavor/many_sims_database.h5",
-    #"/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
+    "/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
 ]
-NSM_stable_filename = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
-do_unpickle = False
-test_size = 0.1
-epochs = 20000
-batch_size = -1
-dataset_size_list = [-1] # -1 means use all the data
-n_generate = 7500
-print_every = 10
-generate_max_fluxfac = 0.95
-ME_stability_zero_weight = 10
-ME_stability_n_equatorial = 64
-average_heavies_in_final_state = True
+parms["NSM_stable_filename"] = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
+parms["do_unpickle"] = False
+parms["test_size"] = 0.1
+parms["epochs"] = 20000
+parms["dataset_size_list"] = [-1] # -1 means use all the data
+parms["n_generate"] = 7500
+parms["print_every"] = 10
+parms["generate_max_fluxfac"] = 0.95
+parms["ME_stability_zero_weight"] = 10
+parms["ME_stability_n_equatorial"] = 64
+parms["average_heavies_in_final_state"] = True
 
 # data augmentation options
-do_augment_permutation=False # this is the most expensive option to make true, and seems to make things worse...
-do_augment_final_stable = False # True
-do_unphysical_check = True # True - seems to help prevent crazy results
-do_augment_0ff = True
-do_augment_1f = True
-do_augment_random_stable = True
-do_augment_NSM_stable = True
+parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
+parms["do_augment_final_stable"]= False # True
+parms["do_unphysical_check"]= True # True - seems to help prevent crazy results
+parms["do_augment_0ff"]= True
+parms["do_augment_1f"]= True
+parms["do_augment_random_stable"]= True
+parms["do_augment_NSM_stable"]= True
 
 # neural network options
-nhidden = 3
-width = 128
-dropout_probability = 0.5 #0.1 # 0.5
-do_batchnorm = False # False - Seems to make things worse
-do_fdotu = True
-activation = nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
+parms["nhidden"]= 3
+parms["width"]= 128
+parms["dropout_probability"]= 0.5 #0.1 # 0.5
+parms["do_batchnorm"]= False # False - Seems to make things worse
+parms["do_fdotu"]= True
+parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
 # optimizer options
-op = torch.optim.AdamW # Adam, SGD, RMSprop
-amsgrad = False
-weight_decay = 1e-2 #1e-5
-learning_rate = 1e-3 # 1e-3
-fused = True
-lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau
-patience = 100
-cooldown = 100
-factor = 0.5
-min_lr = 1e-5
+parms["op"]= torch.optim.AdamW # Adam, SGD, RMSprop
+parms["amsgrad"]= False
+parms["weight_decay"]= 1e-2 #1e-5
+parms["learning_rate"]= 1e-3 # 1e-3
+parms["fused"]= True
+parms["lr_scheduler"]= torch.optim.lr_scheduler.ReduceLROnPlateau
+parms["patience"]= 100
+parms["cooldown"]= 100
+parms["factor"]= 0.5
+parms["min_lr"]= 1e-5
 
 # the number of flavors should be 3
-NF = 3
+parms["NF"]= 3
 
 #========================#
 # use a GPU if available #
 #========================#
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using {device} device")
+parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+print("Using",parms["device"],"device")
 print(torch.cuda.get_device_name(0))
 
 #===============#
 # read the data #
 #===============#
-if do_unpickle:
+if parms["do_unpickle"]:
     with open("train_test_datasets.pkl", "rb") as f:
         F4i_train, F4i_test, F4f_train, F4f_test = pickle.load(f)
 else:
-    F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(NF, database_list, test_size, device, do_augment_permutation)
+    F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(parms)
 
 # [simulationIndex, xyzt, nu/nubar, flavor]
-if average_heavies_in_final_state:
-    assert(do_augment_permutation==False)
+if parms["average_heavies_in_final_state"]:
+    assert(parms["do_augment_permutation"]==False)
     assert(torch.allclose( torch.mean(F4i_train[:,:,:,1:], dim=3), F4i_train[:,:,:,1] ))
     assert(torch.allclose( torch.mean( F4i_test[:,:,:,1:], dim=3), F4i_test[:,:,:,1] ))
     F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3)[:,:,:,None]
     F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3)[:,:,:,None]
     
-F4_NSM_stable = read_NSM_stable_data(NF, NSM_stable_filename, device, do_augment_permutation)
-F4_NSM_stable_train, F4_NSM_stable_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=test_size, random_state=42)
+F4_NSM_stable = read_NSM_stable_data(parms)
+F4_NSM_stable_train, F4_NSM_stable_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=parms["test_size"], random_state=42)
 
 # move the arrays over to the gpu
-F4i_train = torch.Tensor(F4i_train).to(device)
-F4f_train = torch.Tensor(F4f_train).to(device)
-F4i_test  = torch.Tensor(F4i_test ).to(device)
-F4f_test  = torch.Tensor(F4f_test ).to(device)
+F4i_train = torch.Tensor(F4i_train).to(parms["device"])
+F4f_train = torch.Tensor(F4f_train).to(parms["device"])
+F4i_test  = torch.Tensor(F4i_test ).to(parms["device"])
+F4f_test  = torch.Tensor(F4f_test ).to(parms["device"])
 print("Train:",F4i_train.shape)
 print("Test:",F4i_test.shape)
 
 # adjust entries of -1 to instead have the correct size of the dataset
-for i in range(len(dataset_size_list)):
-    if dataset_size_list[i] == -1:
-        dataset_size_list[i] = F4i_train.shape[0]
+for i in range(len(parms["dataset_size_list"])):
+    if parms["dataset_size_list"][i] == -1:
+        parms["dataset_size_list"][i] = F4i_train.shape[0]
 
 #=======================#
 # instantiate the model #
@@ -122,29 +124,30 @@ optimizer_array = []
 plotter_array = []
 scheduler_array = []
 
-for dataset_size in dataset_size_list:
-    if do_unpickle:
+for dataset_size in parms["dataset_size_list"]:
+    if parms["do_unpickle"]:
         with open("model_"+str(dataset_size)+".pkl", "rb") as f:
             model, optimizer, plotter = pickle.load(f)
 
     else:
-        model = AsymptoticNeuralNetwork(NF,
-                      nn.Tanh(),
-                      do_fdotu,
-                      nhidden,
-                      width,
-                      dropout_probability,
-                      activation,
-                      do_batchnorm).to(device)
+        model = AsymptoticNeuralNetwork(parms, nn.Tanh()).to(parms["device"])
         plotter = Plotter(0,["knownData","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
 
     plotter_array.append(plotter)
     model_array.append(model)
     optimizer_array.append(Optimizer(
         model_array[-1],
-        op(model.parameters(), weight_decay=weight_decay, lr=learning_rate, amsgrad=amsgrad, fused=fused),
-        device))
-    scheduler_array.append(lr_scheduler(optimizer_array[-1].optimizer, patience=patience, cooldown=cooldown, factor=factor, min_lr=min_lr)) # 
+        parms["op"](model.parameters(),
+                    weight_decay=parms["weight_decay"],
+                    lr=parms["learning_rate"],
+                    amsgrad=parms["amsgrad"],
+                    fused=parms["fused"]),
+        parms["device"]))
+    scheduler_array.append(parms["lr_scheduler"](optimizer_array[-1].optimizer,
+                                                 patience=parms["patience"],
+                                                 cooldown=parms["cooldown"],
+                                                 factor=parms["factor"],
+                                                 min_lr=parms["min_lr"])) # 
 
 print(model_array[-1])
 print("number of parameters:", sum(p.numel() for p in model_array[-1].parameters()))
@@ -154,30 +157,14 @@ print("######################")
 print("# Training the model #")
 print("######################")
 #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
-for i in range(len(dataset_size_list)):
+for i in range(len(parms["dataset_size_list"])):
     model_array[i], optimizer_array[i], scheduler_array[i], plotter_array[i] = train_asymptotic_model(
+        parms,
         model_array[i],
         optimizer_array[i],
         scheduler_array[i],
         plotter_array[i],
-        NF,
-        epochs,
-        batch_size,
-        n_generate,
-        generate_max_fluxfac,
-        dataset_size_list[i],
-        print_every,
-        device,
-        do_unphysical_check,
-        do_augment_final_stable,
-        do_augment_1f,
-        do_augment_0ff,
-        do_augment_random_stable,
-        do_augment_NSM_stable,
-        ME_stability_zero_weight,
-        ME_stability_n_equatorial,
-        comparison_loss_fn,
-        unphysical_loss_fn,
+        parms["dataset_size_list"][i],
         F4i_train,
         F4f_train,
         F4i_test,
