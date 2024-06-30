@@ -92,36 +92,48 @@ def train_asymptotic_model(parms,
         F4pred_test  = model.predict_F4(F4i_test ,"eval")
         F4pred_train = model.predict_F4(F4i_train,"train")
         loss = contribute_loss(F4pred_train, F4f_train, F4pred_test, F4f_test, "knownData", comparison_loss_fn)
-        
+
+        # final stable #
+        F4pred_test = model.predict_F4(F4f_test,"eval")
+        F4pred_train = model.predict_F4(F4f_train,"train")
+        loss_final_stable = contribute_loss(F4pred_train, F4f_train, F4pred_test, F4f_test, "finalstable", comparison_loss_fn)
         if parms["do_augment_final_stable"]:
-            F4pred_test = model.predict_F4(F4f_test,"eval")
-            F4pred_train = model.predict_F4(F4f_train,"train")
-            loss += contribute_loss(F4pred_train, F4f_train, F4pred_test, F4f_test, "finalstable", comparison_loss_fn)
-            
+            loss += loss_final_stable
+
+        # 1 flavor stable
+        F4pred_test = model.predict_F4(F4_1f_stable_test,"eval")
+        F4pred_train = model.predict_F4(F4_1f_stable_train,"train")
+        loss_1f_stable = contribute_loss(F4pred_train, F4_1f_stable_train, F4pred_test, F4_1f_stable_test, "1f", comparison_loss_fn)
         if parms["do_augment_1f"]:
-            F4pred_test = model.predict_F4(F4_1f_stable_test,"eval")
-            F4pred_train = model.predict_F4(F4_1f_stable_train,"train")
-            loss += contribute_loss(F4pred_train, F4_1f_stable_train, F4pred_test, F4_1f_stable_test, "1f", comparison_loss_fn)
-            
+            loss += loss_1f_stable
+
+        # 0 flux factor stable
+        F4pred_test = model.predict_F4(F4_0ff_stable_test,"eval")
+        F4pred_train = model.predict_F4(F4_0ff_stable_train,"train")
+        loss_0ff_stable = contribute_loss(F4pred_train, F4_0ff_stable_train, F4pred_test, F4_0ff_stable_test, "0ff", comparison_loss_fn)
         if parms["do_augment_0ff"]:
-            F4pred_test = model.predict_F4(F4_0ff_stable_test,"eval")
-            F4pred_train = model.predict_F4(F4_0ff_stable_train,"train")
-            loss += contribute_loss(F4pred_train, F4_0ff_stable_train, F4pred_test, F4_0ff_stable_test, "0ff", comparison_loss_fn)
+            loss += loss_0ff_stable
 
+        # random stable
+        F4pred_test = model.predict_F4(F4_random_stable_test,"eval")
+        F4pred_train = model.predict_F4(F4_random_stable_train,"train")
+        loss_random_stable = contribute_loss(F4pred_train, F4_random_stable_train, F4pred_test, F4_random_stable_test, "randomstable", comparison_loss_fn)
         if parms["do_augment_random_stable"]:
-            F4pred_test = model.predict_F4(F4_random_stable_test,"eval")
-            F4pred_train = model.predict_F4(F4_random_stable_train,"train")
-            loss += contribute_loss(F4pred_train, F4_random_stable_train, F4pred_test, F4_random_stable_test, "randomstable", comparison_loss_fn)
-
-        if parms["do_augment_NSM_stable"]:
-            F4pred_test = model.predict_F4(F4_NSM_stable_test,"eval")
-            F4pred_train = model.predict_F4(F4_NSM_stable_train,"train")
-            loss += contribute_loss(F4pred_train, F4_NSM_stable_train, F4pred_test, F4_NSM_stable_test, "NSM_stable", comparison_loss_fn)
+            loss += loss_random_stable
             
+        # NSM_stable
+        F4pred_test = model.predict_F4(F4_NSM_stable_test,"eval")
+        F4pred_train = model.predict_F4(F4_NSM_stable_train,"train")
+        loss_NSM_stable = contribute_loss(F4pred_train, F4_NSM_stable_train, F4pred_test, F4_NSM_stable_test, "NSM_stable", comparison_loss_fn)
+        if parms["do_augment_NSM_stable"]:
+            loss += loss_NSM_stable
+
+        # unphysical
+        F4pred_test = model.predict_F4(F4i_unphysical_test,"test")
+        F4pred_train = model.predict_F4(F4i_unphysical_train,"train")
+        loss_unphysical = contribute_loss(F4pred_train, None, F4pred_test, None, "unphysical", unphysical_loss_fn) * 100
         if parms["do_unphysical_check"]:
-            F4pred_test = model.predict_F4(F4i_unphysical_test,"test")
-            F4pred_train = model.predict_F4(F4i_unphysical_train,"train")
-            loss += contribute_loss(F4pred_train, None, F4pred_test, None, "NSM_stable", unphysical_loss_fn) * 100
+            loss += loss_unphysical
 
         # have the optimizer take a step
         scheduler.step(loss.item())
