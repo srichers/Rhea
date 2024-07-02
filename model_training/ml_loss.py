@@ -20,6 +20,10 @@ def unphysical_loss_fn(F4f_pred, F4f_true):
     # total conservation loss
     return negative_density_loss + fluxfac_loss
 
+def direction_loss_fn(Fhat_pred, Fhat_true):
+    fdotf = torch.sum(Fhat_pred * Fhat_true, axis=1)
+    return torch.mean(torch.ones_like(fdotf) - fdotf)
+    
 
 def max_error(F4f_pred, F4f_true):
     if F4f_true == None:

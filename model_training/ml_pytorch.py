@@ -51,7 +51,7 @@ parms["do_augment_NSM_stable"]= True
 # neural network options
 parms["nhidden"]= 3
 parms["width"]= 128
-parms["dropout_probability"]= 0.5 #0.1 # 0.5
+parms["dropout_probability"]= 0 #0.1 #0.5 #0.1 # 0.5
 parms["do_batchnorm"]= False # False - Seems to make things worse
 parms["do_fdotu"]= True
 parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
@@ -66,7 +66,7 @@ parms["lr_scheduler"]= torch.optim.lr_scheduler.ReduceLROnPlateau
 parms["patience"]= 100
 parms["cooldown"]= 100
 parms["factor"]= 0.5
-parms["min_lr"]= 1e-5
+parms["min_lr"]= 0 #1e-8
 
 # the number of flavors should be 3
 parms["NF"]= 3
@@ -130,8 +130,8 @@ for dataset_size in parms["dataset_size_list"]:
             model, optimizer, plotter = pickle.load(f)
 
     else:
-        model = AsymptoticNeuralNetwork(parms, nn.Tanh()).to(parms["device"])
-        plotter = Plotter(0,["knownData","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
+        model = AsymptoticNeuralNetwork(parms, None).to(parms["device"]) #nn.Tanh()
+        plotter = Plotter(0,["ndens","fluxmag","direction","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
 
     plotter_array.append(plotter)
     model_array.append(model)
@@ -173,7 +173,7 @@ for i in range(len(parms["dataset_size_list"])):
         F4_NSM_stable_test)
 
     # pickle the model, optimizer, and plotter
-    with open("model_"+str(dataset_size_list[i])+".pkl", "wb") as f:
+    with open("model_"+str(parms["dataset_size_list"][i])+".pkl", "wb") as f:
         pickle.dump([model_array[i], optimizer_array[i], plotter_array[i]], f)
 
 #print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cpu_time_total'))
@@ -192,7 +192,7 @@ outfilename = "model"
 def save_model(model, outfilename, device):
     with torch.no_grad():
         print(F4i_test.shape)
-
+        model.eval()
         model.to(device)
         X = model.X_from_F4(F4i_test.to(device))
         traced_model = torch.jit.trace(model, X)
@@ -200,5 +200,5 @@ def save_model(model, outfilename, device):
         print("Saving to",outfilename+"_"+device+".ptc")
 
 save_model(model, outfilename, "cpu")
-if device=="cuda":
+if parms["device"]=="cuda":
     save_model(model, outfilename, "cuda")

@@ -2,7 +2,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import ml_tools
+from ml_tools import get_ndens_logfluxmag_fhat, restrict_F4_to_physical
 
 class PlotQuantities():
     def __init__(self, epochs):
@@ -158,7 +158,7 @@ def plot_histogram(error, bins, xmin, xmax, filename):
     plt.xlim(xmin,xmax)
     plt.tick_params(axis='both',which="both", direction="in",top=True,right=True)
     plt.minorticks_on()
-    plt.savefig(filename,bbox_inches="tight")
+    plt.savefig(filename+".pdf",bbox_inches="tight")
 
 # apply the model to a dataset and create a histogram of the magnitudes of the error
 # F4 has dimensions [sim, xyzt, nu/nubar, flavor]
@@ -169,10 +169,18 @@ def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, do_restrict_t
 
     # apply any relevant corrections to the distribution
     if do_restrict_to_physical:
-        F4_pred = ml_tools.restrict_F4_to_physical(F4_pred)
+        F4_pred = restrict_F4_to_physical(F4_pred)
 
+    # get number density, flux magnitude, and flux direction
+    ndens_true, fluxmag_true, Fhat_true = get_ndens_logfluxmag_fhat(F4_final)
+    ndens_pred, fluxmag_pred, Fhat_pred = get_ndens_logfluxmag_fhat(F4_pred)
+        
     # calculate the error
     F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()
+    ndens_error = (ndens_true - ndens_pred).to('cpu').detach().numpy()
+    fluxmag_error = (fluxmag_true - fluxmag_pred).to('cpu').detach().numpy()
+    fdotf = torch.sum(Fhat_pred * Fhat_true, axis=1)
+    direction_error = (torch.ones_like(fdotf) - fdotf).to('cpu').detach().numpy()
 
     # calculate the total number density in each simulation
     N = F4_final[:,3,:,:].to('cpu').detach().numpy()
@@ -180,9 +188,15 @@ def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, do_restrict_t
 
     # calculate the magnitude of the error
     F4_error_mag = np.max(np.abs(F4_error), axis=(1,2,3))/N
+    ndens_error_mag = np.max(np.abs(ndens_error), axis=(1,2))/N
+    fluxmag_error_mag = np.max(np.abs(fluxmag_error), axis=(1,2))/N
+    direction_error_mag = np.max(np.abs(direction_error), axis=(1,2))/N
 
     # plot the error
-    plot_histogram(F4_error_mag, bins, xmin, xmax, filename)
+    plot_histogram(       F4_error_mag, bins, xmin, xmax, filename)
+    plot_histogram(    ndens_error_mag, bins, xmin, xmax, filename+"_ndens")
+    plot_histogram(  fluxmag_error_mag, bins, xmin, xmax, filename+"_logfluxmag")
+    plot_histogram(direction_error_mag, bins, xmin, xmax, filename+"_direction")
 
     # print the max error and loss
     print()

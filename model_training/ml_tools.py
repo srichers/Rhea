@@ -103,3 +103,10 @@ def restrict_F4_to_physical(F4_final):
     F4_final = (F4_final + maxalpha[:,None,None,None]*avgF4) / (maxalpha[:,None,None,None] + 1)
 
     return F4_final
+
+def get_ndens_logfluxmag_fhat(F4):
+    ndens = F4[:, 3,:,:]
+    flux  = F4[:,:3,:,:]
+    fluxmag = torch.sqrt(torch.sum(flux**2, dim=1))
+    Fhat = flux/fluxmag[:,None,:,:]
+    return ndens, torch.log(fluxmag), Fhat
