@@ -79,16 +79,18 @@ def train_asymptotic_model(parms,
         # zero the gradients
         optimizer.optimizer.zero_grad()
         loss = torch.tensor(0.0, requires_grad=True)
+        test_loss = torch.tensor(0.0, requires_grad=False)
 
         def contribute_loss(F4pred_train, F4f_train, F4pred_test, F4f_test, key, loss_fn):
-            this_loss = loss_fn(F4pred_train, F4f_train)
-            p.data[key].train_loss[t] = this_loss.item()
+            train_loss = loss_fn(F4pred_train, F4f_train)
+            p.data[key].train_loss[t] = train_loss.item()
             p.data[key].train_err[t]  = max_error(F4pred_train, F4f_train)
             
-            p.data[key].test_loss[t] = loss_fn(F4pred_test, F4f_test)
+            test_loss = loss_fn(F4pred_test, F4f_test)
+            p.data[key].test_loss[t] = test_loss.item()
             p.data[key].test_err[t]  = max_error(F4pred_test, F4f_test)
 
-            return this_loss
+            return train_loss, test_loss
 
 
         F4pred_test  = model.predict_F4(F4i_test ,"eval")
@@ -98,74 +100,117 @@ def train_asymptotic_model(parms,
         ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_logfluxmag_fhat(F4f_train   )
         ndens_true_test , fluxmag_true_test , Fhat_true_test  = get_ndens_logfluxmag_fhat(F4f_test    )
 
+        # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
+        
         # train on making sure the model prediction is correct [ndens]
-        loss_ndens = contribute_loss(ndens_pred_train,
-                                     ndens_true_train,
-                                     ndens_pred_test,
-                                     ndens_true_test,
-                                     "ndens", comparison_loss_fn)
+        loss_ndens, test_loss_ndens = contribute_loss(ndens_pred_train,
+                                                      ndens_true_train,
+                                                      ndens_pred_test,
+                                                      ndens_true_test,
+                                                      "ndens", comparison_loss_fn)
         loss = loss + loss_ndens
+        test_loss = test_loss + test_loss_ndens
 
         # train on making sure the model prediction is correct [fluxmag]
-        loss_fluxmag = loss + contribute_loss(fluxmag_pred_train,
-                                              fluxmag_true_train,
-                                              fluxmag_pred_test,
-                                              fluxmag_true_test,
-                                              "fluxmag", comparison_loss_fn)
+        loss_fluxmag, test_loss_fluxmag = contribute_loss(fluxmag_pred_train,
+                                                          fluxmag_true_train,
+                                                          fluxmag_pred_test,
+                                                          fluxmag_true_test,
+                                                          "fluxmag", comparison_loss_fn)
         loss = loss + loss_fluxmag
+        test_loss = test_loss + test_loss_fluxmag
 
         # train on making sure the model prediction is correct [direction]
-        loss_direction = loss + contribute_loss(Fhat_pred_train,
-                                                Fhat_true_train,
-                                                Fhat_pred_test,
-                                                Fhat_true_test,
-                                                "direction", direction_loss_fn)
+        loss_direction, test_loss_direction = contribute_loss(Fhat_pred_train,
+                                                              Fhat_true_train,
+                                                              Fhat_pred_test,
+                                                              Fhat_true_test,
+                                                              "direction", direction_loss_fn)
         loss = loss + loss_direction
+        test_loss = test_loss + test_loss_direction
 
         # final stable #
         F4pred_test = model.predict_F4(F4f_test,"eval")
         F4pred_train = model.predict_F4(F4f_train,"train")
-        loss_final_stable = contribute_loss(F4pred_train, F4f_train, F4pred_test, F4f_test, "finalstable", comparison_loss_fn)
+        loss_final_stable, test_loss_fs = contribute_loss(F4pred_train,
+                                                          F4f_train,
+                                                          F4pred_test,
+                                                          F4f_test,
+                                                          "finalstable",
+                                                          comparison_loss_fn)
         if parms["do_augment_final_stable"]:
             loss = loss + loss_final_stable
+            test_loss = test_loss + test_loss_fs
 
         # 1 flavor stable
         F4pred_test = model.predict_F4(F4_1f_stable_test,"eval")
         F4pred_train = model.predict_F4(F4_1f_stable_train,"train")
-        loss_1f_stable = contribute_loss(F4pred_train, F4_1f_stable_train, F4pred_test, F4_1f_stable_test, "1f", comparison_loss_fn)
+        loss_1f_stable, test_loss_1f = contribute_loss(F4pred_train,
+                                                       F4_1f_stable_train,
+                                                       F4pred_test,
+                                                       F4_1f_stable_test,
+                                                       "1f",
+                                                       comparison_loss_fn)
         if parms["do_augment_1f"]:
             loss = loss + loss_1f_stable
+            test_loss = test_loss + test_loss_1f
 
         # 0 flux factor stable
         F4pred_test = model.predict_F4(F4_0ff_stable_test,"eval")
         F4pred_train = model.predict_F4(F4_0ff_stable_train,"train")
-        loss_0ff_stable = contribute_loss(F4pred_train, F4_0ff_stable_train, F4pred_test, F4_0ff_stable_test, "0ff", comparison_loss_fn)
+        loss_0ff_stable, test_loss_0ff = contribute_loss(F4pred_train,
+                                                         F4_0ff_stable_train,
+                                                         F4pred_test,
+                                                         F4_0ff_stable_test,
+                                                         "0ff",
+                                                         comparison_loss_fn)
         if parms["do_augment_0ff"]:
             loss = loss + loss_0ff_stable
+            test_loss = test_loss + test_loss_0ff
 
         # random stable
         F4pred_test = model.predict_F4(F4_random_stable_test,"eval")
         F4pred_train = model.predict_F4(F4_random_stable_train,"train")
-        loss_random_stable = contribute_loss(F4pred_train, F4_random_stable_train, F4pred_test, F4_random_stable_test, "randomstable", comparison_loss_fn)
+        loss_random_stable, test_loss_rs = contribute_loss(F4pred_train,
+                                             F4_random_stable_train,
+                                             F4pred_test,
+                                             F4_random_stable_test,
+                                             "randomstable",
+                                             comparison_loss_fn)
         if parms["do_augment_random_stable"]:
             loss = loss + loss_random_stable
+            test_loss = test_loss + test_loss_rs
             
         # NSM_stable
         F4pred_test = model.predict_F4(F4_NSM_stable_test,"eval")
         F4pred_train = model.predict_F4(F4_NSM_stable_train,"train")
-        loss_NSM_stable = contribute_loss(F4pred_train, F4_NSM_stable_train, F4pred_test, F4_NSM_stable_test, "NSM_stable", comparison_loss_fn)
+        loss_NSM_stable, test_loss_NSM_stable = contribute_loss(F4pred_train,
+                                                                F4_NSM_stable_train,
+                                                                F4pred_test,
+                                                                F4_NSM_stable_test,
+                                                                "NSM_stable",
+                                                                comparison_loss_fn)
         if parms["do_augment_NSM_stable"]:
             loss = loss + loss_NSM_stable
+            test_loss = test_loss + test_loss_NSM_stable
 
         # unphysical
         F4pred_test = model.predict_F4(F4i_unphysical_test,"test")
         F4pred_train = model.predict_F4(F4i_unphysical_train,"train")
-        loss_unphysical = contribute_loss(F4pred_train, None, F4pred_test, None, "unphysical", unphysical_loss_fn) * 100
+        loss_unphysical, test_loss_unphysical = contribute_loss(F4pred_train,
+                                                                None,
+                                                                F4pred_test,
+                                                                None,
+                                                                "unphysical",
+                                                                unphysical_loss_fn)
         if parms["do_unphysical_check"]:
-            loss = loss + loss_unphysical
+            loss = loss + loss_unphysical * 100
+            test_loss = test_loss + test_loss_unphysical * 100
 
         # track the total loss
-        p.data["loss"].test_loss[t] = loss.item()
+        p.data["loss"].train_loss[t] = loss.item()
+        p.data["loss"].test_loss[t] = test_loss.item()
+        
 
         # have the optimizer take a step
         scheduler.step(loss.item())

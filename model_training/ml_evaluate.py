@@ -355,7 +355,7 @@ for d in dirlist:
     
     F4f_pred = model.predict_F4(F4i_unphysical,"eval")
     if do_restrict_to_physical:
-        F4f_pred = ml_tools.restrict_F4_to_physical(F4f_pred)
+        F4f_pred = restrict_F4_to_physical(F4f_pred)
 
     # enforce that number density cannot be less than zero
     F4f_pred = F4f_pred.cpu().detach().numpy()
