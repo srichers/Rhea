@@ -110,3 +110,13 @@ def get_ndens_logfluxmag_fhat(F4):
     fluxmag = torch.sqrt(torch.sum(flux**2, dim=1))
     Fhat = flux/fluxmag[:,None,:,:]
     return ndens, torch.log(fluxmag), Fhat
+
+def save_model(model, outfilename, device, F4i_test):
+    with torch.no_grad():
+        print(F4i_test.shape)
+        model.eval()
+        model.to(device)
+        X = model.X_from_F4(F4i_test.to(device))
+        traced_model = torch.jit.trace(model, X)
+        torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
+        print("Saving to",outfilename+"_"+device+".ptc")

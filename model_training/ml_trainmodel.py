@@ -5,6 +5,7 @@ from ml_optimizer import *
 from ml_plot import *
 from ml_maxentropy import *
 from ml_tools import *
+import pickle
 
 def train_asymptotic_model(parms,
                            model,
@@ -23,6 +24,7 @@ def train_asymptotic_model(parms,
     # create a new plotter object of larger size if epochs is larger than the plotter object
     p = Plotter(parms["epochs"],["ndens","fluxmag","direction","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
     p.fill_from_plotter(plotter)
+    p.init_plot_options()
 
     #=====================================================#
     # Load training data into data loader for minibatches #
@@ -162,6 +164,9 @@ def train_asymptotic_model(parms,
         if parms["do_unphysical_check"]:
             loss = loss + loss_unphysical
 
+        # track the total loss
+        p.data["loss"].test_loss[t] = loss.item()
+
         # have the optimizer take a step
         scheduler.step(loss.item())
         loss.backward()
@@ -174,7 +179,19 @@ def train_asymptotic_model(parms,
             print("net loss =", loss.item())
             for key in p.data.keys():
                 print("{:<15} {:<18} {:<15}".format(key, np.sqrt(p.data[key].train_loss[t]),  np.sqrt(p.data[key].test_loss[t]) ))
-            
             print("", flush=True)
+
+        if((t+1)%parms["output_every"]==0):
+            outfilename = "model"+str(t+1)           #
+            save_model(model, outfilename, "cpu", F4_NSM_stable_test)
+            if parms["device"]=="cuda":
+                save_model(model, outfilename, "cuda", F4_NSM_stable_test)
+
+            # pickle the model, optimizer, and plotter
+            with open("model_epoch"+str(t+1)+"_datasetsize"+str(dataset_size)+".pkl", "wb") as f:
+                pickle.dump([model, optimizer, p], f)
+
+            p.plot_error("train_test_error.pdf", ymin=1e-5)
+            
 
     return model, optimizer, scheduler, p

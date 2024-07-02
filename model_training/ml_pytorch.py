@@ -11,6 +11,7 @@ from ml_plot import *
 from ml_trainmodel import *
 from ml_maxentropy import *
 from ml_read_data import *
+from ml_tools import *
 import pickle
 import torch.optim
 import torch.autograd.profiler as profiler
@@ -30,10 +31,11 @@ parms["database_list"] = [
 parms["NSM_stable_filename"] = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
 parms["do_unpickle"] = False
 parms["test_size"] = 0.1
-parms["epochs"] = 20000
+parms["epochs"] = 200
 parms["dataset_size_list"] = [-1] # -1 means use all the data
 parms["n_generate"] = 7500
 parms["print_every"] = 10
+parms["output_every"] = 20
 parms["generate_max_fluxfac"] = 0.95
 parms["ME_stability_zero_weight"] = 10
 parms["ME_stability_n_equatorial"] = 64
@@ -50,7 +52,7 @@ parms["do_augment_NSM_stable"]= True
 
 # neural network options
 parms["nhidden"]= 3
-parms["width"]= 128
+parms["width"]= 256
 parms["dropout_probability"]= 0 #0.1 #0.5 #0.1 # 0.5
 parms["do_batchnorm"]= False # False - Seems to make things worse
 parms["do_fdotu"]= True
@@ -188,17 +190,7 @@ print()
 print("########################")
 print("# Saving model to file #")
 print("########################")
-outfilename = "model"
-def save_model(model, outfilename, device):
-    with torch.no_grad():
-        print(F4i_test.shape)
-        model.eval()
-        model.to(device)
-        X = model.X_from_F4(F4i_test.to(device))
-        traced_model = torch.jit.trace(model, X)
-        torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
-        print("Saving to",outfilename+"_"+device+".ptc")
-
-save_model(model, outfilename, "cpu")
+outfilename = "model"           #
+save_model(model, outfilename, "cpu", F4i_test)
 if parms["device"]=="cuda":
-    save_model(model, outfilename, "cuda")
+    save_model(model, outfilename, "cuda", F4i_test)

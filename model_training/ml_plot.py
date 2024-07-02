@@ -40,6 +40,7 @@ class Plotter():
         self.data = {}
         for name in names:
             self.data[name] = PlotQuantities(epochs)
+        self.data["loss"] = PlotQuantities(epochs)
 
     # return the minimum and maximum values of all datasets
     def minmax(self):
