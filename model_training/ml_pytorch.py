@@ -52,7 +52,7 @@ parms["do_augment_NSM_stable"]= True
 
 # neural network options
 parms["nhidden"]= 3
-parms["width"]= 16
+parms["width"]= 32
 parms["dropout_probability"]= 0 #0.1 #0.5 #0.1 # 0.5
 parms["do_batchnorm"]= False # False - Seems to make things worse
 parms["do_fdotu"]= True
@@ -89,14 +89,6 @@ if parms["do_unpickle"]:
 else:
     F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(parms)
 
-# [simulationIndex, xyzt, nu/nubar, flavor]
-if parms["average_heavies_in_final_state"]:
-    assert(parms["do_augment_permutation"]==False)
-    assert(torch.allclose( torch.mean(F4i_train[:,:,:,1:], dim=3), F4i_train[:,:,:,1] ))
-    assert(torch.allclose( torch.mean( F4i_test[:,:,:,1:], dim=3), F4i_test[:,:,:,1] ))
-    F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3, keepdim=True)
-    F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3, keepdim=True)
-    
 F4_NSM_stable = read_NSM_stable_data(parms)
 F4_NSM_stable_train, F4_NSM_stable_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=parms["test_size"], random_state=42)
 

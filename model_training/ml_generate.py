@@ -14,6 +14,10 @@ def generate_stable_F4_zerofluxfac(parms):
     # normalize
     ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
     F4i /= ntot[:,None,None,None]
+
+    # average if necessary
+    if parms["average_heavies_in_final_state"]:
+        F4i[:,:,:,1:] = torch.mean(F4i[:,:,:,1:], dim=3, keepdims=True)
     
     return F4i
 
@@ -42,6 +46,10 @@ def generate_stable_F4_oneflavor(parms):
             F4i[start:end,0:3,i,j] = Frand
             F4i[start:end,  3,i,j] = 1
     
+    # average if necessary
+    if parms["average_heavies_in_final_state"]:
+        F4i[:,:,:,1:] = torch.mean(F4i[:,:,:,1:], dim=3, keepdims=True)
+
     return F4i
 
 def generate_random_F4(parms):
@@ -75,5 +83,9 @@ def generate_random_F4(parms):
     # normalize so the total number density is 1
     ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
     F4i = F4i / ntot[:,None,None,None]
+
+    # average if necessary
+    if parms["average_heavies_in_final_state"]:
+        F4i[:,:,:,1:] = torch.mean(F4i[:,:,:,1:], dim=3, keepdims=True)
 
     return F4i
