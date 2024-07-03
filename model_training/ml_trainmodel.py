@@ -89,8 +89,10 @@ def train_asymptotic_model(parms,
             return train_loss, test_loss
 
 
-        F4pred_test  = model.predict_F4(F4i_test ,"eval")
-        F4pred_train = model.predict_F4(F4i_train,"train")
+        model.eval()
+        F4pred_test  = model.predict_F4(F4i_test)
+        model.train()
+        F4pred_train = model.predict_F4(F4i_train)
         ndens_pred_train, fluxmag_pred_train, Fhat_pred_train = get_ndens_logfluxmag_fhat(F4pred_train)
         ndens_pred_test , fluxmag_pred_test , Fhat_pred_test  = get_ndens_logfluxmag_fhat(F4pred_test )
         ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_logfluxmag_fhat(F4f_train   )
@@ -126,8 +128,10 @@ def train_asymptotic_model(parms,
         test_loss = test_loss + test_loss_direction
 
         # final stable #
-        F4pred_test = model.predict_F4(F4f_test,"eval")
-        F4pred_train = model.predict_F4(F4f_train,"train")
+        model.eval()
+        F4pred_test = model.predict_F4(F4f_test)
+        model.train()
+        F4pred_train = model.predict_F4(F4f_train)
         loss_final_stable, test_loss_fs = contribute_loss(F4pred_train,
                                                           F4f_train,
                                                           F4pred_test,
@@ -139,8 +143,10 @@ def train_asymptotic_model(parms,
             test_loss = test_loss + test_loss_fs
 
         # 1 flavor stable
-        F4pred_test = model.predict_F4(F4_1f_stable_test,"eval")
-        F4pred_train = model.predict_F4(F4_1f_stable_train,"train")
+        model.eval()
+        F4pred_test = model.predict_F4(F4_1f_stable_test)
+        model.train()
+        F4pred_train = model.predict_F4(F4_1f_stable_train)
         loss_1f_stable, test_loss_1f = contribute_loss(F4pred_train,
                                                        F4_1f_stable_train,
                                                        F4pred_test,
@@ -152,8 +158,10 @@ def train_asymptotic_model(parms,
             test_loss = test_loss + test_loss_1f
 
         # 0 flux factor stable
-        F4pred_test = model.predict_F4(F4_0ff_stable_test,"eval")
-        F4pred_train = model.predict_F4(F4_0ff_stable_train,"train")
+        model.eval()
+        F4pred_test = model.predict_F4(F4_0ff_stable_test)
+        model.train()
+        F4pred_train = model.predict_F4(F4_0ff_stable_train)
         loss_0ff_stable, test_loss_0ff = contribute_loss(F4pred_train,
                                                          F4_0ff_stable_train,
                                                          F4pred_test,
@@ -165,8 +173,10 @@ def train_asymptotic_model(parms,
             test_loss = test_loss + test_loss_0ff
 
         # random stable
-        F4pred_test = model.predict_F4(F4_random_stable_test,"eval")
-        F4pred_train = model.predict_F4(F4_random_stable_train,"train")
+        model.eval()
+        F4pred_test = model.predict_F4(F4_random_stable_test)
+        model.train()
+        F4pred_train = model.predict_F4(F4_random_stable_train)
         loss_random_stable, test_loss_rs = contribute_loss(F4pred_train,
                                              F4_random_stable_train,
                                              F4pred_test,
@@ -178,8 +188,10 @@ def train_asymptotic_model(parms,
             test_loss = test_loss + test_loss_rs
             
         # NSM_stable
-        F4pred_test = model.predict_F4(F4_NSM_stable_test,"eval")
-        F4pred_train = model.predict_F4(F4_NSM_stable_train,"train")
+        model.eval()
+        F4pred_test = model.predict_F4(F4_NSM_stable_test)
+        model.train()
+        F4pred_train = model.predict_F4(F4_NSM_stable_train)
         loss_NSM_stable, test_loss_NSM_stable = contribute_loss(F4pred_train,
                                                                 F4_NSM_stable_train,
                                                                 F4pred_test,
@@ -195,8 +207,10 @@ def train_asymptotic_model(parms,
                                                   parms["NF"],
                                                   parms["device"],
                                                   max_fluxfac=parms["generate_max_fluxfac"])
-        F4pred_test = model.predict_F4(F4i_unphysical_test,"test")
-        F4pred_train = model.predict_F4(F4i_unphysical_train,"train")
+        model.eval()
+        F4pred_test = model.predict_F4(F4i_unphysical_test)
+        model.train()
+        F4pred_train = model.predict_F4(F4i_unphysical_train)
         loss_unphysical, test_loss_unphysical = contribute_loss(F4pred_train,
                                                                 None,
                                                                 F4pred_test,

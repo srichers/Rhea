@@ -126,7 +126,7 @@ print(F4f_train[0,3])
 
 print()
 print("N predicted")
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 print(after[0,3])
 
 print()
@@ -152,7 +152,7 @@ print(F4f_test[0,3])
 
 print()
 print("N predicted")
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 print(after[0,3])
 
 print()
@@ -172,7 +172,7 @@ F4_test[3, 1, 0] =  1
 F4_test[2, 0, 0] =  1/3
 F4_test[2, 1, 0] = -1/3
 before = torch.Tensor(F4_test[None,:,:,:]).to(parms["device"])
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 
 print()
 print("N initial")
@@ -180,12 +180,12 @@ print(before[0,3])
 
 print()
 print("N predicted")
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 print(after[0,3])
 
 print()
 print("N re-predicted")
-after = model.predict_F4(after,"eval")
+after = model.predict_F4(after)
 print(after[0,3])
 
 print()
@@ -223,7 +223,7 @@ F4_test[0, :, 1:] = -0.0216 * F4_test[3, 0, 1]
 F4_test[1, :, 1:] = 0.0743 * F4_test[3, 0, 1]
 F4_test[2, :, 1:] = -0.5354 * F4_test[3, 0, 1]
 before = torch.Tensor(F4_test[None,:,:,:]).to(parms["device"])
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 
 print()
 print("N initial")
@@ -231,12 +231,12 @@ print(before[0,3])
 
 print()
 print("N predicted")
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 print(after[0,3])
 
 print()
 print("N re-predicted")
-after = model.predict_F4(after,"eval")
+after = model.predict_F4(after)
 print(after[0,3])
 
 print()
@@ -266,19 +266,19 @@ F4_test[3, 1, 0] =  .5
 F4_test[2, 0, 0] =  0
 F4_test[2, 1, 0] =  0
 before = torch.Tensor(F4_test[None,:,:,:]).to(parms["device"])
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 
 print()
 print("N initial")
 print(before[0,3])
 
 print("N predicted")
-after = model.predict_F4(before,"eval")
+after = model.predict_F4(before)
 print(after[0,3])
 
 
 print("N re-predicted")
-after = model.predict_F4(after,"eval")
+after = model.predict_F4(after)
 print(after[0,3])
 
 print()
@@ -353,7 +353,7 @@ for d in dirlist:
     error_histogram(model, F4f_test,      F4f_test,      100, 0, 0.1, do_restrict_to_physical,d+"/histogram_finalstable_test")
     #error_histogram(model, F4i_NSMunstable, F4f_NSMunstable, 100, 0, 0.1, do_restrict_to_physical, d+"/histogram_NSM_unstable")
     
-    F4f_pred = model.predict_F4(F4i_unphysical,"eval")
+    F4f_pred = model.predict_F4(F4i_unphysical)
     if do_restrict_to_physical:
         F4f_pred = restrict_F4_to_physical(F4f_pred)
 

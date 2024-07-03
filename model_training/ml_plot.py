@@ -130,7 +130,7 @@ def plot_nue_nuebar(model, npoints, nreps):
         F4_test[2, 1, 0] = -1/3 * ratio_list[i]
         F4_pred = torch.tensor(F4_test[None,:,:,:]).float().to(next(model.parameters()).device)
         for j in range(nreps):
-            F4_pred = model.predict_F4(F4_pred,"eval")
+            F4_pred = model.predict_F4(F4_pred)
             nee_list_fid[i,j]    = F4_pred[0,3,0,0].to('cpu')
             neebar_list_fid[i,j] = F4_pred[0,3,1,0].to('cpu')
             
@@ -166,7 +166,7 @@ def plot_histogram(error, bins, xmin, xmax, filename):
 def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, do_restrict_to_physical, filename):
 
     # get the predicted final F4
-    F4_pred = model.predict_F4(F4_initial,"eval")
+    F4_pred = model.predict_F4(F4_initial)
 
     # apply any relevant corrections to the distribution
     if do_restrict_to_physical:

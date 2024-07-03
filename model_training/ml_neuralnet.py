@@ -64,21 +64,9 @@ class NeuralNetwork(nn.Module):
             if module.bias is not None:
                 module.bias.data.zero_()
     
-    # Push the inputs through the neural network
-    def forward(self,x, mode):
-        # use the appropriate network structure depending on training vs testing
-        if mode=="eval":
-            self.eval()
-        elif mode=="train":
-            self.train()
-        else:
-            assert(False)
-
-        y = self.linear_activation_stack(x)
-        return y
-
     # Create an array of the dot product of each species with itself and each other species
     # Input dimensions expeced to be [sim, xyzt, nu/nubar, flavor]
+    @torch.jit.export
     def X_from_F4(self, F4):
         index = 0
         nsims = F4.shape[0]
@@ -122,6 +110,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
     # convert the 3-flavor matrix into an effective 2-flavor matrix
     # input and output are indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
     # This assumes that the x flavors will represent the SUM of mu and tau flavors.
+    @torch.jit.export
     def convert_y_to_2flavor(self, y):
         y2F = torch.zeros((y.shape[0],2,2,2,2), device=y.device)
 
@@ -149,6 +138,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
     # y must have shape [sim,2,NF,2,NF]
     # F4_final has shape [sim, xyzt, nu/nubar, flavor]
     # Treat all but the last flavor as output, since it is determined by conservation
+    @torch.jit.export
     def F4_from_y(self, F4_initial, y):
         # tensor product with y
         # n indicates the simulation index
@@ -159,7 +149,8 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
 
         return F4_final
 
-    def predict_F4(self, F4_initial, mode):
+    @torch.jit.export
+    def predict_F4(self, F4_initial):
         X = self.X_from_F4(F4_initial)
         y = self.forward(X)
         F4_final = self.F4_from_y(F4_initial, y)
