@@ -31,14 +31,14 @@ parms["database_list"] = [
 parms["NSM_stable_filename"] = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
 parms["do_unpickle"] = False
 parms["test_size"] = 0.1
-parms["epochs"] = 200
+parms["epochs"] = 20000
 parms["dataset_size_list"] = [-1] # -1 means use all the data
 parms["n_generate"] = 7500
 parms["print_every"] = 10
-parms["output_every"] = 20
+parms["output_every"] = 1000
 parms["generate_max_fluxfac"] = 0.95
 parms["ME_stability_zero_weight"] = 10
-parms["ME_stability_n_equatorial"] = 64
+parms["ME_stability_n_equatorial"] = 16
 parms["average_heavies_in_final_state"] = True
 
 # data augmentation options
@@ -52,7 +52,7 @@ parms["do_augment_NSM_stable"]= True
 
 # neural network options
 parms["nhidden"]= 3
-parms["width"]= 256
+parms["width"]= 16
 parms["dropout_probability"]= 0 #0.1 #0.5 #0.1 # 0.5
 parms["do_batchnorm"]= False # False - Seems to make things worse
 parms["do_fdotu"]= True
@@ -94,8 +94,8 @@ if parms["average_heavies_in_final_state"]:
     assert(parms["do_augment_permutation"]==False)
     assert(torch.allclose( torch.mean(F4i_train[:,:,:,1:], dim=3), F4i_train[:,:,:,1] ))
     assert(torch.allclose( torch.mean( F4i_test[:,:,:,1:], dim=3), F4i_test[:,:,:,1] ))
-    F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3)[:,:,:,None]
-    F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3)[:,:,:,None]
+    F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3, keepdim=True)
+    F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3, keepdim=True)
     
 F4_NSM_stable = read_NSM_stable_data(parms)
 F4_NSM_stable_train, F4_NSM_stable_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=parms["test_size"], random_state=42)
@@ -184,13 +184,3 @@ for i in range(len(parms["dataset_size_list"])):
 p = plotter_array[-1]
 model = model_array[-1]
 optimizer = optimizer_array[-1]
- 
-# save the model to file
-print()
-print("########################")
-print("# Saving model to file #")
-print("########################")
-outfilename = "model"           #
-save_model(model, outfilename, "cpu", F4i_test)
-if parms["device"]=="cuda":
-    save_model(model, outfilename, "cuda", F4i_test)
