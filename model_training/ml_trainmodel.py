@@ -40,24 +40,15 @@ def train_asymptotic_model(parms,
     # training loop #
     #===============#
     # generate randomized data and evaluate the test error
-    F4i_unphysical_test = generate_random_F4(parms["n_generate"],
-                                             parms["NF"],
-                                             parms["device"],
-                                             max_fluxfac=parms["generate_max_fluxfac"]) # 
-    F4_0ff_stable_train = generate_stable_F4_zerofluxfac(parms["n_generate"], parms["NF"], parms["device"])
-    F4_0ff_stable_test  = generate_stable_F4_zerofluxfac(parms["n_generate"], parms["NF"], parms["device"])
-    F4_1f_stable_train  = generate_stable_F4_oneflavor(  parms["n_generate"], parms["NF"], parms["device"])
-    F4_1f_stable_test   = generate_stable_F4_oneflavor(  parms["n_generate"], parms["NF"], parms["device"])
+    F4i_unphysical_test = generate_random_F4(parms)
+    F4_0ff_stable_train = generate_stable_F4_zerofluxfac(parms)
+    F4_0ff_stable_test  = generate_stable_F4_zerofluxfac(parms)
+    F4_1f_stable_train  = generate_stable_F4_oneflavor(parms)
+    F4_1f_stable_test   = generate_stable_F4_oneflavor(parms)
 
     # set up datasets of stable distributions based on the max entropy stability condition
-    F4i_random = generate_random_F4(parms["n_generate"],
-                                    parms["NF"],
-                                    'cpu',
-                                    zero_weight=parms["ME_stability_zero_weight"],
-                                    max_fluxfac=parms["generate_max_fluxfac"])
-    unstable_random = has_crossing(F4i_random.detach().numpy(),
-                                   parms["NF"],
-                                   parms["ME_stability_n_equatorial"]).squeeze()
+    F4i_random = generate_random_F4(parms)
+    unstable_random = has_crossing(F4i_random.cpu().detach().numpy(), parms).squeeze()
     print("random Stable:",np.sum(unstable_random==False))
     print("random Unstable:",np.sum(unstable_random==True))
     F4_random_stable = F4i_random[unstable_random==False]
@@ -203,10 +194,7 @@ def train_asymptotic_model(parms,
             test_loss = test_loss + test_loss_NSM_stable
 
         # unphysical. Heavy over-training if not regenerated every iteration
-        F4i_unphysical_train = generate_random_F4(parms["n_generate"]*10,
-                                                  parms["NF"],
-                                                  parms["device"],
-                                                  max_fluxfac=parms["generate_max_fluxfac"])
+        F4i_unphysical_train = generate_random_F4(parms)
         model.eval()
         F4pred_test = model.predict_F4(F4i_unphysical_test)
         model.train()
