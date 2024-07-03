@@ -180,18 +180,18 @@ def error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, do_restrict_t
     F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()
     ndens_error = (ndens_true - ndens_pred).to('cpu').detach().numpy()
     fluxmag_error = (fluxmag_true - fluxmag_pred).to('cpu').detach().numpy()
-    fdotf = torch.sum(Fhat_pred * Fhat_true, axis=1)
+    fdotf = torch.sum(Fhat_pred * Fhat_true, dim=1)
     direction_error = (torch.ones_like(fdotf) - fdotf).to('cpu').detach().numpy()
 
     # calculate the total number density in each simulation
     N = F4_final[:,3,:,:].to('cpu').detach().numpy()
-    N = np.sum(N, axis=(1,2))
+    N = np.sum(N, dim=(1,2))
 
     # calculate the magnitude of the error
-    F4_error_mag = np.max(np.abs(F4_error), axis=(1,2,3))/N
-    ndens_error_mag = np.max(np.abs(ndens_error), axis=(1,2))/N
-    fluxmag_error_mag = np.max(np.abs(fluxmag_error), axis=(1,2))/N
-    direction_error_mag = np.max(np.abs(direction_error), axis=(1,2))/N
+    F4_error_mag = np.max(np.abs(F4_error), dim=(1,2,3))/N
+    ndens_error_mag = np.max(np.abs(ndens_error), dim=(1,2))/N
+    fluxmag_error_mag = np.max(np.abs(fluxmag_error), dim=(1,2))/N
+    direction_error_mag = np.max(np.abs(direction_error), dim=(1,2))/N
 
     # plot the error
     plot_histogram(       F4_error_mag, bins, xmin, xmax, filename)

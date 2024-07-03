@@ -12,7 +12,7 @@ def generate_stable_F4_zerofluxfac(n_trivial_stable, NF, device):
     F4i[:,3,:,:] = torch.rand(n_trivial_stable, 2, NF, device=device)
 
     # normalize
-    ntot = torch.sum(F4i[:,3,:,:], axis=(1,2))
+    ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
     F4i /= ntot[:,None,None,None]
     
     return F4i
@@ -73,7 +73,7 @@ def generate_random_F4(n_generate, NF, device, zero_weight=1, max_fluxfac=1):
     F4i *= Ndens[:,None,:,:]
 
     # normalize so the total number density is 1
-    ntot = torch.sum(F4i[:,3,:,:], axis=(1,2))
+    ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
     F4i = F4i / ntot[:,None,None,None]
 
     return F4i

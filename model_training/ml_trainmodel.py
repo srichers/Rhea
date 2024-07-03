@@ -40,10 +40,6 @@ def train_asymptotic_model(parms,
     # training loop #
     #===============#
     # generate randomized data and evaluate the test error
-    F4i_unphysical_train = generate_random_F4(parms["n_generate"]*10,
-                                              parms["NF"],
-                                              parms["device"],
-                                              max_fluxfac=parms["generate_max_fluxfac"])
     F4i_unphysical_test = generate_random_F4(parms["n_generate"],
                                              parms["NF"],
                                              parms["device"],
@@ -194,7 +190,11 @@ def train_asymptotic_model(parms,
             loss = loss + loss_NSM_stable
             test_loss = test_loss + test_loss_NSM_stable
 
-        # unphysical
+        # unphysical. Heavy over-training if not regenerated every iteration
+        F4i_unphysical_train = generate_random_F4(parms["n_generate"]*10,
+                                                  parms["NF"],
+                                                  parms["device"],
+                                                  max_fluxfac=parms["generate_max_fluxfac"])
         F4pred_test = model.predict_F4(F4i_unphysical_test,"test")
         F4pred_train = model.predict_F4(F4i_unphysical_train,"train")
         loss_unphysical, test_loss_unphysical = contribute_loss(F4pred_train,

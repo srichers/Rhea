@@ -87,7 +87,7 @@ class NeuralNetwork(nn.Module):
 
         # calculate the total number density based on the t component of the four-vector
         # [sim]
-        N = torch.sum(F4_flat[:,3,:], axis=1)
+        N = torch.sum(F4_flat[:,3,:], dim=1)
 
         # normalize F4 by the total number density
         # [sim, xyzt, 2*NF]
@@ -126,9 +126,9 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         y2F = torch.zeros((y.shape[0],2,2,2,2), device=y.device)
 
         y2F[:,:,0,:,0] =                 y[:, :, 0 , :, 0 ]
-        y2F[:,:,0,:,1] = 0.5 * torch.sum(y[:, :, 0 , :, 1:], axis=(  3))
-        y2F[:,:,1,:,1] = 0.5 * torch.sum(y[:, :, 1:, :, 1:], axis=(2,4))
-        y2F[:,:,1,:,0] =       torch.sum(y[:, :, 1:, :, 0 ], axis=(2  ))
+        y2F[:,:,0,:,1] = 0.5 * torch.sum(y[:, :, 0 , :, 1:], dim=(  3))
+        y2F[:,:,1,:,1] = 0.5 * torch.sum(y[:, :, 1:, :, 1:], dim=(2,4))
+        y2F[:,:,1,:,0] =       torch.sum(y[:, :, 1:, :, 0 ], dim=(2  ))
 
         return y2F
 
@@ -139,7 +139,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
 
         # enforce conservation of particle number
         deltaij = torch.eye(2, device=x.device)[None,:,None,:,None]
-        yflavorsum = torch.sum(y,axis=2)[:,:,None,:,:]
+        yflavorsum = torch.sum(y,dim=2)[:,:,None,:,:]
         y = y + (deltaij - yflavorsum) / self.NF
 
         return y

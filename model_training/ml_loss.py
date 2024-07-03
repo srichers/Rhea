@@ -12,7 +12,7 @@ def unphysical_loss_fn(F4f_pred, F4f_true):
     negative_density_loss = torch.mean(negative_density_error**2)
 
     # enforce that flux factors cannot be larger than 1
-    flux_mag2 = torch.sum(F4f_pred[:,0:3,:,:]**2, axis=1) # [sim, nu/nubar, flavor]
+    flux_mag2 = torch.sum(F4f_pred[:,0:3,:,:]**2, dim=1) # [sim, nu/nubar, flavor]
     ndens2 = F4f_pred[:,3,:,:]**2 # [sim, nu/nubar, flavor]
     fluxfac_error = torch.max(flux_mag2 - ndens2, torch.zeros_like(ndens2)) # [sim, nu/nubar, flavor]
     fluxfac_loss = torch.mean(fluxfac_error)
@@ -21,7 +21,7 @@ def unphysical_loss_fn(F4f_pred, F4f_true):
     return negative_density_loss + fluxfac_loss
 
 def direction_loss_fn(Fhat_pred, Fhat_true):
-    fdotf = torch.sum(Fhat_pred * Fhat_true, axis=1)
+    fdotf = torch.sum(Fhat_pred * Fhat_true, dim=1)
     return torch.mean(torch.ones_like(fdotf) - fdotf)
     
 

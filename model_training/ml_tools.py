@@ -8,16 +8,16 @@ from ml_loss import *
 # input dimensions: [sim, xyzt, ...]
 # output dimensions: [sim, ...]
 def dot4(v1,v2):
-    return -v1[:,3]*v2[:,3] + torch.sum(v1[:,:3]*v2[:,:3], axis=1)
+    return -v1[:,3]*v2[:,3] + torch.sum(v1[:,:3]*v2[:,:3], dim=1)
 
 # input dimensions: [sim, xyzt, nu/nubar, flavor]
 # output dimensions: [sim]
 def ntotal(F4):
-    ntotal = torch.sum(F4[:,3], axis=(1,2)) # [sim]
+    ntotal = torch.sum(F4[:,3], dim=(1,2)) # [sim]
     return ntotal
 
 def flux_factor(F4):
-    return torch.sqrt(torch.sum(F4[:,:3]**2, axis=1)) / F4[:,3]
+    return torch.sqrt(torch.sum(F4[:,:3]**2, dim=1)) / F4[:,3]
 
 def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     ntot = ntotal(F4_initial_list)
@@ -34,8 +34,8 @@ def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     #assert(N_Nbar_error < tolerance)
 
     # check for number conservation
-    F4_flavorsum_initial = torch.sum(F4_initial_list, axis=(3)) # [sim, xyzt, nu/nubar]
-    F4_flavorsum_final   = torch.sum(F4_final_list,   axis=(3))
+    F4_flavorsum_initial = torch.sum(F4_initial_list, dim=(3)) # [sim, xyzt, nu/nubar]
+    F4_flavorsum_final   = torch.sum(F4_final_list,   dim=(3))
     F4_flavorsum_error = torch.max(torch.abs(F4_flavorsum_initial - F4_flavorsum_final)/ntot[:,None,None])
     print("F4_flavorsum_difference = ", F4_flavorsum_error.item())
     assert(F4_flavorsum_error < tolerance)
@@ -77,7 +77,7 @@ def augment_permutation(F4_list):
 
 def restrict_F4_to_physical(F4_final):
     NF = F4_final.shape[-1]
-    avgF4 = torch.sum(F4_final, axis=3)[:,:,:,None] / NF
+    avgF4 = torch.sum(F4_final, dim=3)[:,:,:,None] / NF
 
     # enforce that all four-vectors are time-like
     # choose the branch that leads to the most positive alpha
@@ -116,7 +116,9 @@ def save_model(model, outfilename, device, F4i_test):
         print(F4i_test.shape)
         model.eval()
         model.to(device)
-        X = model.X_from_F4(F4i_test.to(device))
-        traced_model = torch.jit.trace(model, X)
-        torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
-        print("Saving to",outfilename+"_"+device+".ptc")
+        #X = model.X_from_F4(F4i_test.to(device))
+        #traced_model = torch.jit.trace(model, X)
+        #torch.jit.save(traced_model, outfilename+"_"+device+".ptc")
+        scripted_model = torch.jit.script(model)
+        torch.jit.save(scripted_model, outfilename+"_"+device+".pt")
+        print("Saving to",outfilename+"_"+device+".pt")
