@@ -17,6 +17,7 @@ class NeuralNetwork(nn.Module):
         if self.do_fdotu:
             self.NX += 2*self.NF
         self.Ny = Ny
+        self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
 
         # append a full layer including linear, activation, and batchnorm
         def append_full_layer(modules, in_dim, out_dim):
@@ -130,6 +131,10 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         deltaij = torch.eye(2, device=x.device)[None,:,None,:,None]
         yflavorsum = torch.sum(y,dim=2)[:,:,None,:,:]
         y = y + (deltaij - yflavorsum) / self.NF
+
+        # enforce symmetry in the heavies
+        if self.average_heavies_in_final_state:
+            y[:,:,1:,:,:] = y[:,:,1:,:,:].mean(dim=2, keepdim=True)
 
         return y
   
