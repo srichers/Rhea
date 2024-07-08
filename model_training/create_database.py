@@ -73,7 +73,7 @@ def growth_properties(data):
     flag = True                                                                # Flag to prevent any errors if the following method fails
     indexes = np.concatenate([[0],argrelextrema(N_offdiag_mag,np.greater)[0]]) # Take all the indexes at which there is a local maxima, as well as the first point in the data
     for i in range(len(indexes)-1):                                            # Loops over all the indexes to check if there are two adjacent points that have a difference of three orders of magnitude
-        if abs(round((np.log10(amp[indexes[i]]/amp[indexes[i+1]])))) >= 3:
+        if abs(round((np.log10(N_offdiag_mag[indexes[i]]/N_offdiag_mag[indexes[i+1]])))) >= 3:
             imax = indexes[i+1]
             flag = False
     if flag == True:                                                           # If the previous method does not work, the following is used
