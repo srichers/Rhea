@@ -19,7 +19,8 @@ from torcheval.metrics import BinaryF1Score, BinaryNormalizedEntropy, BinaryConf
 
 parms = {}
 parms["NSM_stable_filename"] = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
-parms["NSM_unstable_filename"] = "/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
+parms["NSM_unstable_filename"] = "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib/many_sims_database.h5"
+model_prefix = "model_epoch100000_datasetsize"
 
 def get_dataset_size_list(search_string):
     filename_list = glob.glob(search_string)
@@ -30,11 +31,11 @@ def get_dataset_size_list(search_string):
     return sorted(dataset_size_list)
 dataset_size_list = get_dataset_size_list("model_[0-9]*.pkl")
 
-parms["n_generate"] = 1000
-parms["test_size"] = 0.1
+parms["n_generate"] = 10000
 parms["generate_max_fluxfac"] = 0.95
-parms["zero_weight"] = 10
-parms["n_equatorial"] = 64
+parms["ME_stability_zero_weight"] = 10
+parms["ME_stability_n_equatorial"] = 64
+parms["test_size"] = 0.1
 parms["average_heavies_in_final_state"] = True
 
 # data augmentation options
@@ -99,7 +100,7 @@ def get_plotter_model_arrays(search_string, dataset_size_list):
     print(model_array[-1])
     return plotter_array, model_array
 
-plotter_array, model_array_asymptotic = get_plotter_model_arrays("model_",dataset_size_list)
+plotter_array, model_array_asymptotic = get_plotter_model_arrays(model_prefix,dataset_size_list)
 
 # use the largest dataset size for the rest of these metrics
 p_asymptotic = plotter_array[-1]
@@ -319,13 +320,12 @@ plot_dataset_size(plotter_array, dataset_size_list, "ndens","dataset_size_ndens"
 plot_dataset_size(plotter_array, dataset_size_list, "fluxmag","dataset_size_fluxfac")
 plot_dataset_size(plotter_array, dataset_size_list, "direction","dataset_size_direction")
 
-n_generate = 10000
-F4i_0ff = generate_stable_F4_zerofluxfac(n_generate, parms["NF"], parms["device"])
-F4i_1f = generate_stable_F4_oneflavor(n_generate, parms["NF"], parms["device"])
-F4i_unphysical = generate_random_F4(n_generate, parms["NF"], parms["device"], zero_weight=10, max_fluxfac=0.95)
+F4i_0ff = generate_stable_F4_zerofluxfac(parms)
+F4i_1f = generate_stable_F4_oneflavor(parms)
+F4i_unphysical = generate_random_F4(parms)
 
 # set up datasets of stable distributions based on the max entropy stability condition
-unstable_random = has_crossing(F4i_unphysical.detach().cpu().numpy(), parms["NF"], parms["n_equatorial"]).squeeze()
+unstable_random = has_crossing(F4i_unphysical.detach().cpu().numpy(), parms).squeeze()
 F4_random_stable = F4i_unphysical[unstable_random==False]
 F4_random_stable = augment_permutation(F4_random_stable)
 F4_random_stable = F4_random_stable.float().to(parms["device"])
