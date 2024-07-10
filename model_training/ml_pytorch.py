@@ -25,11 +25,12 @@ parms["database_list"] = [
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_twobeam/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_z/many_sims_database.h5",
     #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam_z/many_sims_database.h5",
-    "/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_32beam_effective2flavor/many_sims_database.h5",
+    #"/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_32beam_effective2flavor/many_sims_database.h5",
     "/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
 ]
 parms["NSM_stable_filename"] = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
 parms["do_unpickle"] = False
+parms["unpickle_filename"] = "model_epoch9000_datasetsize9550.pkl"
 parms["test_size"] = 0.1
 parms["epochs"] = 20000
 parms["dataset_size_list"] = [-1] # -1 means use all the data
@@ -120,7 +121,7 @@ scheduler_array = []
 
 for dataset_size in parms["dataset_size_list"]:
     if parms["do_unpickle"]:
-        with open("model_"+str(dataset_size)+".pkl", "rb") as f:
+        with open(parms["unpickle_filename"], "rb") as f:
             model, optimizer, plotter = pickle.load(f)
 
     else:
