@@ -77,41 +77,46 @@ def read_NSM_stable_data(parms):
     print("#############################")
     print("# READING NSM STABLE POINTS #")
     print("#############################")
+    F4_NSM_stable_collected = np.zeros((0, 4, 2, parms["NF"]))
     # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
     # take only the y-z slice to limit the size of the data.
     xslice = 100
-    f_in = h5py.File(parms["NSM_stable_filename"],"r")
-    discriminant = np.array(f_in["crossing_discriminant"])[xslice,:,:]
-    # n has shape [Nx,Ny,Nz]]
-    ne = np.array(f_in["n_e(1|ccm)"])[xslice,:,:]
-    na = np.array(f_in["n_a(1|ccm)"])[xslice,:,:]
-    nx = np.array(f_in["n_x(1|ccm)"])[xslice,:,:]
-    # f has shape [3, Nx,Ny,Nz]
-    fe = np.array(f_in["fn_e(1|ccm)"])[:,xslice,:,:]
-    fa = np.array(f_in["fn_a(1|ccm)"])[:,xslice,:,:]
-    fx = np.array(f_in["fn_x(1|ccm)"])[:,xslice,:,:]
-    f_in.close()
-    stable_locs = np.where(discriminant<=0)
-    nlocs = len(stable_locs[0])
-    print(nlocs,"points")
-    F4_NSM_stable = np.zeros((nlocs,4,2,parms["NF"]))
-    F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
-    F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
-    F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
-    for i in range(3):
-        F4_NSM_stable[:,i,0,0  ] = fe[i][stable_locs]
-        F4_NSM_stable[:,i,1,0  ] = fa[i][stable_locs]
-        F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
+    for filename in parms["NSM_stable_filename"]:
+        f_in = h5py.File(filename,"r")
+        discriminant = np.array(f_in["crossing_discriminant"])[xslice,:,:]
+        # n has shape [Nx,Ny,Nz]]
+        ne = np.array(f_in["n_e(1|ccm)"])[xslice,:,:]
+        na = np.array(f_in["n_a(1|ccm)"])[xslice,:,:]
+        nx = np.array(f_in["n_x(1|ccm)"])[xslice,:,:]
+        # f has shape [3, Nx,Ny,Nz]
+        fe = np.array(f_in["fn_e(1|ccm)"])[:,xslice,:,:]
+        fa = np.array(f_in["fn_a(1|ccm)"])[:,xslice,:,:]
+        fx = np.array(f_in["fn_x(1|ccm)"])[:,xslice,:,:]
+        f_in.close()
+        
+        stable_locs = np.where(discriminant<=0)
+        nlocs = len(stable_locs[0])
+        print(nlocs,"points")
+        F4_NSM_stable = np.zeros((nlocs,4,2,parms["NF"]))
+        F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
+        F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
+        F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
+        for i in range(3):
+            F4_NSM_stable[:,i,0,0  ] = fe[i][stable_locs]
+            F4_NSM_stable[:,i,1,0  ] = fa[i][stable_locs]
+            F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
+        F4_NSM_stable_collected = np.concatenate((F4_NSM_stable_collected, F4_NSM_stable), axis=0)
+        
     # convert into a tensor
     F4_NSM_stable = torch.tensor(F4_NSM_stable).float()
     # normalize the data so the number densities add up to 1
     ntot = ml.ntotal(F4_NSM_stable)
     F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
-
+    
     # don't need the final values because they are the same as the initial
     if parms["do_augment_permutation"]:
         F4_NSM_stable = ml.augment_permutation(F4_NSM_stable)
-
+            
     # move the array to the device
     F4_NSM_stable = torch.Tensor(F4_NSM_stable).to(parms["device"])
 

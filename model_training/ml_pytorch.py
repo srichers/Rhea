@@ -20,26 +20,22 @@ import torch.autograd.profiler as profiler
 parms = {}
 
 parms["database_list"] = [
-    #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam/many_sims_database.h5",
-    #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one/many_sims_database.h5",
-    #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_twobeam/many_sims_database.h5",
-    #"/mnt/scratch/NSM_ML/ML_models/input_data/fluxfac_one_z/many_sims_database.h5",
-    #"/mnt/scratch/NSM_ML/ML_models/input_data/manyflavor_twobeam_z/many_sims_database.h5",
-    #"/mnt/scratch/NSM_ML/ML_models/input_data/maximum_entropy_32beam_effective2flavor/many_sims_database.h5",
-    "/mnt/scratch/NSM_ML/Emu_merger_grid2/many_sims_database.h5"
+    "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib/many_sims_database.h5",
+    "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms/many_sims_database.h5"
 ]
-parms["NSM_stable_filename"] = "/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5"
+parms["NSM_stable_filename"] = ["/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5",
+                                "/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl1_orthonormal.h5"]
 parms["do_unpickle"] = False
-parms["unpickle_filename"] = "model_epoch9000_datasetsize9550.pkl"
+parms["unpickle_filename"] = "model_epoch100000_datasetsize8279.pkl"
 parms["test_size"] = 0.1
-parms["epochs"] = 20000
+parms["epochs"] = 150000
 parms["dataset_size_list"] = [-1] # -1 means use all the data
 parms["n_generate"] = 7500
 parms["print_every"] = 10
-parms["output_every"] = 1000
+parms["output_every"] = 5000
 parms["generate_max_fluxfac"] = 0.95
 parms["ME_stability_zero_weight"] = 10
-parms["ME_stability_n_equatorial"] = 16
+parms["ME_stability_n_equatorial"] = 32
 parms["average_heavies_in_final_state"] = True
 
 # data augmentation options
@@ -63,11 +59,11 @@ parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 parms["op"]= torch.optim.AdamW # Adam, SGD, RMSprop
 parms["amsgrad"]= False
 parms["weight_decay"]= 1e-2 #1e-5
-parms["learning_rate"]= 1e-3 # 1e-3
+parms["learning_rate"]= 2e-4 # 1e-3
 parms["fused"]= True
 parms["lr_scheduler"]= torch.optim.lr_scheduler.ReduceLROnPlateau
-parms["patience"]= 100
-parms["cooldown"]= 100
+parms["patience"]= 500
+parms["cooldown"]= 500
 parms["factor"]= 0.5
 parms["min_lr"]= 0 #1e-8
 
