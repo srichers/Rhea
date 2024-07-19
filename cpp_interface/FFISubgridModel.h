@@ -36,91 +36,6 @@ class FFISubgridModel{
     return result;
   }
 
-  //==========================================//
-  // Create X tensor from four-vector objects //
-  //==========================================//
-  // F4 dimensions: [# grid cells, 4, 2, NF]
-  // X dimensions: [# grid cells, NX]
-  // assume Minkowski metric
-  // Assuming NF==3, the X tensor is
-  // 0: Fe.Fe
-  // 1: Fe.Fmu
-  // 2: Fe.Ftau
-  // 3: Fe.Febar
-  // 4: Fe.Fmubar
-  // 5: Fe.Ftaubar
-  // 6: Fmu.Fmu
-  // 7: Fmu.Ftau
-  // 8: Fmu.Febar
-  // 9: Fmu.Fmubar
-  // 10: Fmu.Ftaubar
-  // 11: Ftau.Ftau
-  // 12: Ftau.Febar
-  // 13: Ftau.Fmubar
-  // 14: Ftau.Ftaubar
-  // 15: Febar.Febar
-  // 16: Febar.Fmubar
-  // 17: Febar.Ftaubar
-  // 18: Fmubar.Fmubar
-  // 19: Fmubar.Ftaubar
-  // 20: Ftaubar.Ftaubar
-  // IF do_fdotu:
-  // 21: Fe.u
-  // 22: Fmu.u
-  // 23: Ftau.u
-  // 24: Febar.u
-  // 25: Fmubar.u
-  // 26: Ftaubar.u
-  torch::Tensor X_from_F4_Minkowski(const torch::Tensor F4){
-    
-    auto options =
-      torch::TensorOptions()
-      .device(F4.device())
-      .requires_grad(false)
-      .dtype(torch::kFloat32);
-
-    int nsims = F4.size(0);
-
-    // calculate the total number density based on the t component of the four-vector
-    // [sim]
-    torch::Tensor ndens_total = torch::sum(F4.index({Slice(), 3, Slice(), Slice()}), {1,2});
-
-    // normalize F4 by the total number density
-    // [sim, xyzt, 2*NF]
-    torch::Tensor F4_normalized = F4.reshape({nsims,4,2*NF}) / ndens_total.reshape({nsims,1,1});
-
-    // create the X tensor
-    torch::Tensor X = torch::zeros({nsims, NX}, options);
-    int index = 0;
-
-    // put the dot product of each species with each other species into the X tensor
-    for(int a=0; a<2*NF; a++){
-      torch::Tensor F1 = F4_normalized.index({Slice(), Slice(), a});
-      for(int b=a; b<2*NF; b++){
-        torch::Tensor F2 = F4_normalized.index({Slice(), Slice(), b});
-        X.index_put_({Slice(), index}, dot4_Minkowski(F1,F2));
-        index++;
-      }
-    }
-
-    if(do_fdotu){
-      // the fluid velocity just has a 1 in the t component
-      torch::Tensor u = torch::zeros({nsims,4}, options);
-      u.index_put_({Slice(), 3}, 1.0);
-
-      // put the dot product of each species with the fluid velocity into the X tensor
-      for(int a=0; a<2*NF; a++){
-        torch::Tensor F1 = F4_normalized.index({Slice(), Slice(), a});
-        X.index_put_({Slice(), index}, dot4_Minkowski(F1,u));
-        index++;
-      }
-    }
-
-    assert(index == NX);
-    return X;
-  }
-
-
   //===================================//
   // Load the serialized pytorch model //
   //===================================//
@@ -131,47 +46,6 @@ class FFISubgridModel{
 
     // set the model to evaluation mode
     model.eval();
-  }
-
-  // function that takes in a list of X (built from dot products) and outputs the prediction for the transformation matrix
-  // inputs are arrays if four-vector sets.
-  // the dimensions of X are [# grid cells, NX]
-  // the dimensions of y are [# grid cells, 2,NF,2,NF]
-  torch::Tensor predict_y(const torch::Tensor& X){
-    auto result = model.forward({X}).toTensor().to(X.device());
-    return result;    
-  }
-
-  // convert a 3-flavor y tensor to a 2-flavor y tensor
-  // y3 has shape [sim,2,NF,2,NF]
-  // y2 has shape [sim,2,2,2]
-  torch::Tensor convert_y_to_2F(const torch::Tensor& y){
-    int nsims = y.size(0);
-    torch::Tensor y2 = torch::zeros({nsims,2,2,2,2});
-    y2.index_put_({Slice(), Slice(), 0, Slice(), 0},                 (y.index({Slice(), Slice(), 0            , Slice(), 0            })       ));
-    y2.index_put_({Slice(), Slice(), 0, Slice(), 1}, 0.5 * torch::sum(y.index({Slice(), Slice(), 0            , Slice(), Slice(1,None)}), {  3}));
-    y2.index_put_({Slice(), Slice(), 1, Slice(), 1}, 0.5 * torch::sum(y.index({Slice(), Slice(), Slice(1,None), Slice(), Slice(1,None)}), {2,4}));
-    y2.index_put_({Slice(), Slice(), 1, Slice(), 0},       torch::sum(y.index({Slice(), Slice(), Slice(1,None), Slice(), 0            }), {2  }));
-    return y2;
-  }
-
-  // function to convert an input F4 and y into an output F4
-  // mirrors the python function F4_from_y
-  // F4_initial must have shape [sim, xyzt, nu/nubar, flavor]
-  // y must have shape [sim,2,NF,2,NF]
-  // F4_final has shape [sim, xyzt, nu/nubar, flavor]
-  torch::Tensor F4_from_y(const torch::Tensor& F4_initial, const torch::Tensor& y){
-    // tensor product with y
-    // n indicates the simulation index
-    // m indicates the spacetime index
-    // i and j indicate nu/nubar
-    // a and b indicate flavor
-    torch::Tensor F4_final = torch::einsum("niajb,nmjb->nmia", {y, F4_initial});
-
-    // make sure the result is physical
-    //F4_final = restrict_to_physical(F4_final);
-
-    return F4_final;
   }
 
   // ensure that the four-vectors are time-like and have positive density

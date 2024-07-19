@@ -14,6 +14,11 @@ int main(int argc, const char* argv[]){
 
   FFISubgridModel<3> model(std::string(argv[1]), device);
 
+  std::cout << "Available methods in the module:" << std::endl;
+  for (const auto& method : model.model.get_methods()) {
+    std::cout << method.name() << std::endl;
+  }
+  
   auto options =
     torch::TensorOptions()
     .device(device)
@@ -23,16 +28,16 @@ int main(int argc, const char* argv[]){
   // Create a sample tensor to pass through the model //
   //==================================================//
   // dimensions are [ngridzones, xyzt, nu/nubar, NF]
-  const int ngridzones = 500000;
+  const int ngridzones = 1;
   torch::Tensor F4_in = torch::zeros({ngridzones,4,2,3}, options);
   std::cout << "tensor device: " << F4_in.device() << std::endl;
   std::cout << std::endl;
-  /* Fiducial
+  // Fiducial
   F4_in.index_put_({Slice(), 3, 0, 0},  1.0  );
   F4_in.index_put_({Slice(), 3, 1, 0},  1.0  );
   F4_in.index_put_({Slice(), 2, 0, 0},  1./3.);
-  F4_in.index_put_({Slice(), 2, 1, 0}, -1./3.);*/
-  F4_in.index_put_({Slice(), 3, 0, 0},  1.4220e+33  ); //Nee
+  F4_in.index_put_({Slice(), 2, 1, 0}, -1./3.);
+  /*F4_in.index_put_({Slice(), 3, 0, 0},  1.4220e+33  ); //Nee
   F4_in.index_put_({Slice(), 3, 1, 0},  1.9146e+33  ); //Neebar
   F4_in.index_put_({Slice(), 3, 0, 1},  4.9113e+32  ); //Nmumu
   F4_in.index_put_({Slice(), 3, 1, 1},  4.9113e+32  ); //Nmumubar
@@ -58,41 +63,37 @@ int main(int argc, const char* argv[]){
   F4_in.index_put_({Slice(), 2, 0, 1},  -3.0697e+32  ); //Fmumu_z
   F4_in.index_put_({Slice(), 2, 1, 1},  -3.0697e+32  ); //Fmumubar_z
   F4_in.index_put_({Slice(), 2, 0, 2},  -3.0697e+32  ); //Ftautau_z
-  F4_in.index_put_({Slice(), 2, 1, 2},  -3.0697e+32  ); //Ftautaubar_z
+  F4_in.index_put_({Slice(), 2, 1, 2},  -3.0697e+32  ); //Ftautaubar_z*/
 
-  /*std::cout << std::endl;
+  std::cout << std::endl;
   std::cout << "F4_in" << std::endl;
-  std::cout << F4_in.index({Slice(),Slice(),Slice(),Slice()}) << std::endl;*/
+  std::cout << F4_in.index({Slice(),Slice(),Slice(),Slice()}) << std::endl;
 
   // put the input through the model 10 times
-  //auto F4_out = F4_in;
-  //std::cout << "F4_out: " << F4_out.device() << std::endl;
-  //torch::Tensor X, y;
-  //X.to(device);
-  //y.to(device);
-  //F4_out.to(device);
+  auto F4_out = F4_in;
+  std::cout << "F4_out: " << F4_out.device() << std::endl;
+  F4_out.to(device);
+  F4_out = model.model.get_method("predict_F4")({F4_in}).toTensor();
+  
 
-  for(int i=0; i<100; i++){
-    std::cout << i << std::endl;
-    auto X = model.X_from_F4_Minkowski(F4_in);
-    auto y = model.predict_y(X);
-    auto F4_out = model.F4_from_y(F4_in, y);
-  }
+  //for(int i=0; i<100; i++){
+  //  std::cout << i << std::endl;
+  //  auto X = model.X_from_F4_Minkowski(F4_in);
+  //  auto y = model.predict_y(X);
+  //  auto F4_out = model.F4_from_y(F4_in, y);
+  // }
 
   // the expected result is an even mixture of all flavors
-  //torch::Tensor F4_expected = torch::zeros({ngridzones,4,2,3});
-  //F4_expected.index_put_({Slice(), 3, Slice(), Slice()}, 1./3.);
+  torch::Tensor F4_expected = torch::zeros({ngridzones,4,2,3});
+  F4_expected.index_put_({Slice(), 3, Slice(), Slice()}, 1./3.);
 
   // check that the results are correct
   // by asserting that all elements are equal to 1 with an absolute and relative tolerance of 1e-2
-  /*std::cout << std::endl;
+  std::cout << std::endl;
   std::cout << "F4_out" << std::endl;
   std::cout << F4_out.index({Slice(),Slice(),Slice(),Slice()}) << std::endl;
-  std::cout << std::endl;
-  std::cout << "y" << std::endl;
-  std::cout << y.index({Slice(), 0,0,Slice(),Slice()}) << std::endl;
   std::cout << std::endl << "==========================" << std::endl;
-  *///assert(torch::allclose(F4_out, F4_expected, 3e-2, 3e-2));
+  //*///assert(torch::allclose(F4_out, F4_expected, 3e-2, 3e-2));
   
   /*
   //====================================//
