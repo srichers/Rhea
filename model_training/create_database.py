@@ -164,9 +164,9 @@ def analyze_file(d):
     dz = cell_size(d)
     
     # open the data file
-    if file_format = "hdf5":
+    if file_format == "hdf5":
         data = h5py.File(d+"/reduced0D.h5","r")
-    elif file_format = "dat":
+    elif file_format == "dat":
         with open(d+"/reduced0D.dat","r") as f:
             headers = f.readline().split()
             keys = [h.split(":")[1] for h in headers]
@@ -183,7 +183,7 @@ def analyze_file(d):
     F4_initial, F4_final, F4_final_stddev, xplot, y0plot, y1plot = final_properties(imax, growthRate, data, dz)
 
     # close the data file
-    if file)format = "hdf5":
+    if file_format == "hdf5":
         data.close()
 
     # return data
