@@ -4,7 +4,7 @@ import os
 import h5py
 import re
 import numpy as np
-from scipy.signal import argrelextrema
+from scipy.signal import argrelmax
 from multiprocessing import Pool
 
 # INPUTS
@@ -71,20 +71,20 @@ def growth_properties(data):
     N_offdiag_mag = np.array(data["N_offdiag_mag(1|ccm)"])
 
     # get the time of the peak
-    flag = True                                                                # Flag to prevent any errors if the following method fails
-    indexes = np.concatenate([[0],argrelextrema(N_offdiag_mag,np.greater)[0]]) # Take all the indexes at which there is a local maxima, as well as the first point in the data
-    for i in range(len(indexes)-1):                                            # Loops over all the indexes to check if there are two adjacent points that have a difference of three orders of magnitude
-        if abs(round((np.log10(N_offdiag_mag[indexes[i]]/N_offdiag_mag[indexes[i+1]])))) >= 3:
-            imax = indexes[i+1]
-            flag = False
-    if flag == True:                                                           # If the previous method does not work, the following is used
-        imax = np.argmax(N_offdiag_mag)
+    # Default value for imax
+    imax = np.argmax(N_offdiag_mag)
 
-    # get the growth rate
-    minOffDiag = N_offdiag_mag[0] #np.min(Nbar_offdiag_mag)
-    maxOffDiag = np.max(N_offdiag_mag)
+    # Take all the indexes at which there is a local maxima, as well as the first point in the data
+    indexes = np.concatenate([[0],argrelmax(N_offdiag_mag)[0]])
+
+    # Loops over all the indexes to find the first local max that is larger than the initial value by factor of 10^3
+    for i in range(len(indexes)):
+        if N_offdiag_mag[indexes[i]] / N_offdiag_mag[0] >= 10**3:
+            imax = indexes[i]
+            break
 
     # calculate the growth rate
+    maxOffDiag = np.max(N_offdiag_mag)
     growthRate = 0
     locs  = np.where((N_offdiag_mag > growthrate_minfac*maxOffDiag) & (N_offdiag_mag < growthrate_maxfac*maxOffDiag) & (t<t[imax]))[0]
     if len(locs)>1:
