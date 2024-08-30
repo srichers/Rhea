@@ -4,6 +4,7 @@
 import numpy as np
 import torch
 from torch import nn
+
 from ml_loss import *
 from ml_neuralnet import *
 from ml_optimizer import *
@@ -21,22 +22,24 @@ parms = {}
 
 parms["database_list"] = [
     "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib/many_sims_database.h5",
-    "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms/many_sims_database.h5"
+    "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms/many_sims_database.h5",
+    "/mnt/scratch/NSM_ML/Emu_merger_grid/maximum_entropy_32beam_effective2flavor/many_sims_database.h5"
 ]
-parms["NSM_stable_filename"] = ["/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5",
+parms["NSM_stable_filename"] = ["/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl1_orthonormal.h5",
                                 "/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl1_orthonormal.h5"]
 parms["do_unpickle"] = False
-parms["unpickle_filename"] = "model_epoch100000_datasetsize8279.pkl"
+parms["unpickle_filename"] = None
 parms["test_size"] = 0.1
 parms["epochs"] = 150000
 parms["dataset_size_list"] = [-1] # -1 means use all the data
-parms["n_generate"] = 7500
+parms["n_generate"] = 200000
 parms["print_every"] = 10
 parms["output_every"] = 5000
 parms["generate_max_fluxfac"] = 0.95
 parms["ME_stability_zero_weight"] = 10
 parms["ME_stability_n_equatorial"] = 32
 parms["average_heavies_in_final_state"] = True
+parms["conserve_lepton_number"] = "none"
 
 # data augmentation options
 parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
@@ -49,8 +52,8 @@ parms["do_augment_NSM_stable"]= True
 
 # neural network options
 parms["nhidden"]= 3
-parms["width"]= 32
-parms["dropout_probability"]= 0 #0.1 #0.5 #0.1 # 0.5
+parms["width"]= 128
+parms["dropout_probability"]= 0.1 #0.1 #0.5 #0.1 # 0.5
 parms["do_batchnorm"]= False # False - Seems to make things worse
 parms["do_fdotu"]= True
 parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU

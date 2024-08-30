@@ -89,6 +89,12 @@ def train_asymptotic_model(parms,
         ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_logfluxmag_fhat(F4f_train   )
         ndens_true_test , fluxmag_true_test , Fhat_true_test  = get_ndens_logfluxmag_fhat(F4f_test    )
 
+        # calculate ELN violation for printout later
+        Ntot_initial = torch.sum(F4i_train[:,3,:,:], dim=(1,2))
+        ELN_initial =    F4i_train[:,3,0,:] -    F4i_train[:,3,1,:]
+        ELN_final   = F4pred_train[:,3,0,:] - F4pred_train[:,3,1,:]
+        ELN_violation = torch.max(torch.abs(ELN_final-ELN_initial) / Ntot_initial[:,None])
+        
         # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
         
         # train on making sure the model prediction is correct [ndens]
@@ -224,6 +230,7 @@ def train_asymptotic_model(parms,
             print(f"Epoch {t+1}")
             print("lr =",scheduler._last_lr)
             print("net loss =", loss.item())
+            print("ELN violation: ",ELN_violation.item())
             for key in p.data.keys():
                 print("{:<15} {:<18} {:<15}".format(key, np.sqrt(p.data[key].train_loss[t]),  np.sqrt(p.data[key].test_loss[t]) ))
             print("", flush=True)

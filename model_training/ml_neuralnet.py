@@ -18,6 +18,7 @@ class NeuralNetwork(nn.Module):
             self.NX += 2*self.NF
         self.Ny = Ny
         self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
+        self.conserve_lepton_number = parms["conserve_lepton_number"]
 
         # append a full layer including linear, activation, and batchnorm
         def append_full_layer(modules, in_dim, out_dim):
@@ -128,13 +129,20 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         y = self.linear_activation_stack(x).reshape(x.shape[0], 2,self.NF,2,self.NF)
 
         # enforce conservation of particle number
-        deltaij = torch.eye(2, device=x.device)[None,:,None,:,None]
+        delta_nunubar = torch.eye(2, device=x.device)[None,:,None,:,None]
         yflavorsum = torch.sum(y,dim=2)[:,:,None,:,:]
-        y = y + (deltaij - yflavorsum) / self.NF
+        y = y + (delta_nunubar - yflavorsum) / self.NF
 
         # enforce symmetry in the heavies
         if self.average_heavies_in_final_state:
             y[:,:,1:,:,:] = y[:,:,1:,:,:].mean(dim=2, keepdim=True)
+
+        # enforce eln conservation through y matrix
+        if self.conserve_lepton_number == "ymatrix":
+            delta_flavor = torch.eye(self.NF, device=x.device)[None,None,:,None,:]
+            ELN_excess = y[:,0] - y[:,1] - (delta_nunubar[:,0]-delta_nunubar[:,1]) * delta_flavor[:,0]
+            y[:,0] -= ELN_excess/2.
+            y[:,1] += ELN_excess/2.
 
         return y
   
@@ -152,12 +160,21 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         # a and b indicate flavor
         F4_final = torch.einsum("niajb,nmjb->nmia", y, F4_initial)
 
+        # enforce eln
+        if self.conserve_lepton_number == "direct":
+            Jt_initial = F4_initial[:,3,0,:] - F4_initial[:,3,1,:]
+            Jt_final   =   F4_final[:,3,0,:] -   F4_final[:,3,1,:]
+            delta_Jt = Jt_final - Jt_initial
+            F4_final[:,3,0,:] = F4_final[:,3,0,:] - 0.5*delta_Jt
+            F4_final[:,3,1,:] = F4_final[:,3,1,:] + 0.5*delta_Jt
+
         return F4_final
 
     @torch.jit.export
     def predict_F4(self, F4_initial):
         X = self.X_from_F4(F4_initial)
         y = self.forward(X)
+
         F4_final = self.F4_from_y(F4_initial, y)
 
         return F4_final
