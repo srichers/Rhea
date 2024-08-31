@@ -141,8 +141,8 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         if self.conserve_lepton_number == "ymatrix":
             delta_flavor = torch.eye(self.NF, device=x.device)[None,None,:,None,:]
             ELN_excess = y[:,0] - y[:,1] - (delta_nunubar[:,0]-delta_nunubar[:,1]) * delta_flavor[:,0]
-            y[:,0] = y - ELN_excess/2.
-            y[:,1] = y + ELN_excess/2.
+            y[:,0] -= ELN_excess/2.
+            y[:,1] += ELN_excess/2.
 
         return y
   

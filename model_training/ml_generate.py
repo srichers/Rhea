@@ -13,7 +13,7 @@ def generate_stable_F4_zerofluxfac(parms):
 
     # normalize
     ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
-    F4i /= ntot[:,None,None,None]
+    F4i = F4i / ntot[:,None,None,None]
 
     # average if necessary
     if parms["average_heavies_in_final_state"]:
@@ -78,7 +78,7 @@ def generate_random_F4(parms):
     F4i[:,0:3,:,:] = F4i[:,0:3,:,:] * fluxfac[:,None,:,:]
     
     # scale by the number density
-    F4i *= Ndens[:,None,:,:]
+    F4i = F4i * Ndens[:,None,:,:]
 
     # normalize so the total number density is 1
     ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
