@@ -169,10 +169,3 @@ for i in range(len(parms["dataset_size_list"])):
     # pickle the model, optimizer, and plotter
     with open("model_"+str(parms["dataset_size_list"][i])+".pkl", "wb") as f:
         pickle.dump([model_array[i], optimizer_array[i], plotter_array[i]], f)
-
-#print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cpu_time_total'))
-        
-# use the largest dataset size for the rest of these metrics
-p = plotter_array[-1]
-model = model_array[-1]
-optimizer = optimizer_array[-1]
