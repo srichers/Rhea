@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This file contains a variety of functions that generate randomized distributions
+'''
+
 import torch
 
 # create list of simulations known to be stable when the flux factor is zero

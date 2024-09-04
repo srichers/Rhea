@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This is the file contains the main training loop, including accumulation of the loss function from various sources.
+'''
+
 import torch
 from ml_loss import *
 from ml_neuralnet import *

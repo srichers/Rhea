@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This file contains the structure of the neural network, including the means of transforming between angular moments and the actual inputs/outputs of the ML model
+'''
+
 import torch
 from torch import nn
 from ml_tools import dot4, restrict_F4_to_physical

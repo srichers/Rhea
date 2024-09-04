@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This is the file contains the functions that define the various loss sources.
+'''
+
 import torch
 
 # with mean, this is equivalent to torch.sum(diff**2) / F4f_pred.numel()

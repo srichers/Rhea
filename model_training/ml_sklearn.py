@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This file is defunct and likely nocontains a variety of functions that generate randomized distributions
+'''
+
 # credit to https://thinkingneuron.com/using-artificial-neural-networks-for-regression-in-python/
 # Convert the flavor transformation data to one with reduced dimensionality to make it easier to train on
 # Run from the directory containin the joint dataset

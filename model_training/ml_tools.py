@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This file contains a variety of utilities used in the model training process.
+'''
+
 import numpy as np
 from sklearn.model_selection import train_test_split
 import torch

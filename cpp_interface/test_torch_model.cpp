@@ -1,3 +1,11 @@
+/*
+Author: Sherwood Richers
+
+License: GPLv3 (see LICENSE file)
+
+Example program that runs a test data point through a trained ML model.
+ */
+
 #include "FFISubgridModel.h"
 #include <torch/torch.h>
 

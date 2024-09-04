@@ -1,3 +1,11 @@
+/*
+Author: Sherwood Richers
+
+License: GPLv3 (see LICENSE file)
+
+This header file can be included in a C++ program to more easily interface with a trained ML model.
+ */
+
 #include <torch/script.h>
 #include <iostream>
 #include <string>

@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This is the file contains functions that read data from the training datasets.
+'''
+
 import h5py
 import numpy as np
 from sklearn.model_selection import train_test_split

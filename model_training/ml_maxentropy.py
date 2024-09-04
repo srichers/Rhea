@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This is the file contains functions that describe maximum entropy distributions, and interpolate those functions onto a sphere.
+'''
+
 import torch
 import numpy as np
 import scipy

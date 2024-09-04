@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This file contains a variety of functions that are useful for recording training performance and creating plots
+'''
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np

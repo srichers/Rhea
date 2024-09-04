@@ -1,6 +1,11 @@
-# credit to https://thinkingneuron.com/using-artificial-neural-networks-for-regression-in-python/
-# Convert the flavor transformation data to one with reduced dimensionality to make it easier to train on
-# Run from the directory containin the joint dataset
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This is the file that is actually run to train a model. It requires access to various databases that are published elsewhere. All model hyperparameters are listed here.
+'''
+
 import numpy as np
 import torch
 from torch import nn

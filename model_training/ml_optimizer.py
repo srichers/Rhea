@@ -1,3 +1,11 @@
+'''
+Author: Sherwood Richers
+
+Copyright: GPLv3 (see LICENSE file)
+
+This is the basic optimizer class used to optimize model parameters.
+'''
+
 import torch
 from ml_loss import *
 from ml_tools import *
