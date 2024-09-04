@@ -23,10 +23,15 @@ pipeline {
 	//=======//
 	// Tests //
 	//=======//
-	stage('Does it run?'){ steps{
+	stage('C++ Interface'){ steps{
 	    dir('cpp_interface'){
 		sh 'make'
-		sh './test_torch_model model_cpu.ptc'
+		sh './test_torch_model ../example_model.pt'
+	    }
+	}}
+	stage('Python Interface'){ steps{
+            dir('model_training'){
+		sh 'python3 example_use_model.py ../example_model.py'
 	    }
 	}}
 
