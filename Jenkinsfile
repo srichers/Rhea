@@ -31,7 +31,7 @@ pipeline {
 	}}
 	stage('Python Interface'){ steps{
             dir('model_training'){
-		sh 'python3 example_use_model.py ../example_model.py'
+		sh 'python3 example_use_model.py ../example_model.pt'
 	    }
 	}}
 
