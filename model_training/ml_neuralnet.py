@@ -143,7 +143,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
 
         # enforce symmetry in the heavies
         if self.average_heavies_in_final_state:
-            y[:,:,1:,:,:] = y[:,:,1:,:,:].mean(dim=2, keepdim=True)
+            y[:,:,1:,:,:] = y.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
 
         # enforce eln conservation through y matrix
         if self.conserve_lepton_number == "ymatrix":
