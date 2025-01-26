@@ -1,0 +1,37 @@
+ml_optimizer
+============
+
+.. py:module:: ml_optimizer
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This is the basic optimizer class used to optimize model parameters.
+
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ml_optimizer.Optimizer
+
+
+Module Contents
+---------------
+
+.. py:class:: Optimizer(model, op, device)
+
+   .. py:attribute:: NF
+
+
+   .. py:attribute:: optimizer
+
+
+   .. py:attribute:: device
+
+

@@ -1,0 +1,28 @@
+ml_pytorch
+==========
+
+.. py:module:: ml_pytorch
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This is the file that is actually run to train a model. It requires access to various databases that are published elsewhere. All model hyperparameters are listed here.
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   ml_pytorch.parms
+
+
+Module Contents
+---------------
+
+.. py:data:: parms
+

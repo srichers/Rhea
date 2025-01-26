@@ -1,0 +1,138 @@
+ml_sklearn
+==========
+
+.. py:module:: ml_sklearn
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file is defunct and likely nocontains a variety of functions that generate randomized distributions
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   ml_sklearn.input_filename
+   ml_sklearn.N_Nbar_tolerance
+   ml_sklearn.f_in
+   ml_sklearn.growthRateList
+   ml_sklearn.F4_initial_list
+   ml_sklearn.F4_final_list
+   ml_sklearn.ntotal
+   ml_sklearn.N_Nbar_initial
+   ml_sklearn.N_Nbar_final
+   ml_sklearn.N_Nbar_difference
+   ml_sklearn.N_Nbar_error
+   ml_sklearn.nsims
+   ml_sklearn.IO_shape
+   ml_sklearn.number_predictors
+   ml_sklearn.X
+   ml_sklearn.y
+   ml_sklearn.PredictorScaler
+   ml_sklearn.TargetVarScaler
+   ml_sklearn.PredictorScalerFit
+   ml_sklearn.TargetVarScalerFit
+   ml_sklearn.n_train
+   ml_sklearn.n_test
+   ml_sklearn.custom_scoring
+   ml_sklearn.F4_test
+   ml_sklearn.estimator
+   ml_sklearn.param_grid
+   ml_sklearn.estimator
+   ml_sklearn.param_grid
+   ml_sklearn.estimator
+   ml_sklearn.param_grid
+   ml_sklearn.estimator
+   ml_sklearn.param_grid
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_sklearn.Accuracy_Score
+   ml_sklearn.run_ML_model
+
+
+Module Contents
+---------------
+
+.. py:data:: input_filename
+   :value: 'many_sims_database.h5'
+
+
+.. py:data:: N_Nbar_tolerance
+   :value: 0.001
+
+
+.. py:data:: f_in
+
+.. py:data:: growthRateList
+
+.. py:data:: F4_initial_list
+
+.. py:data:: F4_final_list
+
+.. py:data:: ntotal
+
+.. py:data:: N_Nbar_initial
+
+.. py:data:: N_Nbar_final
+
+.. py:data:: N_Nbar_difference
+
+.. py:data:: N_Nbar_error
+
+.. py:data:: nsims
+
+.. py:data:: IO_shape
+
+.. py:data:: number_predictors
+
+.. py:data:: X
+
+.. py:data:: y
+
+.. py:data:: PredictorScaler
+
+.. py:data:: TargetVarScaler
+
+.. py:data:: PredictorScalerFit
+
+.. py:data:: TargetVarScalerFit
+
+.. py:data:: n_train
+
+.. py:data:: n_test
+
+.. py:function:: Accuracy_Score(orig, pred)
+
+.. py:data:: custom_scoring
+
+.. py:data:: F4_test
+
+.. py:function:: run_ML_model(estimator, param_grid, label)
+
+.. py:data:: estimator
+
+.. py:data:: param_grid
+
+.. py:data:: estimator
+
+.. py:data:: param_grid
+
+.. py:data:: estimator
+
+.. py:data:: param_grid
+
+.. py:data:: estimator
+
+.. py:data:: param_grid
+

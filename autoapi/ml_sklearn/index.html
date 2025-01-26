@@ -1,0 +1,459 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ml_sklearn &mdash; Rhea  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="ml_generate" href="../ml_generate/index.html" />
+    <link rel="prev" title="ml_pytorch" href="../ml_pytorch/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Rhea
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../conf/index.html">conf</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_plot/index.html">ml_plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_loss/index.html">ml_loss</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_tools/index.html">ml_tools</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_pytorch/index.html">ml_pytorch</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">ml_sklearn</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#attributes">Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#functions">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-contents">Module Contents</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.input_filename"><code class="docutils literal notranslate"><span class="pre">input_filename</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.N_Nbar_tolerance"><code class="docutils literal notranslate"><span class="pre">N_Nbar_tolerance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.f_in"><code class="docutils literal notranslate"><span class="pre">f_in</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.growthRateList"><code class="docutils literal notranslate"><span class="pre">growthRateList</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.F4_initial_list"><code class="docutils literal notranslate"><span class="pre">F4_initial_list</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.F4_final_list"><code class="docutils literal notranslate"><span class="pre">F4_final_list</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.ntotal"><code class="docutils literal notranslate"><span class="pre">ntotal</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.N_Nbar_initial"><code class="docutils literal notranslate"><span class="pre">N_Nbar_initial</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.N_Nbar_final"><code class="docutils literal notranslate"><span class="pre">N_Nbar_final</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.N_Nbar_difference"><code class="docutils literal notranslate"><span class="pre">N_Nbar_difference</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.N_Nbar_error"><code class="docutils literal notranslate"><span class="pre">N_Nbar_error</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.nsims"><code class="docutils literal notranslate"><span class="pre">nsims</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.IO_shape"><code class="docutils literal notranslate"><span class="pre">IO_shape</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.number_predictors"><code class="docutils literal notranslate"><span class="pre">number_predictors</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.X"><code class="docutils literal notranslate"><span class="pre">X</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.y"><code class="docutils literal notranslate"><span class="pre">y</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.PredictorScaler"><code class="docutils literal notranslate"><span class="pre">PredictorScaler</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.TargetVarScaler"><code class="docutils literal notranslate"><span class="pre">TargetVarScaler</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.PredictorScalerFit"><code class="docutils literal notranslate"><span class="pre">PredictorScalerFit</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.TargetVarScalerFit"><code class="docutils literal notranslate"><span class="pre">TargetVarScalerFit</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.n_train"><code class="docutils literal notranslate"><span class="pre">n_train</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.n_test"><code class="docutils literal notranslate"><span class="pre">n_test</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.Accuracy_Score"><code class="docutils literal notranslate"><span class="pre">Accuracy_Score()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.custom_scoring"><code class="docutils literal notranslate"><span class="pre">custom_scoring</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.F4_test"><code class="docutils literal notranslate"><span class="pre">F4_test</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.run_ML_model"><code class="docutils literal notranslate"><span class="pre">run_ML_model()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.estimator"><code class="docutils literal notranslate"><span class="pre">estimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_sklearn.param_grid"><code class="docutils literal notranslate"><span class="pre">param_grid</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">estimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">param_grid</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">estimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">param_grid</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id4"><code class="docutils literal notranslate"><span class="pre">estimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id5"><code class="docutils literal notranslate"><span class="pre">param_grid</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_generate/index.html">ml_generate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_read_data/index.html">ml_read_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_optimizer/index.html">ml_optimizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_neuralnet/index.html">ml_neuralnet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_maxentropy/index.html">ml_maxentropy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_trainmodel/index.html">ml_trainmodel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../example_use_model/index.html">example_use_model</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Rhea</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">API Reference</a></li>
+      <li class="breadcrumb-item active">ml_sklearn</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/autoapi/ml_sklearn/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-ml_sklearn">
+<span id="ml-sklearn"></span><h1>ml_sklearn<a class="headerlink" href="#module-ml_sklearn" title="Link to this heading"></a></h1>
+<p>Author: Sherwood Richers</p>
+<p>Copyright: GPLv3 (see LICENSE file)</p>
+<p>This file is defunct and likely nocontains a variety of functions that generate randomized distributions</p>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.input_filename" title="ml_sklearn.input_filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">input_filename</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.N_Nbar_tolerance" title="ml_sklearn.N_Nbar_tolerance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">N_Nbar_tolerance</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.f_in" title="ml_sklearn.f_in"><code class="xref py py-obj docutils literal notranslate"><span class="pre">f_in</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.growthRateList" title="ml_sklearn.growthRateList"><code class="xref py py-obj docutils literal notranslate"><span class="pre">growthRateList</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.F4_initial_list" title="ml_sklearn.F4_initial_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">F4_initial_list</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.F4_final_list" title="ml_sklearn.F4_final_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">F4_final_list</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.ntotal" title="ml_sklearn.ntotal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ntotal</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.N_Nbar_initial" title="ml_sklearn.N_Nbar_initial"><code class="xref py py-obj docutils literal notranslate"><span class="pre">N_Nbar_initial</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.N_Nbar_final" title="ml_sklearn.N_Nbar_final"><code class="xref py py-obj docutils literal notranslate"><span class="pre">N_Nbar_final</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.N_Nbar_difference" title="ml_sklearn.N_Nbar_difference"><code class="xref py py-obj docutils literal notranslate"><span class="pre">N_Nbar_difference</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.N_Nbar_error" title="ml_sklearn.N_Nbar_error"><code class="xref py py-obj docutils literal notranslate"><span class="pre">N_Nbar_error</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.nsims" title="ml_sklearn.nsims"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nsims</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.IO_shape" title="ml_sklearn.IO_shape"><code class="xref py py-obj docutils literal notranslate"><span class="pre">IO_shape</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.number_predictors" title="ml_sklearn.number_predictors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">number_predictors</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.X" title="ml_sklearn.X"><code class="xref py py-obj docutils literal notranslate"><span class="pre">X</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.y" title="ml_sklearn.y"><code class="xref py py-obj docutils literal notranslate"><span class="pre">y</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.PredictorScaler" title="ml_sklearn.PredictorScaler"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PredictorScaler</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.TargetVarScaler" title="ml_sklearn.TargetVarScaler"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TargetVarScaler</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.PredictorScalerFit" title="ml_sklearn.PredictorScalerFit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PredictorScalerFit</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.TargetVarScalerFit" title="ml_sklearn.TargetVarScalerFit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TargetVarScalerFit</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.n_train" title="ml_sklearn.n_train"><code class="xref py py-obj docutils literal notranslate"><span class="pre">n_train</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.n_test" title="ml_sklearn.n_test"><code class="xref py py-obj docutils literal notranslate"><span class="pre">n_test</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.custom_scoring" title="ml_sklearn.custom_scoring"><code class="xref py py-obj docutils literal notranslate"><span class="pre">custom_scoring</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.F4_test" title="ml_sklearn.F4_test"><code class="xref py py-obj docutils literal notranslate"><span class="pre">F4_test</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#id4" title="ml_sklearn.estimator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">estimator</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#id5" title="ml_sklearn.param_grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param_grid</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#id4" title="ml_sklearn.estimator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">estimator</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#id5" title="ml_sklearn.param_grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param_grid</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#id4" title="ml_sklearn.estimator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">estimator</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#id5" title="ml_sklearn.param_grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param_grid</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#id4" title="ml_sklearn.estimator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">estimator</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#id5" title="ml_sklearn.param_grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param_grid</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_sklearn.Accuracy_Score" title="ml_sklearn.Accuracy_Score"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Accuracy_Score</span></code></a>(orig, pred)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_sklearn.run_ML_model" title="ml_sklearn.run_ML_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run_ML_model</span></code></a>(estimator, param_grid, label)</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading"></a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.input_filename">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">input_filename</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'many_sims_database.h5'</span></em><a class="headerlink" href="#ml_sklearn.input_filename" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.N_Nbar_tolerance">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">N_Nbar_tolerance</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.001</span></em><a class="headerlink" href="#ml_sklearn.N_Nbar_tolerance" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.f_in">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">f_in</span></span><a class="headerlink" href="#ml_sklearn.f_in" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.growthRateList">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">growthRateList</span></span><a class="headerlink" href="#ml_sklearn.growthRateList" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.F4_initial_list">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">F4_initial_list</span></span><a class="headerlink" href="#ml_sklearn.F4_initial_list" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.F4_final_list">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">F4_final_list</span></span><a class="headerlink" href="#ml_sklearn.F4_final_list" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.ntotal">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">ntotal</span></span><a class="headerlink" href="#ml_sklearn.ntotal" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.N_Nbar_initial">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">N_Nbar_initial</span></span><a class="headerlink" href="#ml_sklearn.N_Nbar_initial" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.N_Nbar_final">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">N_Nbar_final</span></span><a class="headerlink" href="#ml_sklearn.N_Nbar_final" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.N_Nbar_difference">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">N_Nbar_difference</span></span><a class="headerlink" href="#ml_sklearn.N_Nbar_difference" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.N_Nbar_error">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">N_Nbar_error</span></span><a class="headerlink" href="#ml_sklearn.N_Nbar_error" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.nsims">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">nsims</span></span><a class="headerlink" href="#ml_sklearn.nsims" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.IO_shape">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">IO_shape</span></span><a class="headerlink" href="#ml_sklearn.IO_shape" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.number_predictors">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">number_predictors</span></span><a class="headerlink" href="#ml_sklearn.number_predictors" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.X">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">X</span></span><a class="headerlink" href="#ml_sklearn.X" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.y">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">y</span></span><a class="headerlink" href="#ml_sklearn.y" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.PredictorScaler">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">PredictorScaler</span></span><a class="headerlink" href="#ml_sklearn.PredictorScaler" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.TargetVarScaler">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">TargetVarScaler</span></span><a class="headerlink" href="#ml_sklearn.TargetVarScaler" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.PredictorScalerFit">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">PredictorScalerFit</span></span><a class="headerlink" href="#ml_sklearn.PredictorScalerFit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.TargetVarScalerFit">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">TargetVarScalerFit</span></span><a class="headerlink" href="#ml_sklearn.TargetVarScalerFit" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.n_train">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">n_train</span></span><a class="headerlink" href="#ml_sklearn.n_train" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.n_test">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">n_test</span></span><a class="headerlink" href="#ml_sklearn.n_test" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ml_sklearn.Accuracy_Score">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">Accuracy_Score</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orig</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pred</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_sklearn.Accuracy_Score" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.custom_scoring">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">custom_scoring</span></span><a class="headerlink" href="#ml_sklearn.custom_scoring" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.F4_test">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">F4_test</span></span><a class="headerlink" href="#ml_sklearn.F4_test" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="ml_sklearn.run_ML_model">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">run_ML_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">estimator</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_grid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_sklearn.run_ML_model" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.estimator">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">estimator</span></span><a class="headerlink" href="#ml_sklearn.estimator" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="ml_sklearn.param_grid">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">param_grid</span></span><a class="headerlink" href="#ml_sklearn.param_grid" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">estimator</span></span><a class="headerlink" href="#id0" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">param_grid</span></span><a class="headerlink" href="#id1" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">estimator</span></span><a class="headerlink" href="#id2" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">param_grid</span></span><a class="headerlink" href="#id3" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="id4">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">estimator</span></span><a class="headerlink" href="#id4" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="id5">
+<span class="sig-prename descclassname"><span class="pre">ml_sklearn.</span></span><span class="sig-name descname"><span class="pre">param_grid</span></span><a class="headerlink" href="#id5" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../ml_pytorch/index.html" class="btn btn-neutral float-left" title="ml_pytorch" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../ml_generate/index.html" class="btn btn-neutral float-right" title="ml_generate" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Sherwood Richers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

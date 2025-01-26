@@ -1,0 +1,83 @@
+ml_plot
+=======
+
+.. py:module:: ml_plot
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file contains a variety of functions that are useful for recording training performance and creating plots
+
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ml_plot.PlotQuantities
+   ml_plot.Plotter
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_plot.plot_nue_nuebar
+   ml_plot.plot_histogram
+   ml_plot.error_histogram
+
+
+Module Contents
+---------------
+
+.. py:class:: PlotQuantities(epochs)
+
+   .. py:attribute:: train_loss
+
+
+   .. py:attribute:: train_err
+
+
+   .. py:attribute:: test_loss
+
+
+   .. py:attribute:: test_err
+
+
+   .. py:method:: fill_from_plotquantities(plotquantities)
+
+
+   .. py:method:: minmax()
+
+
+.. py:class:: Plotter(epochs, names)
+
+   .. py:attribute:: data
+
+
+   .. py:method:: minmax()
+
+
+   .. py:method:: fill_from_plotter(plotter)
+
+
+   .. py:method:: init_plot_options()
+
+
+   .. py:method:: plot_error_single_frame(ax, x, p, label)
+
+
+   .. py:method:: plot_error(filename, ymin=0, ymax=0)
+
+
+.. py:function:: plot_nue_nuebar(model, npoints, nreps)
+
+.. py:function:: plot_histogram(error, bins, xmin, xmax, filename)
+
+.. py:function:: error_histogram(model, F4_initial, F4_final, bins, xmin, xmax, do_restrict_to_physical, filename)
+
