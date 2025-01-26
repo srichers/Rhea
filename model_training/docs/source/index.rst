@@ -10,20 +10,6 @@ Welcome to Rhea's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-Submodules
-----------
-
-.. automodule:: ml_pytorch
-   :members:
-   :undoc-members:
-
-.. automodule:: ml_generate
-   :members:
-   :undoc-members:
-
-.. automodule:: ml_neuralnet
-   :members:
-   :undoc-members:
 
 Indices and tables
 ==================
