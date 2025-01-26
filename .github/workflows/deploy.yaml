@@ -36,5 +36,5 @@ jobs:
       with:
         publish_branch: gh-pages  # The branch where the generated HTML will be deployed
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: model_training/docs/_build/html  # The directory containing the generated HTML
+        publish_dir: model_training/docs/build/html  # The directory containing the generated HTML
         force_orphan: true  # remove branch history
