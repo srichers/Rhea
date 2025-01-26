@@ -5,16 +5,19 @@ on:
     branches:
       - main  # Trigger deployment when pushing to the main branch
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: '3.x'
 
@@ -31,5 +34,7 @@ jobs:
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
-        deploy_key: ${{ secrets.DEPLOY_KEY }}
+        publish_branch: gh-pages  # The branch where the generated HTML will be deployed
+        github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: model_training/docs/_build/html  # The directory containing the generated HTML
+        force_orphan: true  # remove branch history
