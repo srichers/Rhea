@@ -74,10 +74,17 @@ class NeuralNetwork(nn.Module):
             if module.bias is not None:
                 module.bias.data.zero_()
     
-    # Create an array of the dot product of each species with itself and each other species
-    # Input dimensions expeced to be [sim, xyzt, nu/nubar, flavor]
+    
     @torch.jit.export
     def X_from_F4(self, F4):
+        """Given the a list of four fluxes, calculate the inputs to the neural network out of dot products of four fluxes with each other and the four velocity. The four-velocity is assumed to be timelike in an orthonormal tetrad.
+
+        Args:
+            F4 (torch.Tensor): Four-flux tensor. Indexed as [sim, xyzt, nu/nubar, flavor]
+
+        Returns:
+            torch.Tensor: Neural network input tensor. Indexed as [sim, iX]
+        """
         index = 0
         nsims = F4.shape[0]
         X = torch.zeros((nsims, self.NX), device=F4.device)
