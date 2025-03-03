@@ -8,28 +8,38 @@ import time
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
+#Specify the number of layers in the model
+NUM_LAYERS = 3
+#Specify the input and hidden layer sizes
+INPUT_SIZE = 27
+HIDDEN_SIZE = 64
 
 # Define the model
 class BinaryClassifier(nn.Module):
-    def __init__(self, input_size=27, hidden_size=64):
+    def __init__(self, input_size=27, hidden_size=64, num_layers=3):
         super(BinaryClassifier, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, 1)
-        self.sigmoid = nn.Sigmoid()
+        #nn.ModuleList() is a container that holds multiple layers/modules in a list.
+        #Unlike a regular Python list, ModuleList registers the layers as part of the model, ensuring they are correctly included in computations like .to(device), .parameters(), and .train().
+        self.layers = nn.ModuleList()
+        #This adds a fully connected (linear) layer that transforms input features of size input_size to hidden_size.
+        self.layers.append(nn.Linear(input_size, hidden_size))
+        self.layers.append(nn.ReLU())
+        
+        for _ in range(num_layers - 1):  #Create variable hidden layers
+            self.layers.append(nn.Linear(hidden_size, hidden_size))
+            self.layers.append(nn.ReLU())
+        
+        self.layers.append(nn.Linear(hidden_size, 1))
+        self.layers.append(nn.Sigmoid())
 
     def forward(self, x):
-        x = self.fc1(x)
-        x = self.relu(x) #Maybe can use Leaky RelU
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3(x)
-        x = self.sigmoid(x)
+        for layer in self.layers:  #Iterate over layers dynamically
+            x = layer(x)
         return x
 
+
 # Initialize model, loss function, and optimizer
-model = BinaryClassifier().to(device)
+model = BinaryClassifier(input_size=INPUT_SIZE, hidden_size=HIDDEN_SIZE, num_layers=NUM_LAYERS).to(device) 
 criterion = nn.BCELoss()  # Binary Cross-Entropy Loss
 optimizer = optim.Adam(model.parameters(), lr=0.001) #Maybe can use AdamW
 
