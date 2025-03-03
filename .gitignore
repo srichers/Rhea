@@ -1,3 +1,5 @@
 __pycache__/
 build
 .vscode
+stability_model/*.npz
+.DS_Store
