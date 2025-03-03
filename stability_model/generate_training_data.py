@@ -113,8 +113,8 @@ F4_zerofluxfac = generate_stable_F4_zerofluxfac(parms)
 #Is the point unstable?
 #Yes => unstable = 1
 #No => unstable = 0
-unstable_zerofluxfac = torch.zeros((parms["n_generate"]), device=parms["device"])
-unstable_zerofluxfac[:] = 0 #Since all the generated points are stable
+unstable_zerofluxfac = torch.zeros((parms["n_generate"], 1), device=parms["device"])
+unstable_zerofluxfac[:, None] = 0 #Since all the generated points are stable
 #print(F4_zerofluxfac.shape)
 #print(F4_zerofluxfac[0,:,:,:])
 #print(unstable_zerofluxfac.shape)
@@ -126,8 +126,8 @@ F4_oneflavor = generate_stable_F4_oneflavor(parms)
 #Is the point unstable?
 #Yes => unstable = 1
 #No => unstable = 0
-unstable_oneflavor = torch.zeros((parms["n_generate"]*2*parms["NF"]), device=parms["device"])
-unstable_oneflavor[:] = 0 #Since all the generated points are stable
+unstable_oneflavor = torch.zeros((parms["n_generate"]*2*parms["NF"], 1), device=parms["device"])
+unstable_oneflavor[:, None] = 0 #Since all the generated points are stable
 #print(F4_oneflavor.shape)
 #print(F4_oneflavor[0,:,:,:])
 #print(unstable_oneflavor.shape)
