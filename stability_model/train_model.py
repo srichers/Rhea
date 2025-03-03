@@ -2,6 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import time  
+
+# Detect if GPU is available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 
 # Define the model
 class BinaryClassifier(nn.Module):
@@ -23,7 +29,7 @@ class BinaryClassifier(nn.Module):
         return x
 
 # Initialize model, loss function, and optimizer
-model = BinaryClassifier()
+model = BinaryClassifier().to(device)
 criterion = nn.BCELoss()  # Binary Cross-Entropy Loss
 optimizer = optim.Adam(model.parameters(), lr=0.001) #Maybe can use AdamW
 
@@ -70,14 +76,19 @@ output_data = np.concatenate((unstable_zerofluxfac, unstable_oneflavor, unstable
 print("input_data.shape:", input_data.shape)
 print("output_data.shape:", output_data.shape)
 
-# Example usage
-X_sample = torch.from_numpy(input_data) #torch.Tensor(X_zerofluxfac)  #  (sims, X)
-y_sample = torch.from_numpy(output_data)  # (sims, unstable parameter value)
+#Convert data to PyTorch tensors and move to device
+X_sample = torch.from_numpy(input_data).to(device) #torch.Tensor(X_zerofluxfac)  #  (sims, X)
+y_sample = torch.from_numpy(output_data).to(device)  # (sims, unstable parameter value)
 
+#Training loop
 N_epochs = 1000
 print_every_epoch = 100
+
+start_time = time.time()
 for i in range(N_epochs):
     loss = train_step(X_sample, y_sample)
     if i % print_every_epoch == 0:
-        print("Epoch {}, Loss = {}".format(i, loss))
+        elapsed_time = time.time() - start_time
+        elapsed_time_hr = round(elapsed_time/3600.0, 3)
+        print("Epoch {}, Loss = {}, Time elapsed = {} sec = {} hr".format(i, loss, round(elapsed_time, 2), elapsed_time_hr))
 
