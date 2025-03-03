@@ -15,10 +15,6 @@ NUM_LAYERS = 3
 INPUT_SIZE = 27
 HIDDEN_SIZE = 64
 
-DROPOUT_RATE = 0.1 #0.5  # Dropout rate for regularization
-WEIGHT_DECAY = 1e-2 #1e-5  # L2 regularization (weight decay)
-PATIENCE = 1000 #100  # Number of epochs to wait for improvement before stopping
-
 '''
 Regularization is a technique used to prevent overfitting in machine learning models. In the context of neural networks, common regularization techniques include:
 
@@ -28,6 +24,10 @@ Dropout: This randomly drops units (along with their connections) from the neura
 
 Early Stopping: This stops training when the validation loss stops improving, preventing the model from overfitting to the training data.
 '''
+DROPOUT_RATE = 0.1 #0.5  # Dropout rate for regularization
+WEIGHT_DECAY = 1e-2 #1e-5  # L2 regularization (weight decay)
+PATIENCE = 1000 #100  # Number of epochs to wait for improvement before stopping
+
 
 # Define the model
 class BinaryClassifier(nn.Module):
@@ -156,5 +156,5 @@ for i in range(N_epochs):
         break
 
 # Final validation step after training
-final_val_loss = validate_step(X_test, y_test)
-print(f"Final Validation Loss: {final_val_loss}")
+final_test_loss = validate_step(X_test, y_test)
+print(f"Final Validation Loss: {final_test_loss}")
