@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import time  
+from sklearn.model_selection import train_test_split  # Import train_test_split
 
 # Detect if GPU is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -46,7 +47,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001) #Maybe can use AdamW
 #Regularization -> Need to do if loss for test data starts to go up after a certain number of epochs
 #Weight decay, dropout, etc.
 
-# Example of training step (assuming you have data)
+#Training step 
 def train_step(X_batch, y_batch):
     model.train()
     optimizer.zero_grad()
@@ -54,6 +55,14 @@ def train_step(X_batch, y_batch):
     loss = criterion(outputs, y_batch)
     loss.backward()
     optimizer.step()
+    return loss.item()
+
+#Validation step
+def validate_step(X_batch, y_batch):
+    model.eval()
+    with torch.no_grad():
+        outputs = model(X_batch)
+        loss = criterion(outputs, y_batch)
     return loss.item()
 
 #Load training data for stable_zerofluxfac
@@ -86,19 +95,33 @@ output_data = np.concatenate((unstable_zerofluxfac, unstable_oneflavor, unstable
 print("input_data.shape:", input_data.shape)
 print("output_data.shape:", output_data.shape)
 
-#Convert data to PyTorch tensors and move to device
-X_sample = torch.from_numpy(input_data).to(device) #torch.Tensor(X_zerofluxfac)  #  (sims, X)
-y_sample = torch.from_numpy(output_data).to(device)  # (sims, unstable parameter value)
+# Perform train-test split (90% training, 10% testing)
+X_train, X_test, y_train, y_test = train_test_split(input_data, output_data, test_size=0.1, random_state=42)
+
+#Convert data to PyTorch tensors and move to device, and split into training and testing sets
+X_train = torch.from_numpy(X_train).to(device)
+y_train = torch.from_numpy(y_train).to(device)
+X_test = torch.from_numpy(X_test).to(device)
+y_test = torch.from_numpy(y_test).to(device)
+
 
 #Training loop
-N_epochs = 1000
+N_epochs = 2000
 print_every_epoch = 100
 
 start_time = time.time()
 for i in range(N_epochs):
-    loss = train_step(X_sample, y_sample)
+    # Training step
+    train_loss = train_step(X_train, y_train)
+    
+    #Print info
     if i % print_every_epoch == 0:
+        # Validation step
+        test_loss = validate_step(X_test, y_test)
         elapsed_time = time.time() - start_time
         elapsed_time_hr = round(elapsed_time/3600.0, 3)
-        print("Epoch {}, Loss = {}, Time elapsed = {} sec = {} hr".format(i, loss, round(elapsed_time, 2), elapsed_time_hr))
+        print("Epoch {}, Train loss = {}, Test loss = {}, Time elapsed = {} sec = {} hr".format(i, train_loss, test_loss, round(elapsed_time, 2), elapsed_time_hr))
 
+# Final validation step after training
+final_val_loss = validate_step(X_test, y_test)
+print(f"Final Validation Loss: {final_val_loss}")
