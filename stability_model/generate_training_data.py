@@ -18,9 +18,10 @@ parms["n_generate"] = 100 #200000
 parms["NF"] = 3
 
 #Use a GPU if available 
-parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-print("Using",parms["device"],"device")
+#parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+#print("Using",parms["device"],"device")
 #print(torch.cuda.get_device_name(0))
+parms["device"] = "cpu"
 
 parms["average_heavies_in_final_state"] = True
 parms["do_fdotu"]= True

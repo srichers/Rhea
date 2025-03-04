@@ -189,7 +189,7 @@ example_input = torch.randn(1, INPUT_SIZE).to(device)  # Just for model conversi
 traced_model = torch.jit.trace(model, example_input)
 
 # Save the model
-torch.jit.save(traced_model, "model.pt")
+torch.jit.save(traced_model, "final_model.pt")
 # Save the X_from_F4 function
 torch.jit.save(scripted_X_from_F4, "X_from_F4.pt")
 print("Saved model in 'model.pt' and X_from_F4 in 'X_from_F4.pt' using TorchScript.")
