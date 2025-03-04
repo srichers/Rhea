@@ -123,7 +123,7 @@ y_test = torch.from_numpy(y_test).to(device)
 
 
 #Training loop
-N_epochs = 2000
+N_epochs = 200
 print_every_epoch = 100
 best_test_loss = float('inf')
 patience = PATIENCE  # Number of epochs to wait for improvement before stopping
@@ -158,3 +158,38 @@ for i in range(N_epochs):
 # Final validation step after training
 final_test_loss = validate_step(X_test, y_test)
 print(f"Final Validation Loss: {final_test_loss}")
+
+
+'''
+# Save the final model along with additional information
+final_model_info = {
+    'state_dict': model.state_dict(),
+    'input_size': INPUT_SIZE,
+    'hidden_size': HIDDEN_SIZE,
+    'num_layers': NUM_LAYERS,
+    'dropout_rate': DROPOUT_RATE,
+    'optimizer_state_dict': optimizer.state_dict(),  # Save optimizer state if needed
+    'epoch': N_epochs,  # Save the final epoch
+    'final_test_loss': final_test_loss,  # Save the final validation loss
+}
+torch.save(final_model_info, 'final_model.pth')
+print("Final model saved to 'final_model.pth'")
+'''
+
+###############################################################################
+# Convert the model and X_from_F4 fuction into TorchScript to save in a file  #
+###############################################################################
+
+from utils import X_from_F4
+# Convert X_from_F4 into a TorchScript function
+scripted_X_from_F4 = torch.jit.script(X_from_F4)  
+
+# Convert the trained model into TorchScript
+example_input = torch.randn(1, INPUT_SIZE).to(device)  # Just for model conversion
+traced_model = torch.jit.trace(model, example_input)
+
+# Save the model
+torch.jit.save(traced_model, "model.pt")
+# Save the X_from_F4 function
+torch.jit.save(scripted_X_from_F4, "X_from_F4.pt")
+print("Saved model in 'model.pt' and X_from_F4 in 'X_from_F4.pt' using TorchScript.")

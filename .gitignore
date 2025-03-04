@@ -3,3 +3,5 @@ build
 .vscode
 stability_model/*.npz
 .DS_Store
+stability_model/*.pt
+stability_model/*.json
