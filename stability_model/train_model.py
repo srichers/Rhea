@@ -192,4 +192,4 @@ traced_model = torch.jit.trace(model, example_input)
 torch.jit.save(traced_model, "final_model.pt")
 # Save the X_from_F4 function
 torch.jit.save(scripted_X_from_F4, "X_from_F4.pt")
-print("Saved model in 'model.pt' and X_from_F4 in 'X_from_F4.pt' using TorchScript.")
+print("Saved model in 'final_model.pt' and X_from_F4 in 'X_from_F4.pt' using TorchScript.")
