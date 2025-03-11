@@ -26,8 +26,8 @@ Early Stopping: This stops training when the validation loss stops improving, pr
 '''
 DROPOUT_RATE = 0.1 #0.5  # Dropout rate for regularization
 WEIGHT_DECAY = 1e-2 #1e-5  # L2 regularization (weight decay)
-PATIENCE = 1000 #100  # Number of epochs to wait for improvement before stopping
-
+USE_EARLY_STOPPING = True
+PATIENCE = 1000 #100  # Number of epochs to wait for improvement before stopping (Only used if USE_EARLY_STOPPING is True)
 
 # Define the model
 class BinaryClassifier(nn.Module):
@@ -70,9 +70,7 @@ def train_step(X_batch, y_batch):
     optimizer.zero_grad()
     outputs = model(X_batch)
     loss = criterion(outputs, y_batch)
-    loss.backward()
-    optimizer.step()
-    return loss.item()
+    return loss
 
 #Validation step
 def validate_step(X_batch, y_batch):
@@ -96,6 +94,7 @@ unstable_oneflavor = training_data2['unstable_oneflavor']
 training_data3 = np.load('train_data_random.npz')
 X_random = training_data3['X_random']
 unstable_random = training_data3['unstable_random']
+unstable_random = unstable_random.astype(np.float32)
 
 print("X_zerofluxfac.shape:", X_zerofluxfac.shape)
 print("unstable_zerofluxfac.shape:", unstable_zerofluxfac.shape)
@@ -104,38 +103,74 @@ print("unstable_oneflavor.shape:", unstable_oneflavor.shape)
 print("X_random.shape:", X_random.shape)
 print("unstable_random.shape:", unstable_random.shape)
 
-
+'''
 #Combine the datasets
 input_data = np.concatenate((X_zerofluxfac, X_oneflavor, X_random), axis=0)
 output_data = np.concatenate((unstable_zerofluxfac, unstable_oneflavor, unstable_random), axis=0).astype(np.float32)
-
 print("input_data.shape:", input_data.shape)
 print("output_data.shape:", output_data.shape)
-
 # Perform train-test split (90% training, 10% testing)
 X_train, X_test, y_train, y_test = train_test_split(input_data, output_data, test_size=0.1, random_state=42)
+'''
+
+# Perform train-test split for each dataset (90% training, 10% testing)
+X_train1, X_test1, y_train1, y_test1 = train_test_split(X_zerofluxfac, unstable_zerofluxfac, test_size=0.2, random_state=42)
+X_train2, X_test2, y_train2, y_test2 = train_test_split(X_oneflavor, unstable_oneflavor, test_size=0.2, random_state=42)
+X_train3, X_test3, y_train3, y_test3 = train_test_split(X_random, unstable_random, test_size=0.2, random_state=42)
 
 #Convert data to PyTorch tensors and move to device, and split into training and testing sets
-X_train = torch.from_numpy(X_train).to(device)
-y_train = torch.from_numpy(y_train).to(device)
-X_test = torch.from_numpy(X_test).to(device)
-y_test = torch.from_numpy(y_test).to(device)
+X_train1 = torch.from_numpy(X_train1).to(device)
+y_train1 = torch.from_numpy(y_train1).to(device)
+X_test1 = torch.from_numpy(X_test1).to(device)
+y_test1 = torch.from_numpy(y_test1).to(device)
 
+X_train2 = torch.from_numpy(X_train2).to(device)
+y_train2 = torch.from_numpy(y_train2).to(device)
+X_test2 = torch.from_numpy(X_test2).to(device)
+y_test2 = torch.from_numpy(y_test2).to(device)
+
+X_train3 = torch.from_numpy(X_train3).to(device)
+y_train3 = torch.from_numpy(y_train3).to(device)
+X_test3 = torch.from_numpy(X_test3).to(device)
+y_test3 = torch.from_numpy(y_test3).to(device)
+
+###############################################################################
+# Convert X_from_F4 fuction into TorchScript to save in a file  #
+###############################################################################
+from utils import X_from_F4
+# Convert X_from_F4 into a TorchScript function
+scripted_X_from_F4 = torch.jit.script(X_from_F4)  
+# Save the X_from_F4 function
+torch.jit.save(scripted_X_from_F4, "X_from_F4.pt")
+print("Saved X_from_F4 in 'X_from_F4.pt' using TorchScript.")
 
 #Training loop
-N_epochs = 200
-print_every_epoch = 100
+N_epochs = 10000
+print_every_epoch = 100 #10
+save_model_every_epoch = 1000
 best_test_loss = float('inf')
 patience = PATIENCE  # Number of epochs to wait for improvement before stopping
 patience_counter = 0
 
 start_time = time.time()
 for i in range(N_epochs):
-    # Training step
-    train_loss = train_step(X_train, y_train)
+    # Training step 
+    #train_loss = train_step(X_train, y_train)
 
+    #Train each dataset separately
+    loss1 = train_step(X_train1, y_train1)
+    loss2 = train_step(X_train2, y_train2)
+    loss3 = train_step(X_train3, y_train3)
+    #TODO: We can multiply the loss from random by 100 to make it more important
+    train_loss = loss1 + loss2 + 100*loss3 
+    train_loss.backward()
+    optimizer.step()
+    
     # Validation step
-    test_loss = validate_step(X_test, y_test)
+    test_loss1 = validate_step(X_test1, y_test1)
+    test_loss2 = validate_step(X_test2, y_test2)
+    test_loss3 = validate_step(X_test3, y_test3)
+    test_loss = test_loss1 + test_loss2 + test_loss3
 
     # Early stopping logic
     if test_loss < best_test_loss:
@@ -151,45 +186,33 @@ for i in range(N_epochs):
         print("Epoch {}, Train loss = {}, Test loss = {}, Time elapsed = {} sec = {} hr".format(i, train_loss, test_loss, round(elapsed_time, 2), elapsed_time_hr))
 
     # Stop training if validation loss hasn't improved for `patience` epochs
-    if patience_counter >= patience:
+    if patience_counter >= patience and USE_EARLY_STOPPING:
         print(f"Early stopping at epoch {i} as validation loss did not improve for {patience} epochs.")
         break
 
+    if i % save_model_every_epoch == 0:
+        # Convert the trained model into TorchScript
+        example_input = torch.randn(1, INPUT_SIZE).to(device)  # Just for model conversion
+        traced_model = torch.jit.trace(model, example_input)
+        # Save the model
+        torch.jit.save(traced_model, "model_epoch{}.pt".format(i))
+        print("Saved model in 'model_epoch{}.pt' using TorchScript.".format(i))
+
+
 # Final validation step after training
-final_test_loss = validate_step(X_test, y_test)
+final_test_loss1 = validate_step(X_test1, y_test1) 
+final_test_loss2 = validate_step(X_test2, y_test2) 
+final_test_loss3 = validate_step(X_test3, y_test3) 
+final_test_loss = final_test_loss1 + final_test_loss2 + final_test_loss3
 print(f"Final Validation Loss: {final_test_loss}")
 
-
-'''
-# Save the final model along with additional information
-final_model_info = {
-    'state_dict': model.state_dict(),
-    'input_size': INPUT_SIZE,
-    'hidden_size': HIDDEN_SIZE,
-    'num_layers': NUM_LAYERS,
-    'dropout_rate': DROPOUT_RATE,
-    'optimizer_state_dict': optimizer.state_dict(),  # Save optimizer state if needed
-    'epoch': N_epochs,  # Save the final epoch
-    'final_test_loss': final_test_loss,  # Save the final validation loss
-}
-torch.save(final_model_info, 'final_model.pth')
-print("Final model saved to 'final_model.pth'")
-'''
 
 ###############################################################################
 # Convert the model and X_from_F4 fuction into TorchScript to save in a file  #
 ###############################################################################
-
-from utils import X_from_F4
-# Convert X_from_F4 into a TorchScript function
-scripted_X_from_F4 = torch.jit.script(X_from_F4)  
-
 # Convert the trained model into TorchScript
 example_input = torch.randn(1, INPUT_SIZE).to(device)  # Just for model conversion
 traced_model = torch.jit.trace(model, example_input)
-
 # Save the model
-torch.jit.save(traced_model, "final_model.pt")
-# Save the X_from_F4 function
-torch.jit.save(scripted_X_from_F4, "X_from_F4.pt")
-print("Saved model in 'final_model.pt' and X_from_F4 in 'X_from_F4.pt' using TorchScript.")
+torch.jit.save(traced_model, "final_model{}.pt".format(i))
+print("Saved model in 'final_model{}.pt' using TorchScript.".format(i))
