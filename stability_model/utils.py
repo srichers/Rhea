@@ -5,6 +5,7 @@ sys.path.append('../model_training')
 from ml_tools import *
 from ml_maxentropy import *
 from ml_generate import *
+from ml_read_data import *
 
 #########################################################################################################
 ###########################################  X_from_F4    ###############################################
@@ -19,7 +20,7 @@ def X_from_F4(NF: int, do_fdotu: bool, F4: torch.Tensor):
     NX = NF * (1 + 2*NF)
     if do_fdotu:
             NX += 2*NF
-    print("NX = ", NX)
+    #print("NX = ", NX)
     X = torch.zeros((nsims, NX), device=F4.device)
     F4_flat = F4.reshape((nsims, 4, 2*NF)) # [simulationIndex, xyzt, species]
 

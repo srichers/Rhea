@@ -28,6 +28,10 @@ parms["do_fdotu"]= True
 parms["generate_max_fluxfac"] = 0.95
 parms["ME_stability_zero_weight"] = 10
 parms["ME_stability_n_equatorial"] = 32
+parms["NSM_stable_filename"] = ["/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl1_orthonormal.h5"]
+#parms["NSM_stable_filename"] = ["/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl1_orthonormal.h5"]
+parms["do_augment_permutation"] = False
+
 
 
 ################################################
@@ -92,6 +96,12 @@ unstable_random = has_crossing(F4_random.detach().numpy(), parms)
 #print("unstable_random.shape", unstable_random.shape)
 #print("unstable_random", unstable_random)
 
+print("Generating NSM stable data..")
+F4_NSM_stable = read_NSM_stable_data(parms)
+print(F4_NSM_stable.shape[0])
+unstable_NSM_stable = torch.zeros((F4_NSM_stable.shape[0], 1), device=parms["device"])
+unstable_NSM_stable[:, None] = 0 #Since all the generated points are stable
+print("unstable_NSM_stable.shape", unstable_NSM_stable.shape)
 
 ################################################
 ############# Convert from F4 to X #############
@@ -114,6 +124,11 @@ print("X_random[0,:]", X_random[0,:])
 print("unstable_random.shape", unstable_random.shape)
 print("unstable_random[0]", unstable_random[0])
 
+X_NSM_stable = X_from_F4(parms["NF"], parms["do_fdotu"], F4_NSM_stable)
+print("X_NSM_stable.shape", X_NSM_stable.shape)
+print("X_NSM_stable[0,:]", X_NSM_stable[0,:])
+print("unstable_NSM_stable.shape", unstable_NSM_stable.shape)
+print("unstable_NSM_stable[0]", unstable_NSM_stable[0])
 
 ################################################
 ############# Save the data ####################
@@ -121,6 +136,7 @@ print("unstable_random[0]", unstable_random[0])
 np.savez('train_data_stable_zerofluxfac.npz', X_zerofluxfac=X_zerofluxfac, unstable_zerofluxfac=unstable_zerofluxfac)
 np.savez('train_data_stable_oneflavor.npz', X_oneflavor=X_oneflavor, unstable_oneflavor=unstable_oneflavor)
 np.savez('train_data_random.npz', X_random=X_random, unstable_random=unstable_random)
+np.savez('train_data_NSM_stable.npz', X_NSM_stable=X_NSM_stable, unstable_NSM_stable=unstable_NSM_stable)
 
 # Save parameters to a JSON file
 with open("parms.json", "w") as f:
