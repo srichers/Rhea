@@ -96,12 +96,19 @@ X_random = training_data3['X_random']
 unstable_random = training_data3['unstable_random']
 unstable_random = unstable_random.astype(np.float32)
 
+#Load training data for NSM stable
+training_data4 = np.load('train_data_NSM_stable.npz')
+X_NSM_stable = training_data4['X_NSM_stable']
+unstable_NSM_stable = training_data4['unstable_NSM_stable']
+
 print("X_zerofluxfac.shape:", X_zerofluxfac.shape)
 print("unstable_zerofluxfac.shape:", unstable_zerofluxfac.shape)
 print("X_oneflavor.shape:", X_oneflavor.shape)
 print("unstable_oneflavor.shape:", unstable_oneflavor.shape)
 print("X_random.shape:", X_random.shape)
 print("unstable_random.shape:", unstable_random.shape)
+print("X_NSM_stable.shape:", X_NSM_stable.shape)
+print("unstable_NSM_stable.shape:", unstable_NSM_stable.shape)
 
 '''
 #Combine the datasets
@@ -117,6 +124,7 @@ X_train, X_test, y_train, y_test = train_test_split(input_data, output_data, tes
 X_train1, X_test1, y_train1, y_test1 = train_test_split(X_zerofluxfac, unstable_zerofluxfac, test_size=0.2, random_state=42)
 X_train2, X_test2, y_train2, y_test2 = train_test_split(X_oneflavor, unstable_oneflavor, test_size=0.2, random_state=42)
 X_train3, X_test3, y_train3, y_test3 = train_test_split(X_random, unstable_random, test_size=0.2, random_state=42)
+X_train4, X_test4, y_train4, y_test4 = train_test_split(X_NSM_stable, unstable_NSM_stable, test_size=0.2, random_state=42)
 
 #Convert data to PyTorch tensors and move to device, and split into training and testing sets
 X_train1 = torch.from_numpy(X_train1).to(device)
@@ -133,6 +141,11 @@ X_train3 = torch.from_numpy(X_train3).to(device)
 y_train3 = torch.from_numpy(y_train3).to(device)
 X_test3 = torch.from_numpy(X_test3).to(device)
 y_test3 = torch.from_numpy(y_test3).to(device)
+
+X_train4 = torch.from_numpy(X_train4).to(device)
+y_train4 = torch.from_numpy(y_train4).to(device)
+X_test4 = torch.from_numpy(X_test4).to(device)
+y_test4 = torch.from_numpy(y_test4).to(device)
 
 ###############################################################################
 # Convert X_from_F4 fuction into TorchScript to save in a file  #
@@ -161,8 +174,9 @@ for i in range(N_epochs):
     loss1 = train_step(X_train1, y_train1)
     loss2 = train_step(X_train2, y_train2)
     loss3 = train_step(X_train3, y_train3)
+    loss4 = train_step(X_train4, y_train4)
     #TODO: We can multiply the loss from random by 100 to make it more important
-    train_loss = loss1 + loss2 + 100*loss3 
+    train_loss = loss1 + loss2 + 100*loss3 + loss4
     train_loss.backward()
     optimizer.step()
     
@@ -170,7 +184,8 @@ for i in range(N_epochs):
     test_loss1 = validate_step(X_test1, y_test1)
     test_loss2 = validate_step(X_test2, y_test2)
     test_loss3 = validate_step(X_test3, y_test3)
-    test_loss = test_loss1 + test_loss2 + test_loss3
+    test_loss4 = validate_step(X_test4, y_test4)
+    test_loss = test_loss1 + test_loss2 + test_loss3 + test_loss4
 
     # Early stopping logic
     if test_loss < best_test_loss:
@@ -203,7 +218,8 @@ for i in range(N_epochs):
 final_test_loss1 = validate_step(X_test1, y_test1) 
 final_test_loss2 = validate_step(X_test2, y_test2) 
 final_test_loss3 = validate_step(X_test3, y_test3) 
-final_test_loss = final_test_loss1 + final_test_loss2 + final_test_loss3
+final_test_loss4 = validate_step(X_test4, y_test4)
+final_test_loss = final_test_loss1 + final_test_loss2 + final_test_loss3 + final_test_loss4
 print(f"Final Validation Loss: {final_test_loss}")
 
 
