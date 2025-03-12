@@ -27,7 +27,7 @@ Early Stopping: This stops training when the validation loss stops improving, pr
 DROPOUT_RATE = 0.1 #0.5  # Dropout rate for regularization
 WEIGHT_DECAY = 1e-2 #1e-5  # L2 regularization (weight decay)
 USE_EARLY_STOPPING = True
-PATIENCE = 1000 #100  # Number of epochs to wait for improvement before stopping (Only used if USE_EARLY_STOPPING is True)
+PATIENCE = 5000 #100  # Number of epochs to wait for improvement before stopping (Only used if USE_EARLY_STOPPING is True)
 
 # Define the model
 class BinaryClassifier(nn.Module):
