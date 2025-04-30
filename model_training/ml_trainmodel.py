@@ -25,12 +25,12 @@ def train_asymptotic_model(parms,
                            F4f_train,
                            F4i_test,
                            F4f_test,
-                           F4_NSM_stable_train,
-                           F4_NSM_stable_test):
+                           logGrowthRate_train,
+                           logGrowthRate_test):
     print("Training dataset size:",dataset_size)
 
     # create a new plotter object of larger size if epochs is larger than the plotter object
-    p = Plotter(parms["epochs"],["ndens","fluxmag","direction","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
+    p = Plotter(parms["epochs"],["ndens","fluxmag","direction","logGrowthRate","unphysical"])
     p.fill_from_plotter(plotter)
     p.init_plot_options()
 
@@ -49,24 +49,6 @@ def train_asymptotic_model(parms,
     #===============#
     # generate randomized data and evaluate the test error
     F4i_unphysical_test = generate_random_F4(parms)
-    F4_0ff_stable_train = generate_stable_F4_zerofluxfac(parms)
-    F4_0ff_stable_test  = generate_stable_F4_zerofluxfac(parms)
-    F4_1f_stable_train  = generate_stable_F4_oneflavor(parms)
-    F4_1f_stable_test   = generate_stable_F4_oneflavor(parms)
-
-    # set up datasets of stable distributions based on the max entropy stability condition
-    F4i_random = generate_random_F4(parms)
-    unstable_random = has_crossing(F4i_random.cpu().detach().numpy(), parms).squeeze()
-    print("random Stable:",np.sum(unstable_random==False))
-    print("random Unstable:",np.sum(unstable_random==True))
-    F4_random_stable = F4i_random[unstable_random==False]
-    F4_random_stable = augment_permutation(F4_random_stable)
-    F4_random_stable = F4_random_stable.float().to(parms["device"])
-
-    # split into a test and train set
-    ntotal = F4_random_stable.shape[0]
-    F4_random_stable_train = F4_random_stable[ntotal//2:]
-    F4_random_stable_test = F4_random_stable[:ntotal//2]
 
     epochs_already_done = len(plotter.data["ndens"].train_loss)
     for t in range(epochs_already_done, parms["epochs"]):
@@ -89,9 +71,9 @@ def train_asymptotic_model(parms,
 
 
         model.eval()
-        F4pred_test  = model.predict_F4(F4i_test)
+        F4pred_test, logGrowthRate_pred_test  = model.predict_F4_logGrowthRate(F4i_test)
         model.train()
-        F4pred_train = model.predict_F4(F4i_train)
+        F4pred_train, logGrowthRate_pred_train = model.predict_F4_logGrowthRate(F4i_train)
         ndens_pred_train, fluxmag_pred_train, Fhat_pred_train = get_ndens_logfluxmag_fhat(F4pred_train)
         ndens_pred_test , fluxmag_pred_test , Fhat_pred_test  = get_ndens_logfluxmag_fhat(F4pred_test )
         ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_logfluxmag_fhat(F4f_train   )
@@ -132,87 +114,21 @@ def train_asymptotic_model(parms,
         loss = loss + loss_direction
         test_loss = test_loss + test_loss_direction
 
-        # final stable #
-        model.eval()
-        F4pred_test = model.predict_F4(F4f_test)
-        model.train()
-        F4pred_train = model.predict_F4(F4f_train)
-        loss_final_stable, test_loss_fs = contribute_loss(F4pred_train,
-                                                          F4f_train,
-                                                          F4pred_test,
-                                                          F4f_test,
-                                                          "finalstable",
-                                                          comparison_loss_fn)
-        if parms["do_augment_final_stable"]:
-            loss = loss + loss_final_stable
-            test_loss = test_loss + test_loss_fs
-
-        # 1 flavor stable
-        model.eval()
-        F4pred_test = model.predict_F4(F4_1f_stable_test)
-        model.train()
-        F4pred_train = model.predict_F4(F4_1f_stable_train)
-        loss_1f_stable, test_loss_1f = contribute_loss(F4pred_train,
-                                                       F4_1f_stable_train,
-                                                       F4pred_test,
-                                                       F4_1f_stable_test,
-                                                       "1f",
-                                                       comparison_loss_fn)
-        if parms["do_augment_1f"]:
-            loss = loss + loss_1f_stable
-            test_loss = test_loss + test_loss_1f
-
-        # 0 flux factor stable
-        model.eval()
-        F4pred_test = model.predict_F4(F4_0ff_stable_test)
-        model.train()
-        F4pred_train = model.predict_F4(F4_0ff_stable_train)
-        loss_0ff_stable, test_loss_0ff = contribute_loss(F4pred_train,
-                                                         F4_0ff_stable_train,
-                                                         F4pred_test,
-                                                         F4_0ff_stable_test,
-                                                         "0ff",
-                                                         comparison_loss_fn)
-        if parms["do_augment_0ff"]:
-            loss = loss + loss_0ff_stable
-            test_loss = test_loss + test_loss_0ff
-
-        # random stable
-        model.eval()
-        F4pred_test = model.predict_F4(F4_random_stable_test)
-        model.train()
-        F4pred_train = model.predict_F4(F4_random_stable_train)
-        loss_random_stable, test_loss_rs = contribute_loss(F4pred_train,
-                                             F4_random_stable_train,
-                                             F4pred_test,
-                                             F4_random_stable_test,
-                                             "randomstable",
-                                             comparison_loss_fn)
-        if parms["do_augment_random_stable"]:
-            loss = loss + loss_random_stable
-            test_loss = test_loss + test_loss_rs
-            
-        # NSM_stable
-        model.eval()
-        F4pred_test = model.predict_F4(F4_NSM_stable_test)
-        model.train()
-        F4pred_train = model.predict_F4(F4_NSM_stable_train)
-        loss_NSM_stable, test_loss_NSM_stable = contribute_loss(F4pred_train,
-                                                                F4_NSM_stable_train,
-                                                                F4pred_test,
-                                                                F4_NSM_stable_test,
-                                                                "NSM_stable",
-                                                                comparison_loss_fn)
-        if parms["do_augment_NSM_stable"]:
-            loss = loss + loss_NSM_stable
-            test_loss = test_loss + test_loss_NSM_stable
-
+        # train on making sure the model prediction is correct [growthrate]
+        loss_growthrate, test_loss_growthrate = contribute_loss(logGrowthRate_pred_train,
+                                                                logGrowthRate_train,
+                                                                logGrowthRate_pred_test,
+                                                                logGrowthRate_test,
+                                                                "logGrowthRate", comparison_loss_fn)
+        loss = loss + loss_growthrate * 0.01
+        test_loss = test_loss + test_loss_growthrate * 0.01
+        
         # unphysical. Heavy over-training if not regenerated every iteration
         F4i_unphysical_train = generate_random_F4(parms)
         model.eval()
-        F4pred_test = model.predict_F4(F4i_unphysical_test)
+        F4pred_test, logGrowthRate_unphysical_test = model.predict_F4_logGrowthRate(F4i_unphysical_test)
         model.train()
-        F4pred_train = model.predict_F4(F4i_unphysical_train)
+        F4pred_train, logGrowthRate_unphysical_train = model.predict_F4_logGrowthRate(F4i_unphysical_train)
         loss_unphysical, test_loss_unphysical = contribute_loss(F4pred_train,
                                                                 None,
                                                                 F4pred_test,
@@ -245,9 +161,9 @@ def train_asymptotic_model(parms,
 
         if((t+1)%parms["output_every"]==0):
             outfilename = "model"+str(t+1)           #
-            save_model(model, outfilename, "cpu", F4_NSM_stable_test)
+            save_model(model, outfilename, "cpu", F4i_test)
             if parms["device"]=="cuda":
-                save_model(model, outfilename, "cuda", F4_NSM_stable_test)
+                save_model(model, outfilename, "cuda", F4i_test)
 
             # pickle the model, optimizer, and plotter
             with open("model_epoch"+str(t+1)+"_datasetsize"+str(dataset_size)+".pkl", "wb") as f:

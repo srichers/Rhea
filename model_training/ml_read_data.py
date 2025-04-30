@@ -28,16 +28,19 @@ def read_test_train_data(parms):
     print("#############################")
     F4_initial_list = []
     F4_final_list = []
+    growthrate_list = []
     for d in parms["database_list"]:
         print("Reading:",d)
         f_in = h5py.File(d,"r")
         F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
         F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
+        growthrate_list.append(np.array(f_in["growthRate(1|s)"  ]))
         assert(parms["NF"] == int(np.array(f_in["nf"])) )
         f_in.close()
         print("    ",len(F4_initial_list[-1]),"points in",d)
     F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=parms["device"]).float()
     F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=parms["device"]).float()
+    growthrate_list = torch.tensor(np.concatenate(growthrate_list), device=parms["device"]).float()
 
     # fix slightly negative energy densities
     ntot = ml.ntotal(F4_initial_list)
@@ -50,18 +53,25 @@ def read_test_train_data(parms):
     # normalize the data so the number densities add up to 1
     F4_initial_list = F4_initial_list / ntot[:,None,None,None]
     F4_final_list   = F4_final_list   / ntot[:,None,None,None]
+    growthrate_list = growthrate_list / ntot[:]
 
     # make sure the data are good
     check_conservation(F4_initial_list, F4_final_list)
+    assert(torch.all(growthrate_list > 0))
+
+    # convert growthrates into logarithms of growthrates
+    logGrowthRate_list = torch.log(growthrate_list)
 
     # split into training and testing sets
-    F4i_train, F4i_test, F4f_train, F4f_test = train_test_split(F4_initial_list, F4_final_list, test_size=parms["test_size"], random_state=42)
+    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = train_test_split(F4_initial_list, F4_final_list, logGrowthRate_list, test_size=parms["test_size"], random_state=42)
 
     if parms["do_augment_permutation"]:
         F4i_train = ml.augment_permutation(F4i_train)
         F4f_train = ml.augment_permutation(F4f_train)
         F4i_test  = ml.augment_permutation(F4i_test )
         F4f_test  = ml.augment_permutation(F4f_test )
+        growthrate_train = ml.augment_permutation(growthrate_train)
+        growthrate_test = ml.augment_permutation(growthrate_test)
 
     # average heavies if necessary
     if parms["average_heavies_in_final_state"]:
@@ -73,9 +83,9 @@ def read_test_train_data(parms):
     
     # pickle the train and test datasets
     with open("train_test_datasets.pkl","wb") as f:
-        pickle.dump([F4i_train, F4i_test, F4f_train, F4f_test],f)
+        pickle.dump([F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test],f)
 
-    return F4i_train, F4i_test, F4f_train, F4f_test
+    return F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test
 
 #=================================================#
 # read in the stable points from the NSM snapshot #

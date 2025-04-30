@@ -120,8 +120,9 @@ class NeuralNetwork(nn.Module):
 
 class AsymptoticNeuralNetwork(NeuralNetwork):
     def __init__(self, parms, final_layer):
-        
-        self.Ny = (2*parms["NF"])**2
+
+        # add one extra to predict growth rate
+        self.Ny = (2*parms["NF"])**2 + 1
         super().__init__(parms, self.Ny, final_layer)
 
     # convert the 3-flavor matrix into an effective 2-flavor matrix
@@ -141,7 +142,9 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
     # Push the inputs through the neural network
     # output is indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
     def forward(self,x):
-        y = self.linear_activation_stack(x).reshape(x.shape[0], 2,self.NF,2,self.NF)
+        yfull = self.linear_activation_stack(x)
+        y = yfull[:,:-1].reshape(x.shape[0], 2,self.NF,2,self.NF)
+        logGrowthRate = yfull[:,-1]
 
         # enforce conservation of particle number
         delta_nunubar = torch.eye(2, device=x.device)[None,:,None,:,None]
@@ -159,7 +162,7 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
             y[:,0] -= ELN_excess/2.
             y[:,1] += ELN_excess/2.
 
-        return y
+        return y, logGrowthRate
   
     # Use the initial F4 and the ML output to calculate the final F4
     # F4_initial must have shape [sim, xyzt, nu/nubar, flavor]
@@ -186,10 +189,10 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         return F4_final
 
     @torch.jit.export
-    def predict_F4(self, F4_initial):
+    def predict_F4_logGrowthRate(self, F4_initial):
         X = self.X_from_F4(F4_initial)
-        y = self.forward(X)
+        y, logGrowthRate = self.forward(X)
 
         F4_final = self.F4_from_y(F4_initial, y)
 
-        return F4_final
+        return F4_final, logGrowthRate
