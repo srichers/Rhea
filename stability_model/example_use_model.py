@@ -4,16 +4,8 @@ import sys
 import json
 
 # Load the traced model after training
-model = torch.jit.load('final_model.pt')
+model = torch.jit.load('example1/stabilitytModel40_cpu.pt')
 model.eval()  # Set to evaluation mode
-
-# Load the X_from_F4 function
-X_from_F4 = torch.jit.load('X_from_F4.pt')
-
-# Load parameters saved when generating the training data
-with open("parms.json", "r") as f:
-    parms = json.load(f)
-print("Loaded parameters:", parms)
 
 # use a GPU if available
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -21,7 +13,7 @@ print("Using",device,"device")
 model.to(device)
 
 # Load number of flavors
-NF = parms["NF"] 
+NF = 3
 
 print()
 print("#########################")
@@ -47,24 +39,20 @@ F4_test[1, :, 1:] = 0.0743 * F4_test[3, 0, 1]
 F4_test[2, :, 1:] = -0.5354 * F4_test[3, 0, 1]
 
 # set the tensor to have the correct dimensions (first index is used to evaluate many data points at the same time)
-before = torch.Tensor(F4_test[None,:,:,:]).to(device)
-
-#Convert F4 to X
-X_input = X_from_F4(parms["NF"], parms["do_fdotu"], before)
+F4_input = torch.Tensor(F4_test[None,:,:,:]).to(device)
 
 # print the number densities of each species before transforming
 print()
 print("N initial")
-print(before[0,3])
+print(F4_input[0,3])
 
 # print the number densities predicted by Emu
 print()
 print("TODO:: Emu expected: stable/unstable?")
 
 # Inference with real input
-output = model(X_input)
-unstable_flag = (output >= 0.5).float().item()
-print("Model output: unstable_flag = ", unstable_flag)  # Predictions
+unstable_probability, unstable_flag = model.predict_unstable_flag(F4_input)
+print("unstable_probability = ", unstable_probability, "\nunstable_flag = ", unstable_flag)  # Predictions
 
 if unstable_flag > 0.5:
     print("UNSTABLE")
