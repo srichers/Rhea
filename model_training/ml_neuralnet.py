@@ -25,8 +25,6 @@ class NeuralNetwork(nn.Module):
         if self.do_fdotu:
             self.NX += 2*self.NF
         self.Ny = Ny
-        self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
-        self.conserve_lepton_number = parms["conserve_lepton_number"]
 
         # append a full layer including linear, activation, and batchnorm
         def append_full_layer(modules, in_dim, out_dim):
@@ -120,8 +118,13 @@ class NeuralNetwork(nn.Module):
 
 class AsymptoticNeuralNetwork(NeuralNetwork):
     def __init__(self, parms, final_layer):
-        
-        self.Ny = (2*parms["NF"])**2
+
+        # one y matrix for ndens, one for flux
+        # add one extra to predict growth rate
+        self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
+        self.conserve_lepton_number = parms["conserve_lepton_number"]
+        self.Ny_onematrix = (2*parms["NF"])**2
+        self.Ny = 2*self.Ny_onematrix + 1
         super().__init__(parms, self.Ny, final_layer)
 
     # convert the 3-flavor matrix into an effective 2-flavor matrix
@@ -141,25 +144,31 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
     # Push the inputs through the neural network
     # output is indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
     def forward(self,x):
-        y = self.linear_activation_stack(x).reshape(x.shape[0], 2,self.NF,2,self.NF)
+        yfull = self.linear_activation_stack(x)
+        ydens = yfull[:,:self.Ny_onematrix].reshape(x.shape[0], 2,self.NF,2,self.NF)
+        yflux = yfull[:,self.Ny_onematrix:-1].reshape(x.shape[0], 2,self.NF,2,self.NF)
+        logGrowthRate = yfull[:,-1]
 
         # enforce conservation of particle number
         delta_nunubar = torch.eye(2, device=x.device)[None,:,None,:,None]
-        yflavorsum = torch.sum(y,dim=2)[:,:,None,:,:]
-        y = y + (delta_nunubar - yflavorsum) / self.NF
+        ydens_flavorsum = torch.sum(ydens,dim=2)[:,:,None,:,:]
+        yflux_flavorsum = torch.sum(yflux,dim=2)[:,:,None,:,:]
+        ydens = ydens + (delta_nunubar - ydens_flavorsum) / self.NF
+        yflux = yflux + (delta_nunubar - yflux_flavorsum) / self.NF
 
         # enforce symmetry in the heavies
         if self.average_heavies_in_final_state:
-            y[:,:,1:,:,:] = y.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
+            ydens[:,:,1:,:,:] = ydens.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
+            yflux[:,:,1:,:,:] = yflux.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
 
         # enforce eln conservation through y matrix
         if self.conserve_lepton_number == "ymatrix":
             delta_flavor = torch.eye(self.NF, device=x.device)[None,None,:,None,:]
-            ELN_excess = y[:,0] - y[:,1] - (delta_nunubar[:,0]-delta_nunubar[:,1]) * delta_flavor[:,0]
-            y[:,0] -= ELN_excess/2.
-            y[:,1] += ELN_excess/2.
+            ELN_excess = ydens[:,0] - ydens[:,1] - (delta_nunubar[:,0]-delta_nunubar[:,1]) * delta_flavor[:,0]
+            ydens[:,0] -= ELN_excess/2.
+            ydens[:,1] += ELN_excess/2.
 
-        return y
+        return ydens, yflux, logGrowthRate
   
     # Use the initial F4 and the ML output to calculate the final F4
     # F4_initial must have shape [sim, xyzt, nu/nubar, flavor]
@@ -167,13 +176,14 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
     # F4_final has shape [sim, xyzt, nu/nubar, flavor]
     # Treat all but the last flavor as output, since it is determined by conservation
     @torch.jit.export
-    def F4_from_y(self, F4_initial, y):
+    def F4_from_y(self, F4_initial, ydens, yflux):
         # tensor product with y
         # n indicates the simulation index
         # m indicates the spacetime index
         # i and j indicate nu/nubar
         # a and b indicate flavor
-        F4_final = torch.einsum("niajb,nmjb->nmia", y, F4_initial)
+        F4_final = torch.einsum("niajb,nmjb->nmia", yflux, F4_initial)
+        F4_final[:,3,:,:] = torch.einsum("niajb,njb->nia", ydens, F4_initial[:,3,:,:])
 
         # enforce eln
         if self.conserve_lepton_number == "direct":
@@ -186,10 +196,12 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         return F4_final
 
     @torch.jit.export
-    def predict_F4(self, F4_initial):
+    def predict_F4_logGrowthRate(self, F4_initial):
         X = self.X_from_F4(F4_initial)
-        y = self.forward(X)
+        ydens, yflux, logGrowthRate = self.forward(X)
 
-        F4_final = self.F4_from_y(F4_initial, y)
+        F4_final = self.F4_from_y(F4_initial, ydens, yflux)
 
-        return F4_final
+        return F4_final, logGrowthRate
+
+    

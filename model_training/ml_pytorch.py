@@ -27,12 +27,11 @@ if __name__ == "__main__":
     parms = {}
 
     parms["database_list"] = [
+        "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-old/many_sims_database.h5",
         "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib/many_sims_database.h5",
         "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms/many_sims_database.h5",
         "/mnt/scratch/NSM_ML/Emu_merger_grid/maximum_entropy_32beam_effective2flavor/many_sims_database.h5"
     ]
-    parms["NSM_stable_filename"] = ["/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl1_orthonormal.h5",
-                                    "/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl1_orthonormal.h5"]
     parms["do_unpickle"] = False
     parms["unpickle_filename"] = None
     parms["test_size"] = 0.1
@@ -42,10 +41,9 @@ if __name__ == "__main__":
     parms["print_every"] = 10
     parms["output_every"] = 5000
     parms["generate_max_fluxfac"] = 0.95
-    parms["ME_stability_zero_weight"] = 10
-    parms["ME_stability_n_equatorial"] = 32
+    parms["generate_zero_weight"] = 10
     parms["average_heavies_in_final_state"] = True
-    parms["conserve_lepton_number"] = "none"
+    parms["conserve_lepton_number"] = "direct"
 
     # data augmentation options
     parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
@@ -91,12 +89,9 @@ if __name__ == "__main__":
     #===============#
     if parms["do_unpickle"]:
         with open("train_test_datasets.pkl", "rb") as f:
-            F4i_train, F4i_test, F4f_train, F4f_test = pickle.load(f)
+            F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = pickle.load(f)
     else:
-        F4i_train, F4i_test, F4f_train, F4f_test = read_test_train_data(parms)
-
-    F4_NSM_stable = read_NSM_stable_data(parms)
-    F4_NSM_stable_train, F4_NSM_stable_test, _, _ = train_test_split(F4_NSM_stable, F4_NSM_stable, test_size=parms["test_size"], random_state=42)
+        F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = read_test_train_data(parms)
 
     # move the arrays over to the gpu
     F4i_train = torch.Tensor(F4i_train).to(parms["device"])
@@ -131,7 +126,7 @@ if __name__ == "__main__":
 
         else:
             model = AsymptoticNeuralNetwork(parms, None).to(parms["device"]) #nn.Tanh()
-            plotter = Plotter(0,["ndens","fluxmag","direction","unphysical","0ff","1f","finalstable","randomstable","NSM_stable"])
+            plotter = Plotter(0,["ndens","fluxmag","direction","logGrowthRate","unphysical"])
 
         plotter_array.append(plotter)
         model_array.append(model)
@@ -169,8 +164,8 @@ if __name__ == "__main__":
             F4f_train,
             F4i_test,
             F4f_test,
-            F4_NSM_stable_train,
-            F4_NSM_stable_test)
+            logGrowthRate_train,
+            logGrowthRate_test)
 
         # pickle the model, optimizer, and plotter
         with open("model_"+str(parms["dataset_size_list"][i])+".pkl", "wb") as f:

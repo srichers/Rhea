@@ -80,7 +80,7 @@ def generate_random_F4(parms):
 
     # choose a random flux factor
     fluxfac = torch.rand(parms["n_generate"], 2, parms["NF"], device=parms["device"])*parms["generate_max_fluxfac"]
-    fluxfac = fluxfac**parms["ME_stability_zero_weight"]
+    fluxfac = fluxfac**parms["generate_zero_weight"]
 
     # multiply the spatial flux by the flux factor times the density.
     F4i[:,0:3,:,:] = F4i[:,0:3,:,:] * fluxfac[:,None,:,:]
