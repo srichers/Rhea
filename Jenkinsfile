@@ -34,6 +34,11 @@ pipeline {
 		sh 'python3 example_use_model.py ../example_model.pt'
 	    }
 	}}
+	stage('ME has crossint'){ steps{
+            dir('model_training'){
+		sh 'python3 ml_maxentropy.py'
+	    }
+	}}
 
     } // stages{
 

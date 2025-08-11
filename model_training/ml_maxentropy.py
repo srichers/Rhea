@@ -77,8 +77,8 @@ def uniform_sphere(nphi_at_equator):
 # check whether a collection of number fluxes is stable according to the maximum entropy condition
 # generate many directions along which to test whether the distributions cross
 # F4i has dimensions [sim, xyzt, nu/nubar, flavor]
-def has_crossing(F4i, parms):
-    assert(parms["NF"]==3)
+def has_crossing(F4i, NF, nphi_at_equator):
+    assert(NF==3)
     nsims = F4i.shape[0]
 
     # evaluate the flux factor for each species
@@ -101,20 +101,20 @@ def has_crossing(F4i, parms):
     assert(np.all(fluxfac>=0))
 
     # get Z for each species
-    Z = np.zeros((nsims,2,parms["NF"]))
+    Z = np.zeros((nsims,2,NF))
     for i in range(2):
-        for j in range(parms["NF"]):
+        for j in range(NF):
             Z[:,i,j], residual = get_Z(fluxfac[:,i,j])
 
     # generate a bunch of directions along which to test whether the distributions cross
     # result has dimensions [3,ndirections]
-    xyz = uniform_sphere(parms["ME_stability_n_equatorial"])
+    xyz = uniform_sphere(nphi_at_equator)
     ndirections = xyz.shape[1]
 
     # Evaluate costheta relative to Fhat for each species
-    costheta = np.zeros((nsims,2,parms["NF"],ndirections))
+    costheta = np.zeros((nsims,2,NF,ndirections))
     for i in range(2):
-        for j in range(parms["NF"]):
+        for j in range(NF):
             costheta[:,i,j,:] = np.sum(xyz[None,:,:] * Fhat[:,:,i,j,None], axis=1)
     costheta[badlocs] = 0
     assert(np.all(np.abs(costheta)<1+1e-6))
@@ -122,9 +122,9 @@ def has_crossing(F4i, parms):
     costheta[np.where(costheta<-1)] = -1
 
     # Evaluate the distribution for each species
-    f = np.zeros((nsims,2,parms["NF"],ndirections))
+    f = np.zeros((nsims,2,NF,ndirections))
     for i in range(2):
-        for j in range(parms["NF"]):
+        for j in range(NF):
             f[:,i,j,:] = distribution(F4i[:,3,i,j,None], Z[:,i,j,None], costheta[:,i,j,:])
 
     # lepton number is difference between neutrinos and antineutrinos
@@ -132,11 +132,11 @@ def has_crossing(F4i, parms):
     lepton_number = f[:,0,:,:] - f[:,1,:,:]
 
     # calculate the G quantities
-    NG = (parms["NF"]**2-parms["NF"])//2
+    NG = (NF**2-NF)//2
     G = np.zeros((nsims,NG,ndirections))
     iG = 0
-    for i in range(parms["NF"]):
-        for j in range(i+1,parms["NF"]):
+    for i in range(NF):
+        for j in range(i+1,NF):
             G[:,iG,:] = lepton_number[:,i,:] - lepton_number[:,j,:]
             iG += 1
     assert(iG==NG)
@@ -158,13 +158,17 @@ if __name__ == "__main__":
     F4i = torch.zeros((1,4,2,3))
     F4i[0,3,0,0] = 1
     F4i[0,3,1,0] = 2
-    print("should be false:", has_crossing(F4i.detach().numpy(), 3, 64))
+    result = has_crossing(F4i.detach().numpy(), 3, 64)
+    print(result,"should be 0")
+    assert(all(result==0))
 
     F4i = torch.zeros((1,4,2,3))
     F4i[0,3,0,0] = 1
     F4i[0,3,1,0] = 1
     F4i[0,0,0,0] =  0.5
     F4i[0,0,1,0] = -0.5
-    print("should be true:", has_crossing(F4i.detach().numpy(), 3, 64))
+    result = has_crossing(F4i.detach().numpy(), 3, 64)
+    print(result,"should be 1")
+    assert(all(result==1))
 
 
