@@ -39,7 +39,7 @@ pipeline {
 		sh 'python3 ml_maxentropy.py'
 	    }
 	}}
-	stage('ME has crossint'){ steps{
+	stage('data generation'){ steps{
             dir('model_training'){ dir('data'){
 		sh 'python3 ml_generate.py'
 	    }}
