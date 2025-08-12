@@ -11,7 +11,6 @@ from ml_loss import *
 from ml_neuralnet import *
 from ml_optimizer import *
 from ml_plot import *
-from ml_maxentropy import *
 from ml_tools import *
 import pickle
 

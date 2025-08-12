@@ -9,7 +9,7 @@ This file contains a variety of functions that generate randomized distributions
 import torch
 import sys
 sys.path.append("..")
-import ml_maxentropy
+import maxentropy
 import h5py
 
 # create list of simulations known to be stable when the flux factor is zero
@@ -81,34 +81,29 @@ def generate_random_F4(NF, n_generate, average_heavies_in_final_state, zero_weig
 
     return F4i
 
+def write_stable_dataset(outfilename, F4i, stable):
+    f = h5py.File(outfilename,"w")
+    f["F4_initial(1|ccm)"] = F4i
+    f["stable"] = stable
+    f.close()
 
 if __name__ == "__main__":
     NF = 3
     ngenerate = 100
-    
+
     result = generate_stable_F4_zerofluxfac(NF, ngenerate, False).numpy()
     print("generate_stable_F4_zerofluxfac output: ",result.shape)
-    assert(all(ml_maxentropy.has_crossing(result, 3, 64)==False))
-    f = h5py.File("stable_zerofluxfac_database.h5","w")
-    f["F4_initial(1|ccm)"] = result
-    f["stable"] = torch.ones(ngenerate)
-    f.close()
+    assert(all(maxentropy.has_crossing(result, 3, 64)==False))
+    write_stable_dataset("stable_zerofluxfac_database.h5",result, torch.ones(ngenerate))
     
     result = generate_stable_F4_oneflavor(NF, ngenerate, False).numpy()
     print("generate_stable_F4_oneflavor output: ",result.shape)
-    assert(all(ml_maxentropy.has_crossing(result, 3, 64)==False))
-    f = h5py.File("stable_oneflavor_database.h5","w")
-    f["F4_initial(1|ccm)"] = result
-    f["stable"] = torch.ones(ngenerate)
-    f.close()
+    assert(all(maxentropy.has_crossing(result, 3, 64)==False))
+    write_stable_datset("stable_oneflavor_database.h5", result, torch.ones(ngenerate))
 
     result = generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
-    hascrossing = torch.tensor(ml_maxentropy.has_crossing(result, 3, 200))
+    hascrossing = torch.tensor(maxentropy.has_crossing(result, 3, 200))
     print("generate_stable_F4_oneflavor output: ",result.shape)
     print("nstable:",torch.sum(hascrossing))
-    f = h5py.File("stable_random_database.h5","w")
-    f["F4_initial(1|ccm)"] = result
-    f["stable"] = 1-hascrossing
-    f.close()
-    
+    write_stable_dataset("stable_random_database.h5", result, 1-hascrossing)
     
