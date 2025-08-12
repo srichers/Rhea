@@ -10,6 +10,7 @@ import torch
 import sys
 sys.path.append("..")
 import ml_maxentropy
+import h5py
 
 # create list of simulations known to be stable when the flux factor is zero
 # input has dimensions  [nsims  , xyzt, nu/nubar, flavor]
@@ -22,17 +23,15 @@ def generate_stable_F4_zerofluxfac(NF, n_generate, average_heavies_in_final_stat
     # densities randomly from 0 to 1
     F4i[:,3,:,:] = torch.rand(n_generate, 2, NF)
 
-    # normalize
-    ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
-    F4i = F4i / ntot[:,None,None,None]
-
-    # average if necessary
-    if average_heavies_in_final_state:
-        F4i[:,:,:,1:] = torch.mean(F4i[:,:,:,1:], dim=3, keepdims=True)
-    
     return F4i
 
 def generate_stable_F4_oneflavor(NF, n_generate, average_heavies_in_final_state):
+    # set F4i with the new flux values
+    F4i = torch.zeros((n_generate, 4, 2, NF))
+
+    # set electron neutrino number densities to 1
+    F4i[:,3,0,0] = 1
+
     # choose the flux to be in a random direction
     costheta = 2*(torch.rand(n_generate) - 0.5)
     phi = 2*torch.pi*torch.rand(n_generate)
@@ -47,20 +46,9 @@ def generate_stable_F4_oneflavor(NF, n_generate, average_heavies_in_final_state)
     # set Frand to be the flux factor times the density. Assume that the density is 1
     Frand = Frand * fluxfac[:,None]
 
-    # set F4i with the new flux values
-    F4i = torch.zeros((n_generate*2*NF, 4, 2, NF))
-    for i in range(2):
-        for j in range(NF):
-            # set start and end indices for current flavor and nu/nubar
-            start = i*n_generate + j*n_generate*2
-            end   = start + n_generate
-            F4i[start:end,0:3,i,j] = Frand
-            F4i[start:end,  3,i,j] = 1
+    # set the fluxes of F4i
+    F4i[:,0:3,0,0] = Frand
     
-    # average if necessary
-    if average_heavies_in_final_state:
-        F4i[:,:,:,1:] = torch.mean(F4i[:,:,:,1:], dim=3, keepdims=True)
-
     return F4i
 
 def generate_random_F4(NF, n_generate, average_heavies_in_final_state, zero_weight, max_fluxfac):
@@ -91,27 +79,36 @@ def generate_random_F4(NF, n_generate, average_heavies_in_final_state, zero_weig
     # scale by the number density
     F4i = F4i * Ndens[:,None,:,:]
 
-    # normalize so the total number density is 1
-    ntot = torch.sum(F4i[:,3,:,:], dim=(1,2))
-    F4i = F4i / ntot[:,None,None,None]
-
-    # average if necessary
-    if average_heavies_in_final_state:
-        F4i[:,:,:,1:] = torch.mean(F4i[:,:,:,1:], dim=3, keepdims=True)
-
     return F4i
 
 
 if __name__ == "__main__":
     NF = 3
-    result = generate_stable_F4_zerofluxfac(NF, 100, False).numpy()
+    ngenerate = 100
+    
+    result = generate_stable_F4_zerofluxfac(NF, ngenerate, False).numpy()
     print("generate_stable_F4_zerofluxfac output: ",result.shape)
     assert(all(ml_maxentropy.has_crossing(result, 3, 64)==False))
+    f = h5py.File("stable_zerofluxfac_database.h5","w")
+    f["F4_initial(1|ccm)"] = result
+    f["stable"] = torch.ones(ngenerate)
+    f.close()
     
-    result = generate_stable_F4_oneflavor(NF, 100, False).numpy()
+    result = generate_stable_F4_oneflavor(NF, ngenerate, False).numpy()
     print("generate_stable_F4_oneflavor output: ",result.shape)
     assert(all(ml_maxentropy.has_crossing(result, 3, 64)==False))
+    f = h5py.File("stable_oneflavor_database.h5","w")
+    f["F4_initial(1|ccm)"] = result
+    f["stable"] = torch.ones(ngenerate)
+    f.close()
 
-    result = generate_random_F4(NF, 100, False, 10, 0.95).numpy()
-    print("generate_random_F4 output:", result.shape)
-    #assert(all(ml_maxentropy.has_crossing(result, 3, 64)==False)) # these are NOT all stable
+    result = generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
+    hascrossing = torch.tensor(ml_maxentropy.has_crossing(result, 3, 200))
+    print("generate_stable_F4_oneflavor output: ",result.shape)
+    print("nstable:",torch.sum(hascrossing))
+    f = h5py.File("stable_random_database.h5","w")
+    f["F4_initial(1|ccm)"] = result
+    f["stable"] = 1-hascrossing
+    f.close()
+    
+    
