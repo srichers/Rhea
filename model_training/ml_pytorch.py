@@ -50,7 +50,6 @@ if __name__ == "__main__":
     parms["do_augment_final_stable"]= False # True
     parms["do_unphysical_check"]= True # True - seems to help prevent crazy results
     parms["do_augment_0ff"]= True
-    parms["do_augment_1f"]= True
     parms["do_augment_random_stable"]= True
     parms["do_augment_NSM_stable"]= True
 

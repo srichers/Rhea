@@ -72,10 +72,10 @@ def main():
     ################################################
     ############# Save the data ####################
     ################################################
-    np.savez('../train_data_stable_zerofluxfac.npz', X_zerofluxfac=X_zerofluxfac, unstable_zerofluxfac=unstable_zerofluxfac)
-    np.savez('../train_data_stable_oneflavor.npz', X_oneflavor=X_oneflavor, unstable_oneflavor=unstable_oneflavor)
-    np.savez('../train_data_random.npz', X_random=X_random, unstable_random=unstable_random)
-    np.savez('../train_data_NSM_stable.npz', X_NSM_stable=X_NSM_stable, unstable_NSM_stable=unstable_NSM_stable)
+    np.savez('train_data_stable_zerofluxfac.npz', X_zerofluxfac=X_zerofluxfac, unstable_zerofluxfac=unstable_zerofluxfac)
+    np.savez('train_data_stable_oneflavor.npz', X_oneflavor=X_oneflavor, unstable_oneflavor=unstable_oneflavor)
+    np.savez('train_data_random.npz', X_random=X_random, unstable_random=unstable_random)
+    np.savez('train_data_NSM_stable.npz', X_NSM_stable=X_NSM_stable, unstable_NSM_stable=unstable_NSM_stable)
     print("*******************TRAINING DATA GENERATED AND SAVED IN NPZ FILES*****************************\n")
 
 if __name__ == "__main__":
