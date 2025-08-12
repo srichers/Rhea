@@ -11,14 +11,11 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 import ml_tools as ml
-from ml_loss import *
-from ml_neuralnet import *
-from ml_optimizer import *
-from ml_plot import *
-from ml_trainmodel import *
-import pickle
+import sys
+sys.path.append("data")
+import generate
 
-def read_test_train_data(parms):
+def read_asymptotic_data(parms):
     #===============================================#
     # read in the database from the previous script #
     #===============================================#
@@ -51,19 +48,20 @@ def read_test_train_data(parms):
         F4_initial_list[:,i,:,:][badlocs] = 0
 
     # normalize the data so the number densities add up to 1
+    # This prevents some cases from outweighing others
     F4_initial_list = F4_initial_list / ntot[:,None,None,None]
     F4_final_list   = F4_final_list   / ntot[:,None,None,None]
     growthrate_list = growthrate_list / ntot[:]
 
     # make sure the data are good
-    check_conservation(F4_initial_list, F4_final_list)
+    ml.check_conservation(F4_initial_list, F4_final_list)
     assert(torch.all(growthrate_list > 0))
 
     # convert growthrates into logarithms of growthrates
     logGrowthRate_list = torch.log(growthrate_list)
 
     # split into training and testing sets
-    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = train_test_split(F4_initial_list, F4_final_list, logGrowthRate_list, test_size=parms["test_size"], random_state=42)
+    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = train_test_split(F4_initial_list, F4_final_list, logGrowthRate_list, test_size=parms["test_size"], random_state=parms["random_state"])
 
     if parms["do_augment_permutation"]:
         F4i_train = ml.augment_permutation(F4i_train)
@@ -81,66 +79,54 @@ def read_test_train_data(parms):
         F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3, keepdim=True)
         F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3, keepdim=True)
     
-    # pickle the train and test datasets
-    with open("train_test_datasets.pkl","wb") as f:
-        pickle.dump([F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test],f)
-
     return F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test
 
 #=================================================#
 # read in the stable points from the NSM snapshot #
 #=================================================#
-def read_NSM_stable_data(parms):
-    print()
-    print("#############################")
-    print("# READING NSM STABLE POINTS #")
-    print("#############################")
-    F4_NSM_stable_collected = np.zeros((0, 4, 2, parms["NF"]))
-    # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
-    # take only the y-z slice to limit the size of the data.
-    xslice = 100
-    for filename in parms["NSM_stable_filename"]:
+def read_stable_data(parms):
+    F4_collected = np.zeros((0, 4, 2, parms["NF"]))
+    stable_collected = np.zeros((0))
+
+    for filename in parms["stable_database_list"]:
         f_in = h5py.File(filename,"r")
-        discriminant = np.array(f_in["crossing_discriminant"])[xslice,:,:]
-        # n has shape [Nx,Ny,Nz]]
-        ne = np.array(f_in["n_e(1|ccm)"])[xslice,:,:]
-        na = np.array(f_in["n_a(1|ccm)"])[xslice,:,:]
-        nx = np.array(f_in["n_x(1|ccm)"])[xslice,:,:]
-        # f has shape [3, Nx,Ny,Nz]
-        fe = np.array(f_in["fn_e(1|ccm)"])[:,xslice,:,:]
-        fa = np.array(f_in["fn_a(1|ccm)"])[:,xslice,:,:]
-        fx = np.array(f_in["fn_x(1|ccm)"])[:,xslice,:,:]
+        F4_collected = np.concatenate((F4_collected, f_in["F4_initial(1|ccm)"][...]), axis=0)
+        stable_collected = np.concatenate((stable_collected, f_in["stable"][...]))
         f_in.close()
-        
-        stable_locs = np.where(discriminant<=0)
-        nlocs = len(stable_locs[0])
-        print(nlocs,"points")
-        F4_NSM_stable = np.zeros((nlocs,4,2,parms["NF"]))
-        F4_NSM_stable[:,3,0,0  ] = ne[stable_locs]
-        F4_NSM_stable[:,3,1,0  ] = na[stable_locs]
-        F4_NSM_stable[:,3,:,1:3] = nx[stable_locs][:,None,None] / 4.
-        for i in range(3):
-            F4_NSM_stable[:,i,0,0  ] = fe[i][stable_locs]
-            F4_NSM_stable[:,i,1,0  ] = fa[i][stable_locs]
-            F4_NSM_stable[:,i,:,1:3] = fx[i][stable_locs][:,None,None] / 4.
-        F4_NSM_stable_collected = np.concatenate((F4_NSM_stable_collected, F4_NSM_stable), axis=0)
-        
+
     # convert into a tensor
-    F4_NSM_stable = torch.tensor(F4_NSM_stable).float()
-    # normalize the data so the number densities add up to 1
-    ntot = ml.ntotal(F4_NSM_stable)
-    F4_NSM_stable = F4_NSM_stable / ntot[:,None,None,None]
-    
+    F4_collected = torch.tensor(F4_collected, device=parms["device"]).float()
+    stable_collected = torch.tensor(stable_collected, device=parms["device"]).float()
+
+    # split into training and testing sets
+    F4_train, F4_test, stable_train, stable_test = train_test_split(F4_collected, stable_collected, test_size=parms["test_size"], random_state=parms["random_state"])
+
     # don't need the final values because they are the same as the initial
     if parms["do_augment_permutation"]:
-        F4_NSM_stable = ml.augment_permutation(F4_NSM_stable)
-            
-    # move the array to the device
-    F4_NSM_stable = torch.Tensor(F4_NSM_stable).to(parms["device"])
+        F4_train = ml.augment_permutation(F4_train)
+        F4_test = ml.augment_permutation(F4_test)
+        stable_train = ml.augment_permutation(stable_train)
+        stable_test = ml.augment_permutation(stable_test)
 
-    # average heavies if necessary
-    if parms["average_heavies_in_final_state"]:
-        assert(parms["do_augment_permutation"]==False)
-        assert(torch.allclose( torch.mean(F4_NSM_stable[:,:,:,1:], dim=3), F4_NSM_stable[:,:,:,1] ))
+    return F4_train, F4_test, stable_train, stable_test
+
+if __name__ == "__main__":
+    parms = {
+        "NF" : 3,
+        "database_list" : ["/mnt/scratch/srichers/software/Rhea/model_training/data/asymptotic_M1-NuLib-7ms.h5"],
+        "stable_database_list" : ["/mnt/scratch/srichers/software/Rhea/model_training/data/stable_M1-LeakageRates_rl0.h5"],
+        "test_size" : 0.1,
+        "random_state" : 42,
+        "do_augment_permutation" : False,
+        "average_heavies_in_final_state" : False,
+        "device" : 'cpu'
+    }
     
-    return F4_NSM_stable
+    print("reading asymptotic dataset")
+    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = read_asymptotic_data(parms)
+    print(F4i_train.shape, F4i_test.shape, F4f_train.shape, F4f_test.shape, logGrowthRate_train.shape, logGrowthRate_test.shape)
+
+    print("reading stable dataset")
+    F4_train, F4_test, stable_train, stable_test = read_stable_data(parms)
+    print(F4_train.shape, F4_test.shape, stable_train.shape, stable_test.shape)
+
