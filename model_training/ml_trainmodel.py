@@ -9,7 +9,6 @@ This is the file contains the main training loop, including accumulation of the 
 import torch
 from ml_loss import *
 from ml_neuralnet import *
-from ml_optimizer import *
 from ml_plot import *
 from ml_tools import *
 import pickle
@@ -18,42 +17,25 @@ def train_asymptotic_model(parms,
                            model,
                            optimizer,
                            scheduler,
-                           plotter,
-                           dataset_size,
+                           p,
+                           F4s_train,
+                           F4s_test,
+                           stable_train,
+                           stable_test,
                            F4i_train,
-                           F4f_train,
                            F4i_test,
+                           F4f_train,
                            F4f_test,
                            logGrowthRate_train,
                            logGrowthRate_test):
-    print("Training dataset size:",dataset_size)
-
-    # create a new plotter object of larger size if epochs is larger than the plotter object
-    p = Plotter(parms["epochs"],["ndens","fluxmag","direction","logGrowthRate","unphysical"])
-    p.fill_from_plotter(plotter)
-    p.init_plot_options()
-
-    #=====================================================#
-    # Load training data into data loader for minibatches #
-    #=====================================================#
-    if dataset_size == -1:
-        dataset_size = F4i_train.shape[0]
-    assert(dataset_size <= F4i_train.shape[0])
-    F4i_train = F4i_train[:dataset_size]
-    F4f_train = F4f_train[:dataset_size]
-    dataset = torch.utils.data.TensorDataset(F4i_train, F4f_train)
 
     #===============#
     # training loop #
     #===============#
-    # generate randomized data and evaluate the test error
-    F4i_unphysical_test = generate_random_F4(parms)
-
-    epochs_already_done = len(plotter.data["ndens"].train_loss)
-    for t in range(epochs_already_done, parms["epochs"]):
+    for t in range(parms["epochs"]):
 
         # zero the gradients
-        optimizer.optimizer.zero_grad()
+        optimizer.zero_grad()
         loss = torch.tensor(0.0, requires_grad=True)
         test_loss = torch.tensor(0.0, requires_grad=False)
 
@@ -69,10 +51,15 @@ def train_asymptotic_model(parms,
             return train_loss, test_loss
 
 
+        # evaluate the training and test datasets
         model.eval()
-        F4pred_test, logGrowthRate_pred_test  = model.predict_F4_logGrowthRate(F4i_test)
+        F4pred_test, logGrowthRate_pred_test, _  = model.predict_all(F4i_test)
+        _, _, stable_pred_test = model.predict_all(F4s_test)
         model.train()
-        F4pred_train, logGrowthRate_pred_train = model.predict_F4_logGrowthRate(F4i_train)
+        F4pred_train, logGrowthRate_pred_train, _ = model.predict_all(F4i_train)
+        _, _, stable_pred_train = model.predict_all(F4s_train)
+
+        # convert F4 to densities and fluxes to feed to loss functions
         ndens_pred_train, fluxmag_pred_train, Fhat_pred_train = get_ndens_logfluxmag_fhat(F4pred_train)
         ndens_pred_test , fluxmag_pred_test , Fhat_pred_test  = get_ndens_logfluxmag_fhat(F4pred_test )
         ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_logfluxmag_fhat(F4f_train   )
@@ -85,6 +72,11 @@ def train_asymptotic_model(parms,
         ELN_violation = torch.max(torch.abs(ELN_final-ELN_initial) / Ntot_initial[:,None])
         
         # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
+        loss_stability, test_loss_stability = contribute_loss(stable_pred_train,
+                                                              stable_train,
+                                                              stable_pred_test,
+                                                              stable_test,
+                                                              "stability", stability_loss_fn)
         
         # train on making sure the model prediction is correct [ndens]
         loss_ndens, test_loss_ndens = contribute_loss(ndens_pred_train,
@@ -122,12 +114,7 @@ def train_asymptotic_model(parms,
         loss = loss + loss_growthrate * 0.01
         test_loss = test_loss + test_loss_growthrate * 0.01
         
-        # unphysical. Heavy over-training if not regenerated every iteration
-        F4i_unphysical_train = generate_random_F4(parms)
-        model.eval()
-        F4pred_test, logGrowthRate_unphysical_test = model.predict_F4_logGrowthRate(F4i_unphysical_test)
-        model.train()
-        F4pred_train, logGrowthRate_unphysical_train = model.predict_F4_logGrowthRate(F4i_unphysical_train)
+        # unphysical. Have experienced heavy over-training in the past if not regenerated every iteration
         loss_unphysical, test_loss_unphysical = contribute_loss(F4pred_train,
                                                                 None,
                                                                 F4pred_test,
@@ -146,7 +133,7 @@ def train_asymptotic_model(parms,
         # have the optimizer take a step
         scheduler.step(loss.item())
         loss.backward()
-        optimizer.optimizer.step()
+        optimizer.step()
 
         # report max error
         if((t+1)%parms["print_every"]==0):
@@ -159,14 +146,12 @@ def train_asymptotic_model(parms,
             print("", flush=True)
 
         if((t+1)%parms["output_every"]==0):
-            outfilename = "model"+str(t+1)           #
+            outfilename = "model"+str(t+1)
             save_model(model, outfilename, "cpu", F4i_test)
-            if parms["device"]=="cuda":
-                save_model(model, outfilename, "cuda", F4i_test)
 
-            # pickle the model, optimizer, and plotter
+            # pickle the model, optimizer, scheduler, and plotter
             with open("model_epoch"+str(t+1)+"_datasetsize"+str(dataset_size)+".pkl", "wb") as f:
-                pickle.dump([model, optimizer, p], f)
+                pickle.dump([model, optimizer, scheduler, p], f)
 
             p.plot_error("train_test_error.pdf", ymin=1e-5)
             

@@ -61,7 +61,7 @@ def read_asymptotic_data(parms):
     logGrowthRate_list = torch.log(growthrate_list)
 
     # split into training and testing sets
-    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = train_test_split(F4_initial_list, F4_final_list, logGrowthRate_list, test_size=parms["test_size"], random_state=parms["random_state"])
+    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = train_test_split(F4_initial_list, F4_final_list, logGrowthRate_list, test_size=parms["test_size"], random_state=parms["random_seed"])
 
     if parms["do_augment_permutation"]:
         F4i_train = ml.augment_permutation(F4i_train)
@@ -78,6 +78,9 @@ def read_asymptotic_data(parms):
         assert(torch.allclose( torch.mean( F4i_test[:,:,:,1:], dim=3), F4i_test[:,:,:,1] ))
         F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3, keepdim=True)
         F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3, keepdim=True)
+
+    print("Train:",F4i_train.shape)
+    print("Test:",F4i_test.shape)
     
     return F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test
 
@@ -99,7 +102,7 @@ def read_stable_data(parms):
     stable_collected = torch.tensor(stable_collected, device=parms["device"]).float()
 
     # split into training and testing sets
-    F4_train, F4_test, stable_train, stable_test = train_test_split(F4_collected, stable_collected, test_size=parms["test_size"], random_state=parms["random_state"])
+    F4_train, F4_test, stable_train, stable_test = train_test_split(F4_collected, stable_collected, test_size=parms["test_size"], random_state=parms["random_seed"])
 
     # don't need the final values because they are the same as the initial
     if parms["do_augment_permutation"]:
@@ -114,9 +117,9 @@ if __name__ == "__main__":
     parms = {
         "NF" : 3,
         "database_list" : ["/mnt/scratch/srichers/software/Rhea/model_training/data/asymptotic_M1-NuLib-7ms.h5"],
-        "stable_database_list" : ["/mnt/scratch/srichers/software/Rhea/model_training/data/stable_M1-LeakageRates_rl0.h5"],
+        "stable_database_list" : ["/mnt/scratch/srichers/software/Rhea/model_training/data/stable_oneflavor.h5"],
         "test_size" : 0.1,
-        "random_state" : 42,
+        "random_seed" : 42,
         "do_augment_permutation" : False,
         "average_heavies_in_final_state" : False,
         "device" : 'cpu'

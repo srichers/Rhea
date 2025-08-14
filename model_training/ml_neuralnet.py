@@ -7,12 +7,13 @@ This file contains the structure of the neural network, including the means of t
 '''
 
 import torch
+import numpy as np
 from torch import nn
-from ml_tools import dot4, restrict_F4_to_physical
+from ml_tools import dot4, restrict_F4_to_physical, ntotal
 
 # define the NN model
 class NeuralNetwork(nn.Module):
-    def __init__(self, parms, Ny, final_layer):
+    def __init__(self, parms):
         super().__init__()
 
         # store input arguments
@@ -24,7 +25,12 @@ class NeuralNetwork(nn.Module):
         self.NX = self.NF * (1 + 2*self.NF)
         if self.do_fdotu:
             self.NX += 2*self.NF
-        self.Ny = Ny
+
+        # one y matrix for ndens, one for flux
+        # add one extra to predict growth rate
+        self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
+        self.conserve_lepton_number = parms["conserve_lepton_number"]
+        self.Ny = (2*parms["NF"])**2
 
         # append a full layer including linear, activation, and batchnorm
         def append_full_layer(modules, in_dim, out_dim):
@@ -36,35 +42,57 @@ class NeuralNetwork(nn.Module):
                 modules.append(nn.Dropout(parms["dropout_probability"]))
             return modules
 
-
         # put together the layers of the neural network
-        modules = []
-        if parms["nhidden"]==0:
+        modules_shared = []
+        modules_stability = []
+        modules_logGrowthRate = []
+        modules_density = []
+        modules_flux = []
+        
+        # set up shared layers
+        modules_shared = append_full_layer(modules_shared, self.NX, parms["width_shared"])
+        for i in range(parms["nhidden_shared"]):
+            modules_shared = append_full_layer(modules_shared, parms["width_shared"], parms["width_shared"])
 
-            # just stupid linear regression
-            modules.append(nn.Linear(self.NX, self.Ny))
+        # set up stability layers. Note that output is a logit, NOT a number between 0 and 1. The loss should be BCEWithLogitsLoss
+        modules_stability = append_full_layer(modules_stability, parms["width_shared"], parms["width_stability"])
+        for i in range(parms["nhidden_stability"]):
+            modules_stability = append_full_layer(modules_stability, parms["width_stability"], parms["width_stability"])
+        modules_stability.append(nn.Linear(parms["width_stability"], 1))
 
-        else:
+        # set up logGrowthRate layers
+        modules_logGrowthRate = append_full_layer(modules_logGrowthRate, parms["width_shared"], parms["width_logGrowthRate"])
+        for i in range(parms["nhidden_logGrowthRate"]):
+            modules_logGrowthRate = append_full_layer(modules_logGrowthRate, parms["width_logGrowthRate"], parms["width_logGrowthRate"])
+        modules_logGrowthRate.append(nn.Linear(parms["width_logGrowthRate"], 1))
 
-            # set up input layer
-            modules = append_full_layer(modules, self.NX, parms["width"])
+        # set up the density layers
+        modules_density = append_full_layer(modules_density, parms["width_shared"], parms["width_density"])
+        for i in range(parms["nhidden_density"]):
+            modules_density = append_full_layer(modules_density, parms["width_density"], parms["width_density"])
+        modules_density.append(nn.Linear(parms["width_density"], self.Ny))
 
-            # set up hidden layers
-            for i in range(parms["nhidden"]):
-                modules = append_full_layer(modules, parms["width"], parms["width"])
-
-            # set up final layer
-            modules.append(nn.Linear(parms["width"], self.Ny))
-
-        # apply tanh to limit outputs to be from -1 to 1 to limit the amount of craziness possible
-        if final_layer != None:
-            modules.append(final_layer)
+        # set up the flux layers
+        modules_flux = append_full_layer(modules_flux, parms["width_shared"], parms["width_flux"])
+        for i in range(parms["nhidden_flux"]):
+            modules_flux = append_full_layer(modules_flux, parms["width_flux"], parms["width_flux"])
+        modules_flux.append(nn.Linear(parms["width_flux"], self.Ny))
 
         # turn the list of modules into a sequential model
-        self.linear_activation_stack = nn.Sequential(*modules)
+        self.linear_activation_stack_shared        = nn.Sequential(*modules_shared)
+        self.linear_activation_stack_stability     = nn.Sequential(*modules_stability)
+        self.linear_activation_stack_logGrowthRate = nn.Sequential(*modules_logGrowthRate)
+        self.linear_activation_stack_density       = nn.Sequential(*modules_density)
+        self.linear_activation_stack_flux          = nn.Sequential(*modules_flux)
         
         # initialize the weights
-        self.apply(self._init_weights)
+        torch.manual_seed(parms["random_seed"])
+        np.random.seed(parms["random_seed"])
+        self.linear_activation_stack_shared.apply(self._init_weights)
+        self.linear_activation_stack_stability.apply(self._init_weights)
+        self.linear_activation_stack_logGrowthRate.apply(self._init_weights)
+        self.linear_activation_stack_density.apply(self._init_weights)
+        self.linear_activation_stack_flux.apply(self._init_weights)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -116,16 +144,6 @@ class NeuralNetwork(nn.Module):
         assert(index==self.NX)
         return X
 
-class AsymptoticNeuralNetwork(NeuralNetwork):
-    def __init__(self, parms, final_layer):
-
-        # one y matrix for ndens, one for flux
-        # add one extra to predict growth rate
-        self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
-        self.conserve_lepton_number = parms["conserve_lepton_number"]
-        self.Ny_onematrix = (2*parms["NF"])**2
-        self.Ny = 2*self.Ny_onematrix + 1
-        super().__init__(parms, self.Ny, final_layer)
 
     # convert the 3-flavor matrix into an effective 2-flavor matrix
     # input and output are indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
@@ -144,31 +162,39 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
     # Push the inputs through the neural network
     # output is indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
     def forward(self,x):
-        yfull = self.linear_activation_stack(x)
-        ydens = yfull[:,:self.Ny_onematrix].reshape(x.shape[0], 2,self.NF,2,self.NF)
-        yflux = yfull[:,self.Ny_onematrix:-1].reshape(x.shape[0], 2,self.NF,2,self.NF)
-        logGrowthRate = yfull[:,-1]
+        # evaluate the shared portion of the network
+        y_shared = self.linear_activation_stack_shared(x)
 
+        # evaluate each task
+        y_stability     = self.linear_activation_stack_stability(y_shared)
+        y_logGrowthRate = self.linear_activation_stack_logGrowthRate(y_shared)
+        y_dens          = self.linear_activation_stack_density(y_shared)
+        y_flux          = self.linear_activation_stack_flux(y_shared)
+
+        # reshape into a matrix
+        y_dens = y_dens.reshape(x.shape[0], 2,self.NF,2,self.NF)
+        y_flux = y_flux.reshape(x.shape[0], 2,self.NF,2,self.NF)
+        
         # enforce conservation of particle number
         delta_nunubar = torch.eye(2, device=x.device)[None,:,None,:,None]
-        ydens_flavorsum = torch.sum(ydens,dim=2)[:,:,None,:,:]
-        yflux_flavorsum = torch.sum(yflux,dim=2)[:,:,None,:,:]
-        ydens = ydens + (delta_nunubar - ydens_flavorsum) / self.NF
-        yflux = yflux + (delta_nunubar - yflux_flavorsum) / self.NF
+        y_dens_flavorsum = torch.sum(y_dens,dim=2)[:,:,None,:,:]
+        y_flux_flavorsum = torch.sum(y_flux,dim=2)[:,:,None,:,:]
+        y_dens = y_dens + (delta_nunubar - y_dens_flavorsum) / self.NF
+        y_flux = y_flux + (delta_nunubar - y_flux_flavorsum) / self.NF
 
         # enforce symmetry in the heavies
         if self.average_heavies_in_final_state:
-            ydens[:,:,1:,:,:] = ydens.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
-            yflux[:,:,1:,:,:] = yflux.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
+            y_dens[:,:,1:,:,:] = y_dens.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
+            y_flux[:,:,1:,:,:] = y_flux.clone().detach()[:,:,1:,:,:].mean(dim=2, keepdim=True)
 
         # enforce eln conservation through y matrix
         if self.conserve_lepton_number == "ymatrix":
             delta_flavor = torch.eye(self.NF, device=x.device)[None,None,:,None,:]
-            ELN_excess = ydens[:,0] - ydens[:,1] - (delta_nunubar[:,0]-delta_nunubar[:,1]) * delta_flavor[:,0]
-            ydens[:,0] -= ELN_excess/2.
-            ydens[:,1] += ELN_excess/2.
+            ELN_excess = y_dens[:,0] - y_dens[:,1] - (delta_nunubar[:,0]-delta_nunubar[:,1]) * delta_flavor[:,0]
+            y_dens[:,0] -= ELN_excess/2.
+            y_dens[:,1] += ELN_excess/2.
 
-        return ydens, yflux, logGrowthRate
+        return y_dens, y_flux, y_logGrowthRate, y_stability
   
     # Use the initial F4 and the ML output to calculate the final F4
     # F4_initial must have shape [sim, xyzt, nu/nubar, flavor]
@@ -176,14 +202,14 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
     # F4_final has shape [sim, xyzt, nu/nubar, flavor]
     # Treat all but the last flavor as output, since it is determined by conservation
     @torch.jit.export
-    def F4_from_y(self, F4_initial, ydens, yflux):
+    def F4_from_y(self, F4_initial, y_dens, y_flux):
         # tensor product with y
         # n indicates the simulation index
         # m indicates the spacetime index
         # i and j indicate nu/nubar
         # a and b indicate flavor
-        F4_final = torch.einsum("niajb,nmjb->nmia", yflux, F4_initial)
-        F4_final[:,3,:,:] = torch.einsum("niajb,njb->nia", ydens, F4_initial[:,3,:,:])
+        F4_final = torch.einsum("niajb,nmjb->nmia", y_flux, F4_initial)
+        F4_final[:,3,:,:] = torch.einsum("niajb,njb->nia", y_dens, F4_initial[:,3,:,:])
 
         # enforce eln
         if self.conserve_lepton_number == "direct":
@@ -196,12 +222,22 @@ class AsymptoticNeuralNetwork(NeuralNetwork):
         return F4_final
 
     @torch.jit.export
-    def predict_F4_logGrowthRate(self, F4_initial):
+    def predict_all(self, F4_initial):
+        # get X values from input
         X = self.X_from_F4(F4_initial)
-        ydens, yflux, logGrowthRate = self.forward(X)
 
-        F4_final = self.F4_from_y(F4_initial, ydens, yflux)
+        # propagate through the network
+        y_dens, y_flux, y_logGrowthRate, y_stability = self.forward(X)
 
-        return F4_final, logGrowthRate
+        # apply sigmoid to stability logits
+        stability = torch.squeeze(torch.sigmoid(y_stability))
+
+        # convert transformation matrix to flux values
+        F4_final = self.F4_from_y(F4_initial, y_dens, y_flux)
+
+        # apply total density scaling to log growth rate
+        logGrowthRate = torch.squeeze(y_logGrowthRate) #+ torch.log(ntotal(F4_initial))
+
+        return F4_final, logGrowthRate, stability
 
     

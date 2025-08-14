@@ -13,13 +13,10 @@ if __name__ == "__main__":
 
     from ml_loss import *
     from ml_neuralnet import *
-    from ml_optimizer import *
     from ml_plot import *
     from ml_trainmodel import *
-    from ml_maxentropy import *
     from ml_read_data import *
     from ml_tools import *
-    import pickle
     import torch.optim
     import torch.autograd.profiler as profiler
 
@@ -27,37 +24,38 @@ if __name__ == "__main__":
     parms = {}
 
     parms["database_list"] = [
-        "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-old/many_sims_database.h5",
-        "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib/many_sims_database.h5",
-        "/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms/many_sims_database.h5",
-        "/mnt/scratch/NSM_ML/Emu_merger_grid/maximum_entropy_32beam_effective2flavor/many_sims_database.h5"
+        "data/asymptotic_M1-NuLib-7ms.h5",
     ]
-    parms["do_unpickle"] = False
-    parms["unpickle_filename"] = None
+    parms["stable_database_list"] = [
+        "data/stable_oneflavor.h5",
+    ]
     parms["test_size"] = 0.1
-    parms["epochs"] = 150000
-    parms["dataset_size_list"] = [-1] # -1 means use all the data
-    parms["n_generate"] = 200000
+    parms["epochs"] = 100
     parms["print_every"] = 10
     parms["output_every"] = 5000
-    parms["generate_max_fluxfac"] = 0.95
-    parms["generate_zero_weight"] = 10
     parms["average_heavies_in_final_state"] = True
     parms["conserve_lepton_number"] = "direct"
-
+    parms["random_seed"] = 42
+    
     # data augmentation options
     parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
     parms["do_augment_final_stable"]= False # True
     parms["do_unphysical_check"]= True # True - seems to help prevent crazy results
-    parms["do_augment_0ff"]= True
-    parms["do_augment_random_stable"]= True
-    parms["do_augment_NSM_stable"]= True
 
     # neural network options
-    parms["nhidden"]= 3
-    parms["width"]= 128
+    parms["nhidden_shared"]        = 1
+    parms["nhidden_stability"]     = 2
+    parms["nhidden_logGrowthRate"] = 2
+    parms["nhidden_asymptotic"]    = 2
+    parms["nhidden_density"]       = 2
+    parms["nhidden_flux"]          = 2
+    parms["width_shared"]        = 128
+    parms["width_stability"]     = 64
+    parms["width_logGrowthRate"] = 64
+    parms["width_density"]       = 64
+    parms["width_flux"]          = 64
     parms["dropout_probability"]= 0.1 #0.1 #0.5 #0.1 # 0.5
-    parms["do_batchnorm"]= False # False - Seems to make things worse
+    parms["do_batchnorm"]= False
     parms["do_fdotu"]= True
     parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
@@ -86,25 +84,10 @@ if __name__ == "__main__":
     #===============#
     # read the data #
     #===============#
-    if parms["do_unpickle"]:
-        with open("train_test_datasets.pkl", "rb") as f:
-            F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = pickle.load(f)
-    else:
-        F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = read_test_train_data(parms)
+    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = read_asymptotic_data(parms)
 
-    # move the arrays over to the gpu
-    F4i_train = torch.Tensor(F4i_train).to(parms["device"])
-    F4f_train = torch.Tensor(F4f_train).to(parms["device"])
-    F4i_test  = torch.Tensor(F4i_test ).to(parms["device"])
-    F4f_test  = torch.Tensor(F4f_test ).to(parms["device"])
-    print("Train:",F4i_train.shape)
-    print("Test:",F4i_test.shape)
-
-    # adjust entries of -1 to instead have the correct size of the dataset
-    for i in range(len(parms["dataset_size_list"])):
-        if parms["dataset_size_list"][i] == -1:
-            parms["dataset_size_list"][i] = F4i_train.shape[0]
-
+    F4s_train, F4s_test, stable_train, stable_test = read_stable_data(parms)
+            
     #=======================#
     # instantiate the model #
     #=======================#
@@ -112,60 +95,46 @@ if __name__ == "__main__":
     print("#############################")
     print("# SETTING UP NEURAL NETWORK #")
     print("#############################")
-    # set up an array of models, optimizers, and plotters for different dataset sizes
-    model_array = []
-    optimizer_array = []
-    plotter_array = []
-    scheduler_array = []
+    model = NeuralNetwork(parms).to(parms["device"]) #nn.Tanh()
+    plotter = Plotter(parms["epochs"],["ndens","fluxmag","direction","logGrowthRate","stability","unphysical"])
+    optimizer = parms["op"](model.parameters(),
+                            weight_decay=parms["weight_decay"],
+                            lr=parms["learning_rate"],
+                            amsgrad=parms["amsgrad"],
+                            fused=parms["fused"]
+    )
 
-    for dataset_size in parms["dataset_size_list"]:
-        if parms["do_unpickle"]:
-            with open(parms["unpickle_filename"], "rb") as f:
-                model, optimizer, plotter = pickle.load(f)
+    scheduler = parms["lr_scheduler"](optimizer,
+                                      patience=parms["patience"],
+                                      cooldown=parms["cooldown"],
+                                      factor=parms["factor"],
+                                      min_lr=parms["min_lr"]) # 
 
-        else:
-            model = AsymptoticNeuralNetwork(parms, None).to(parms["device"]) #nn.Tanh()
-            plotter = Plotter(0,["ndens","fluxmag","direction","logGrowthRate","unphysical"])
-
-        plotter_array.append(plotter)
-        model_array.append(model)
-        optimizer_array.append(Optimizer(
-            model_array[-1],
-            parms["op"](model.parameters(),
-                        weight_decay=parms["weight_decay"],
-                        lr=parms["learning_rate"],
-                        amsgrad=parms["amsgrad"],
-                        fused=parms["fused"]),
-            parms["device"]))
-        scheduler_array.append(parms["lr_scheduler"](optimizer_array[-1].optimizer,
-                                                    patience=parms["patience"],
-                                                    cooldown=parms["cooldown"],
-                                                    factor=parms["factor"],
-                                                    min_lr=parms["min_lr"])) # 
-
-    print(model_array[-1])
-    print("number of parameters:", sum(p.numel() for p in model_array[-1].parameters()))
+    print("number of parameters:", sum(p.numel() for p in model.parameters()))
 
     print()
     print("######################")
     print("# Training the model #")
     print("######################")
     #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
-    for i in range(len(parms["dataset_size_list"])):
-        model_array[i], optimizer_array[i], scheduler_array[i], plotter_array[i] = train_asymptotic_model(
-            parms,
-            model_array[i],
-            optimizer_array[i],
-            scheduler_array[i],
-            plotter_array[i],
-            parms["dataset_size_list"][i],
-            F4i_train,
-            F4f_train,
-            F4i_test,
-            F4f_test,
-            logGrowthRate_train,
-            logGrowthRate_test)
-
-        # pickle the model, optimizer, and plotter
-        with open("model_"+str(parms["dataset_size_list"][i])+".pkl", "wb") as f:
-            pickle.dump([model_array[i], optimizer_array[i], plotter_array[i]], f)
+    print(stable_train.shape, stable_test.shape)
+    model, optimizer, scheduler, plotter = train_asymptotic_model(
+        parms,
+        model,
+        optimizer,
+        scheduler,
+        plotter,
+        F4s_train,
+        F4s_test,
+        stable_train,
+        stable_test,
+        F4i_train,
+        F4i_test,
+        F4f_train,
+        F4f_test,
+        logGrowthRate_train,
+        logGrowthRate_test)
+    
+    # pickle the model, optimizer, and plotter
+    with open("model_optimizer_scheduler_plotter.pkl", "wb") as f:
+        pickle.dump([model, optimizer, scheduler, plotter], f)
