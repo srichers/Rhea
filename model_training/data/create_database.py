@@ -167,6 +167,7 @@ def final_properties(imax, growthRate, data, dz):
     y1plot = np.array(data["N_offdiag_mag(1|ccm)"]) / Ntot
     
     if tend > average_min_tsat*tmax and growthRate>0:
+
         i0 = np.argmin(np.abs(t-average_start_tsat*tmax))
         i1 = -1 #np.argmin(np.abs(t-average_min_tsat*tmax))
         F4_final        = np.average(F4[:,:,:,i0:i1], axis=(3))
@@ -311,7 +312,7 @@ if __name__ == "__main__":
     
     result = generate.generate_stable_F4_oneflavor(NF, ngenerate, False).numpy()
     print("generate_stable_F4_oneflavor output: ",result.shape)
-    generate.write_stable_dataset("stable_oneflavor.h5", result, torch.ones(ngenerate))
+    generate.write_stable_dataset("stable_oneflavor.h5", result, torch.ones(result.shape[0]))
 
     result = generate.generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
     hascrossing = torch.tensor(maxentropy.has_crossing(result, 3, nphi_maxentropy_check))
@@ -320,6 +321,7 @@ if __name__ == "__main__":
     generate.write_stable_dataset("stable_random.h5", result, 1-hascrossing)
 
     # datasets from many Emu simulations
+    write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-old", "asymptotic_M1-NuLib-old.h5")
     write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib", "asymptotic_M1-NuLib.h5")
     write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms", "asymptotic_M1-NuLib-7ms.h5")
     write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/maximum_entropy_32beam_effective2flavor", "asymptotic_random.h5")
