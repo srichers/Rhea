@@ -34,14 +34,10 @@ pipeline {
 		sh 'python3 example_use_model.py ../example_model.pt'
 	    }
 	}}
-	stage('ME has crossing'){ steps{
-            dir('model_training'){
-		sh 'python3 ml_maxentropy.py'
-	    }
-	}}
 	stage('data generation'){ steps{
             dir('model_training'){ dir('data'){
-		sh 'python3 ml_generate.py'
+		sh 'python3 maxentropy.py'
+		sh 'python3 generate.py'
 	    }}
 	}}
 
