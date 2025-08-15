@@ -34,9 +34,6 @@ def generate_stable_F4_oneflavor(NF, n_generate, average_heavies_in_final_state)
 
     for s in range(2):
         for f in range(NF):
-            # set electron neutrino number densities to 1
-            F4i[:,3,s,f] = 1
-            
             # choose the flux to be in a random direction
             costheta = 2*(torch.rand(n_generate_each_species) - 0.5)
             phi = 2*torch.pi*torch.rand(n_generate_each_species)
@@ -55,6 +52,7 @@ def generate_stable_F4_oneflavor(NF, n_generate, average_heavies_in_final_state)
             start = n_generate_each_species * (f + NF*s)
             stop = start + n_generate_each_species
             F4i[start:stop,0:3,s,f] = Frand
+            F4i[start:stop,3,s,f] = 1
     
     return F4i
 
@@ -106,7 +104,7 @@ if __name__ == "__main__":
     result = generate_stable_F4_oneflavor(NF, n_generate, False).numpy()
     print("generate_stable_F4_oneflavor output: ",result.shape)
     assert(all(maxentropy.has_crossing(result, 3, 64)==False))
-    write_stable_datset("stable_oneflavor_database.h5", result, torch.ones(n_generate))
+    write_stable_dataset("stable_oneflavor_database.h5", result, torch.ones(n_generate))
 
     result = generate_random_F4(NF, n_generate, False, 10, 0.95).numpy()
     hascrossing = torch.tensor(maxentropy.has_crossing(result, 3, 200))
