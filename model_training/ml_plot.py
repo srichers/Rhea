@@ -10,7 +10,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from ml_tools import get_ndens_logfluxmag_fhat, restrict_F4_to_physical
+from ml_tools import get_ndens_fluxmag_fhat, restrict_F4_to_physical
 
 class PlotQuantities():
     def __init__(self, epochs):
@@ -181,8 +181,8 @@ def error_histogram(model, F4_initial, F4_final, logGrowthRate_true, bins, xmin,
         F4_pred = restrict_F4_to_physical(F4_pred)
 
     # get number density, flux magnitude, and flux direction
-    ndens_true, fluxmag_true, Fhat_true = get_ndens_logfluxmag_fhat(F4_final)
-    ndens_pred, fluxmag_pred, Fhat_pred = get_ndens_logfluxmag_fhat(F4_pred)
+    ndens_true, fluxmag_true, Fhat_true = get_ndens_fluxmag_fhat(F4_final)
+    ndens_pred, fluxmag_pred, Fhat_pred = get_ndens_fluxmag_fhat(F4_pred)
         
     # calculate the error
     F4_error = (F4_final - F4_pred).to('cpu').detach().numpy()
@@ -206,7 +206,7 @@ def error_histogram(model, F4_initial, F4_final, logGrowthRate_true, bins, xmin,
     # plot the error
     plot_histogram(       F4_error_mag, bins, xmin, xmax, filename)
     plot_histogram(    ndens_error_mag, bins, xmin, xmax, filename+"_ndens")
-    plot_histogram(  fluxmag_error_mag, bins, xmin, xmax, filename+"_logfluxmag")
+    plot_histogram(  fluxmag_error_mag, bins, xmin, xmax, filename+"_fluxmag")
     plot_histogram(direction_error_mag, bins, xmin, xmax, filename+"_direction")
     plot_histogram(logGrowthRate_error_mag, bins, xmin, xmax, filename+"_logGrowthRate")
 

@@ -28,6 +28,12 @@ def train_asymptotic_model(parms,
                            F4f_test,
                            logGrowthRate_train,
                            logGrowthRate_test):
+    
+    # calculate initial number densities
+    ntot_train = torch.sum(F4i_train[:,3,:,:], dim=(1,2))
+    ntot_test = torch.sum(F4i_test[:,3,:,:], dim=(1,2))
+    logntot_train = torch.log(ntot_train)
+    logntot_test = torch.log(ntot_test)
 
     #===============#
     # training loop #
@@ -60,16 +66,16 @@ def train_asymptotic_model(parms,
         _, _, stable_pred_train = model.predict_all(F4s_train)
 
         # convert F4 to densities and fluxes to feed to loss functions
-        ndens_pred_train, fluxmag_pred_train, Fhat_pred_train = get_ndens_logfluxmag_fhat(F4pred_train)
-        ndens_pred_test , fluxmag_pred_test , Fhat_pred_test  = get_ndens_logfluxmag_fhat(F4pred_test )
-        ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_logfluxmag_fhat(F4f_train   )
-        ndens_true_test , fluxmag_true_test , Fhat_true_test  = get_ndens_logfluxmag_fhat(F4f_test    )
+        # note the outputs are all normalized to the total number density
+        ndens_pred_train, fluxmag_pred_train, Fhat_pred_train = get_ndens_fluxmag_fhat(F4pred_train)
+        ndens_pred_test , fluxmag_pred_test , Fhat_pred_test  = get_ndens_fluxmag_fhat(F4pred_test )
+        ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_fluxmag_fhat(F4f_train   )
+        ndens_true_test , fluxmag_true_test , Fhat_true_test  = get_ndens_fluxmag_fhat(F4f_test    )
 
         # calculate ELN violation for printout later
-        Ntot_initial = torch.sum(F4i_train[:,3,:,:], dim=(1,2))
         ELN_initial =    F4i_train[:,3,0,:] -    F4i_train[:,3,1,:]
         ELN_final   = F4pred_train[:,3,0,:] - F4pred_train[:,3,1,:]
-        ELN_violation = torch.max(torch.abs(ELN_final-ELN_initial) / Ntot_initial[:,None])
+        ELN_violation = torch.max(torch.abs(ELN_final-ELN_initial) / ntot_train[:,None])
         
         # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
         loss_stability, test_loss_stability = contribute_loss(stable_pred_train,
@@ -106,10 +112,10 @@ def train_asymptotic_model(parms,
         test_loss = test_loss + test_loss_direction
 
         # train on making sure the model prediction is correct [growthrate]
-        loss_growthrate, test_loss_growthrate = contribute_loss(logGrowthRate_pred_train,
-                                                                logGrowthRate_train,
-                                                                logGrowthRate_pred_test,
-                                                                logGrowthRate_test,
+        loss_growthrate, test_loss_growthrate = contribute_loss(logGrowthRate_pred_train - logntot_train,
+                                                                logGrowthRate_train      - logntot_train,
+                                                                logGrowthRate_pred_test  - logntot_test,
+                                                                logGrowthRate_test       - logntot_test,
                                                                 "logGrowthRate", comparison_loss_fn)
         loss = loss + loss_growthrate * 0.01
         test_loss = test_loss + test_loss_growthrate * 0.01
@@ -150,7 +156,7 @@ def train_asymptotic_model(parms,
             save_model(model, outfilename, "cpu", F4i_test)
 
             # pickle the model, optimizer, scheduler, and plotter
-            with open("model_epoch"+str(t+1)+"_datasetsize"+str(dataset_size)+".pkl", "wb") as f:
+            with open("model_epoch"+str(t+1)+".pkl", "wb") as f:
                 pickle.dump([model, optimizer, scheduler, p], f)
 
             p.plot_error("train_test_error.pdf", ymin=1e-5)

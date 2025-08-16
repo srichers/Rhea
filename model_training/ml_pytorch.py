@@ -24,15 +24,17 @@ if __name__ == "__main__":
     parms = {}
 
     parms["database_list"] = [
-        "data/asymptotic_M1-NuLib-7ms.h5",
+        "data/dummy_asymptotic.h5",
     ]
     parms["stable_database_list"] = [
         "data/stable_oneflavor.h5",
+        "data/stable_random.h5",
+        "data/stable_zerofluxfac.h5",
     ]
     parms["test_size"] = 0.1
-    parms["epochs"] = 100
-    parms["print_every"] = 10
-    parms["output_every"] = 5000
+    parms["epochs"] = 10
+    parms["print_every"] = 1
+    parms["output_every"] = 10
     parms["average_heavies_in_final_state"] = True
     parms["conserve_lepton_number"] = "direct"
     parms["random_seed"] = 42
@@ -79,7 +81,8 @@ if __name__ == "__main__":
     #========================#
     parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     print("Using",parms["device"],"device")
-    print(torch.cuda.get_device_name(0))
+    if parms["device"] == "cuda":
+        print(torch.cuda.get_device_name(0))
 
     #===============#
     # read the data #

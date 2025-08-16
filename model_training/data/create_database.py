@@ -288,10 +288,16 @@ def write_asymptotic_dataset(directory, outfilename):
 
 # just for the purpose of creating a dummy dataset that Jenkins can create so we don't have to store data in git
 def write_dummy_asymptotic_dataset(ngenerate, outfilename):
-    F4_random = generate.generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
+    F4_random = generate.generate_random_F4(NF, ngenerate, False, 1, 0.95).numpy()
+    #ndens = F4_random[:,3,:,:]
+    #flux = F4_random[:,:3,:,:]
+    #fluxmag = np.sqrt(np.sum(flux**2,axis=(1)))
+    #print("ndens:",np.sum(ndens, axis=(1,2)))
+    #print("fluxmag:",np.max(fluxmag,axis=(1,2)))
+    #print("fluxfac:",np.max(fluxmag/ndens, axis=(1,2)))
     output = h5py.File(outfilename,"w")
     output["nf"] = NF
-    output["growthRate(1|s)"] = np.zeros(ngenerate)
+    output["growthRate(1|s)"] = np.ones(ngenerate)
     output["F4_final(1|ccm)"] = F4_random
     output["F4_initial(1|ccm)"] = F4_random
     output.close()

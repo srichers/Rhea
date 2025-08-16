@@ -236,7 +236,8 @@ class NeuralNetwork(nn.Module):
         F4_final = self.F4_from_y(F4_initial, y_dens, y_flux)
 
         # apply total density scaling to log growth rate
-        logGrowthRate = torch.squeeze(y_logGrowthRate) #+ torch.log(ntotal(F4_initial))
+        # expects F4 to be in units of cm^-3
+        logGrowthRate = torch.squeeze(y_logGrowthRate) + torch.log(ntotal(F4_initial))
 
         return F4_final, logGrowthRate, stability
 

@@ -33,7 +33,7 @@ def direction_loss_fn(Fhat_pred, Fhat_true):
     return torch.mean(torch.ones_like(fdotf) - fdotf)
 
 def stability_loss_fn(stability_pred, stability_true):
-    return torch.nn.BCELoss(reduction='mean')(stability_pred, stability_true)
+    return torch.nn.BCEWithLogitsLoss(reduction='mean')(stability_pred, stability_true)
 
 def max_error(F4f_pred, F4f_true):
     if F4f_true == None:

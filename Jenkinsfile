@@ -40,6 +40,11 @@ pipeline {
 		sh 'python3 generate.py'
 	    }}
 	}}
+	stage('training'){ steps{
+            dir('model_training'){
+		sh 'python3 ml_pytorch.py'
+	    }
+	}}
 
     } // stages{
 
