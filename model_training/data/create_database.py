@@ -286,6 +286,16 @@ def write_asymptotic_dataset(directory, outfilename):
     output.close()
     print()
 
+# just for the purpose of creating a dummy dataset that Jenkins can create so we don't have to store data in git
+def write_dummy_asymptotic_dataset(ngenerate, outfilename):
+    F4_random = generate.generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
+    output = h5py.File(outfilename,"w")
+    output["nf"] = NF
+    output["growthRate(1|s)"] = np.zeros(ngenerate)
+    output["F4_final(1|ccm)"] = F4_random
+    output["F4_initial(1|ccm)"] = F4_random
+    output.close()
+    
 if __name__ == "__main__":
     # stable/unstable criteria based on maximum entropy conditions applied to NSM snapshot data
     #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5","stable_M1-NuLib_rl0.h5")
@@ -320,9 +330,12 @@ if __name__ == "__main__":
     print("nstable:",torch.sum(hascrossing))
     generate.write_stable_dataset("stable_random.h5", result, 1-hascrossing)
 
+    write_dummy_asymptotic_dataset(ngenerate, "dummy_asymptotic.h5")
+    
     # datasets from many Emu simulations
     #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-old", "asymptotic_M1-NuLib-old.h5")
     #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib", "asymptotic_M1-NuLib.h5")
     #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms", "asymptotic_M1-NuLib-7ms.h5")
     #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/maximum_entropy_32beam_effective2flavor", "asymptotic_random.h5")
+    
     

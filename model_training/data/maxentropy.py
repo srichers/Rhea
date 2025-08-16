@@ -150,7 +150,7 @@ def has_crossing(F4i, NF, nphi_at_equator):
     crosses_zero = np.any(crosses_zero, axis=1).astype(float) # [nsims]
 
     # add extra unit dimension to compatibility with loss functions
-    return crosses_zero[:,None]
+    return crosses_zero[:]
 
 
 if __name__ == "__main__":
