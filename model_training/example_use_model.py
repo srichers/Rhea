@@ -60,9 +60,13 @@ print("N initial")
 print(before[0,3])
 
 # print the number densities predicted by the ML model
+after, logGrowthRate, stable = model.predict_all(before)
+print()
+print("Stability prediction:", stable)
+print()
+print("Growthrate prediction:", torch.exp(logGrowthRate))
 print()
 print("N predicted")
-after = model.predict_F4(before)
 print(after[0,3])
 
 # print the number densities predicted by Emu
@@ -70,3 +74,4 @@ print()
 print("Emu expected:")
 print(" [[ 9.95460068e+32  7.85471511e+32  6.23293031e+32]")
 print("  [ 1.48812960e+33  7.85471511e+32  6.23293016e+32]]")
+

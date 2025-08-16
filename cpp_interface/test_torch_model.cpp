@@ -77,13 +77,22 @@ int main(int argc, const char* argv[]){
   std::cout << "Input number densities" << std::endl;
   std::cout << F4_in.index({0,3,Slice(),Slice()}) << std::endl;
 
-  auto F4_out = F4_in;
-  F4_out.to(device);
-  F4_out = model.model.get_method("predict_F4")({F4_in}).toTensor();
+  // fetch output
+  torch::IValue output = model.model.get_method("predict_all")({F4_in}).toTensor();
+
+  // Convert to tuple
+  auto output_tuple = output.toTuple()->elements();
   
+  // Extract individual tensors
+  torch::Tensor F4_out        = output_tuple[0].toTensor();
+  torch::Tensor logGrowthRate = output_tuple[1].toTensor();
+  torch::Tensor stability     = output_tuple[2].toTensor();
+
   std::cout << std::endl;
   std::cout << "Output number densities" << std::endl;
   std::cout << F4_out.index({0,3,Slice(),Slice()}) << std::endl;
+  std::cout << "Stability: " << stability << std::endl;
+  std::cout << "logGrowthRate: " << logGrowthRate << std::endl;
   std::cout << std::endl << "==========================" << std::endl;
   
   return 0;

@@ -23,17 +23,6 @@ pipeline {
 	//=======//
 	// Tests //
 	//=======//
-	stage('C++ Interface'){ steps{
-	    dir('cpp_interface'){
-		sh 'make'
-		sh './test_torch_model ../example_model.pt'
-	    }
-	}}
-	stage('Python Interface'){ steps{
-            dir('model_training'){
-		sh 'python3 example_use_model.py ../example_model.pt'
-	    }
-	}}
 	stage('data generation'){ steps{
             dir('model_training'){ dir('data'){
 		sh 'python3 maxentropy.py'
@@ -43,6 +32,17 @@ pipeline {
 	stage('training'){ steps{
             dir('model_training'){
 		sh 'python3 ml_pytorch.py'
+	    }
+	}}
+	stage('Python Interface'){ steps{
+            dir('model_training'){
+		sh 'python3 example_use_model.py ../model_training/model10_cpu.pt'
+	    }
+	}}
+	stage('C++ Interface'){ steps{
+	    dir('cpp_interface'){
+		sh 'make'
+		sh './test_torch_model ../model_training/model10_cpu.pt'
 	    }
 	}}
 
