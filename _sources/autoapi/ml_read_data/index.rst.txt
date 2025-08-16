@@ -1,0 +1,41 @@
+ml_read_data
+============
+
+.. py:module:: ml_read_data
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This is the file contains functions that read data from the training datasets.
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   ml_read_data.parms
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_read_data.read_asymptotic_data
+   ml_read_data.read_stable_data
+
+
+Module Contents
+---------------
+
+.. py:function:: read_asymptotic_data(parms)
+
+.. py:function:: read_stable_data(parms)
+
+.. py:data:: parms
+

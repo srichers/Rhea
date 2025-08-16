@@ -1,0 +1,28 @@
+ml_trainmodel
+=============
+
+.. py:module:: ml_trainmodel
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This is the file contains the main training loop, including accumulation of the loss function from various sources.
+
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_trainmodel.train_asymptotic_model
+
+
+Module Contents
+---------------
+
+.. py:function:: train_asymptotic_model(parms, model, optimizer, scheduler, p, F4s_train, F4s_test, stable_train, stable_test, F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test)
+
