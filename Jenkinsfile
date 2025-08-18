@@ -27,6 +27,7 @@ pipeline {
             dir('model_training'){ dir('data'){
 		sh 'python3 maxentropy.py'
 		sh 'python3 generate.py'
+		sh 'python3 create_database.py'
 	    }}
 	}}
 	stage('training'){ steps{
