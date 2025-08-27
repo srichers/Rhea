@@ -44,7 +44,6 @@ def train_asymptotic_model(parms,
         optimizer.zero_grad()
         loss = torch.tensor(0.0, requires_grad=True)
         test_loss = torch.tensor(0.0, requires_grad=False)
-
         def contribute_loss(F4pred_train, F4f_train, F4pred_test, F4f_test, key, loss_fn):
             train_loss = loss_fn(F4pred_train, F4f_train)
             p.data[key].train_loss[t] = train_loss.item()
@@ -83,6 +82,8 @@ def train_asymptotic_model(parms,
                                                               stable_pred_test,
                                                               stable_test,
                                                               "stability", stability_loss_fn)
+        loss = loss + loss_stability
+        test_loss = test_loss + test_loss_stability
         
         # train on making sure the model prediction is correct [ndens]
         loss_ndens, test_loss_ndens = contribute_loss(ndens_pred_train,
@@ -137,9 +138,12 @@ def train_asymptotic_model(parms,
         
 
         # have the optimizer take a step
-        scheduler.step(loss.item())
         loss.backward()
         optimizer.step()
+        if t>=parms["warmup_iters"]:
+            scheduler.step(loss.item())
+        else:
+            scheduler.step()
 
         # report max error
         if((t+1)%parms["print_every"]==0):

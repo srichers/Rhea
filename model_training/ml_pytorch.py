@@ -67,10 +67,10 @@ if __name__ == "__main__":
     parms["weight_decay"]= 1e-2 #1e-5
     parms["learning_rate"]= 2e-4 # 1e-3
     parms["fused"]= True
-    parms["lr_scheduler"]= torch.optim.lr_scheduler.ReduceLROnPlateau
     parms["patience"]= 500
     parms["cooldown"]= 500
     parms["factor"]= 0.5
+    parms["warmup_iters"]=10
     parms["min_lr"]= 0 #1e-8
 
     # the number of flavors should be 3
@@ -107,11 +107,18 @@ if __name__ == "__main__":
                             fused=parms["fused"]
     )
 
-    scheduler = parms["lr_scheduler"](optimizer,
-                                      patience=parms["patience"],
-                                      cooldown=parms["cooldown"],
-                                      factor=parms["factor"],
-                                      min_lr=parms["min_lr"]) # 
+    scheduler_warmup = torch.optim.lr_scheduler.LinearLR(optimizer,
+                                                         start_factor=1.0/parms["warmup_iters"],
+                                                         end_factor=1,
+                                                         total_iters=parms["warmup_iters"])
+    scheduler_main = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                                patience=parms["patience"],
+                                                                cooldown=parms["cooldown"],
+                                                                factor=parms["factor"],
+                                                                min_lr=parms["min_lr"]) #
+    scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer,
+                                                      schedulers=[scheduler_warmup, scheduler_main],
+                                                      milestones=[parms["warmup_iters"]])
 
     print("number of parameters:", sum(p.numel() for p in model.parameters()))
 
