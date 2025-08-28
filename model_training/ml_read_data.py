@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 import torch
 import ml_tools as ml
 import sys
+from torch.utils.data import TensorDataset
 sys.path.append("data")
 import generate
 
@@ -23,66 +24,56 @@ def read_asymptotic_data(parms):
     print("#############################")
     print("# PREPARING TEST/TRAIN DATA #")
     print("#############################")
-    F4_initial_list = []
-    F4_final_list = []
-    growthrate_list = []
+
+    dataset_train_list = []
+    dataset_test_list = []
     for d in parms["database_list"]:
-        print("Reading:",d)
+        # read from file
         f_in = h5py.File(d,"r")
-        F4_initial_list.append(np.array(f_in["F4_initial(1|ccm)"])) # [simulationIndex, xyzt, nu/nubar, flavor]
-        F4_final_list.append(  np.array(f_in["F4_final(1|ccm)"  ]))
-        growthrate_list.append(np.array(f_in["growthRate(1|s)"  ]))
+        F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]) # [simulationIndex, xyzt, nu/nubar, flavor]
+        F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...])
+        growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
         assert(parms["NF"] == int(np.array(f_in["nf"])) )
         f_in.close()
-        print("    ",len(F4_initial_list[-1]),"points in",d)
-    F4_initial_list = torch.tensor(np.concatenate(F4_initial_list), device=parms["device"]).float()
-    F4_final_list   = torch.tensor(np.concatenate(F4_final_list  ), device=parms["device"]).float()
-    growthrate_list = torch.tensor(np.concatenate(growthrate_list), device=parms["device"]).float()
+        print(len(F4_initial),"points in",d)
 
-    # fix slightly negative energy densities
-    ntot = ml.ntotal(F4_initial_list)
-    ndens = F4_initial_list[:,3,:,:]
-    badlocs = torch.where(ndens < 0)
-    assert(torch.all(ndens/ntot[:,None,None] > -1e10))
-    for i in range(4):
-        F4_initial_list[:,i,:,:][badlocs] = 0
+        # fix slightly negative energy densities
+        ntot = ml.ntotal(F4_initial)
+        ndens = F4_initial[:,3,:,:]
+        badlocs = torch.where(ndens < 0)
+        assert(torch.all(ndens/ntot[:,None,None] > -1e10))
+        for i in range(4):
+            F4_initial[:,i,:,:][badlocs] = 0
 
-    # normalize the data so the number densities add up to 1
-    # This prevents some cases from outweighing others
-    F4_initial_list = F4_initial_list / ntot[:,None,None,None]
-    F4_final_list   = F4_final_list   / ntot[:,None,None,None]
-    growthrate_list = growthrate_list / ntot[:]
+        # make sure the data are good
+        ml.check_conservation(F4_initial, F4_final)
+        assert(torch.all(growthrate > 0))
 
-    # make sure the data are good
-    ml.check_conservation(F4_initial_list, F4_final_list)
-    assert(torch.all(growthrate_list > 0))
+        # average heavies if necessary
+        if parms["average_heavies_in_final_state"]:
+            assert(parms["do_augment_permutation"]==False)
+            assert(torch.allclose( torch.mean(F4_initial[:,:,:,1:], dim=3), F4_initial[:,:,:,1] ))
+            F4_final[:,:,:,1:] = torch.mean(F4_final[:,:,:,1:], dim=3, keepdim=True)
 
-    # convert growthrates into logarithms of growthrates
-    logGrowthRate_list = torch.log(growthrate_list)
+        # split into training and testing sets
+        F4i_train, F4i_test, F4f_train, F4f_test, growthrate_train, growthrate_test = train_test_split(F4_initial, F4_final, growthrate, test_size=parms["test_size"], random_state=parms["random_seed"])
 
-    # split into training and testing sets
-    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = train_test_split(F4_initial_list, F4_final_list, logGrowthRate_list, test_size=parms["test_size"], random_state=parms["random_seed"])
+        if parms["do_augment_permutation"]:
+            F4i_train = ml.augment_permutation(F4i_train)
+            F4f_train = ml.augment_permutation(F4f_train)
+            F4i_test  = ml.augment_permutation(F4i_test )
+            F4f_test  = ml.augment_permutation(F4f_test )
+            growthrate_train = ml.augment_permutation(growthrate_train)
+            growthrate_test = ml.augment_permutation(growthrate_test)
 
-    if parms["do_augment_permutation"]:
-        F4i_train = ml.augment_permutation(F4i_train)
-        F4f_train = ml.augment_permutation(F4f_train)
-        F4i_test  = ml.augment_permutation(F4i_test )
-        F4f_test  = ml.augment_permutation(F4f_test )
-        growthrate_train = ml.augment_permutation(growthrate_train)
-        growthrate_test = ml.augment_permutation(growthrate_test)
+        # add dataset to the lists
+        dataset_train_list.append( TensorDataset(F4i_train, F4f_train, growthrate_train) )
+        dataset_test_list.append(  TensorDataset(F4i_test , F4f_test , growthrate_test ) )
 
-    # average heavies if necessary
-    if parms["average_heavies_in_final_state"]:
-        assert(parms["do_augment_permutation"]==False)
-        #assert(torch.allclose( torch.mean(F4i_train[:,:,:,1:], dim=3), F4i_train[:,:,:,1] ))
-        #assert(torch.allclose( torch.mean( F4i_test[:,:,:,1:], dim=3), F4i_test[:,:,:,1] ))
-        F4f_train[:,:,:,1:] = torch.mean(F4f_train[:,:,:,1:], dim=3, keepdim=True)
-        F4f_test[:,:,:,1:] =  torch.mean( F4f_test[:,:,:,1:], dim=3, keepdim=True)
-
-    print("Train:",F4i_train.shape)
-    print("Test:",F4i_test.shape)
+    print("Train:",[len(d) for d in dataset_train_list])
+    print("Test:",[len(d) for d in dataset_test_list])
     
-    return F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test
+    return dataset_train_list, dataset_test_list
 
 #=================================================#
 # read in the stable points from the NSM snapshot #
@@ -91,27 +82,34 @@ def read_stable_data(parms):
     F4_collected = np.zeros((0, 4, 2, parms["NF"]))
     stable_collected = np.zeros((0))
 
+    dataset_train_list = []
+    dataset_test_list = []
+    
     for filename in parms["stable_database_list"]:
         f_in = h5py.File(filename,"r")
-        F4_collected = np.concatenate((F4_collected, f_in["F4_initial(1|ccm)"][...]), axis=0)
-        stable_collected = np.concatenate((stable_collected, f_in["stable"][...]))
+        F4 = torch.Tensor(f_in["F4_initial(1|ccm)"][...])
+        stable = torch.Tensor(f_in["stable"][...])
         f_in.close()
+        print(len(stable),"points in",filename)
+        print("    ",sum(stable).item(),"points are stable.")
 
-    # convert into a tensor
-    F4_collected = torch.tensor(F4_collected, device=parms["device"]).float()
-    stable_collected = torch.tensor(stable_collected, device=parms["device"]).float()
+        # split into training and testing sets
+        F4_train, F4_test, stable_train, stable_test = train_test_split(F4, stable, test_size=parms["test_size"], random_state=parms["random_seed"])
 
-    # split into training and testing sets
-    F4_train, F4_test, stable_train, stable_test = train_test_split(F4_collected, stable_collected, test_size=parms["test_size"], random_state=parms["random_seed"])
+        # don't need the final values because they are the same as the initial
+        if parms["do_augment_permutation"]:
+            F4_train = ml.augment_permutation(F4_train)
+            F4_test = ml.augment_permutation(F4_test)
+            stable_train = ml.augment_permutation(stable_train)
+            stable_test = ml.augment_permutation(stable_test)
 
-    # don't need the final values because they are the same as the initial
-    if parms["do_augment_permutation"]:
-        F4_train = ml.augment_permutation(F4_train)
-        F4_test = ml.augment_permutation(F4_test)
-        stable_train = ml.augment_permutation(stable_train)
-        stable_test = ml.augment_permutation(stable_test)
-
-    return F4_train, F4_test, stable_train, stable_test
+        dataset_train_list.append( TensorDataset(F4_train, stable_train) )
+        dataset_test_list.append(  TensorDataset(F4_test , stable_test ) )
+        
+    print("Train:",[len(d) for d in dataset_train_list])
+    print("Test:",[len(d) for d in dataset_test_list])
+    
+    return dataset_train_list, dataset_test_list
 
 if __name__ == "__main__":
     parms = {
@@ -126,8 +124,8 @@ if __name__ == "__main__":
     }
     
     print("reading asymptotic dataset")
-    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = read_asymptotic_data(parms)
-    print(F4i_train.shape, F4i_test.shape, F4f_train.shape, F4f_test.shape, logGrowthRate_train.shape, logGrowthRate_test.shape)
+    F4i_train, F4i_test, F4f_train, F4f_test, growthrate_train, growthrate_test = read_asymptotic_data(parms)
+    print(F4i_train.shape, F4i_test.shape, F4f_train.shape, F4f_test.shape, growthrate_train.shape, growthrate_test.shape)
 
     print("reading stable dataset")
     F4_train, F4_test, stable_train, stable_test = read_stable_data(parms)

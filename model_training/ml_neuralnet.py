@@ -45,7 +45,7 @@ class NeuralNetwork(nn.Module):
         # put together the layers of the neural network
         modules_shared = []
         modules_stability = []
-        modules_logGrowthRate = []
+        modules_growthrate = []
         modules_density = []
         modules_flux = []
         
@@ -60,11 +60,11 @@ class NeuralNetwork(nn.Module):
             modules_stability = append_full_layer(modules_stability, parms["width_stability"], parms["width_stability"])
         modules_stability.append(nn.Linear(parms["width_stability"], 1))
 
-        # set up logGrowthRate layers
-        modules_logGrowthRate = append_full_layer(modules_logGrowthRate, parms["width_shared"], parms["width_logGrowthRate"])
-        for i in range(parms["nhidden_logGrowthRate"]):
-            modules_logGrowthRate = append_full_layer(modules_logGrowthRate, parms["width_logGrowthRate"], parms["width_logGrowthRate"])
-        modules_logGrowthRate.append(nn.Linear(parms["width_logGrowthRate"], 1))
+        # set up growthrate layers
+        modules_growthrate = append_full_layer(modules_growthrate, parms["width_shared"], parms["width_growthrate"])
+        for i in range(parms["nhidden_growthrate"]):
+            modules_growthrate = append_full_layer(modules_growthrate, parms["width_growthrate"], parms["width_growthrate"])
+        modules_growthrate.append(nn.Linear(parms["width_growthrate"], 1))
 
         # set up the density layers
         modules_density = append_full_layer(modules_density, parms["width_shared"], parms["width_density"])
@@ -79,18 +79,18 @@ class NeuralNetwork(nn.Module):
         modules_flux.append(nn.Linear(parms["width_flux"], self.Ny))
 
         # turn the list of modules into a sequential model
-        self.linear_activation_stack_shared        = nn.Sequential(*modules_shared)
-        self.linear_activation_stack_stability     = nn.Sequential(*modules_stability)
-        self.linear_activation_stack_logGrowthRate = nn.Sequential(*modules_logGrowthRate)
-        self.linear_activation_stack_density       = nn.Sequential(*modules_density)
-        self.linear_activation_stack_flux          = nn.Sequential(*modules_flux)
+        self.linear_activation_stack_shared     = nn.Sequential(*modules_shared)
+        self.linear_activation_stack_stability  = nn.Sequential(*modules_stability)
+        self.linear_activation_stack_growthrate = nn.Sequential(*modules_growthrate)
+        self.linear_activation_stack_density    = nn.Sequential(*modules_density)
+        self.linear_activation_stack_flux       = nn.Sequential(*modules_flux)
         
         # initialize the weights
         torch.manual_seed(parms["random_seed"])
         np.random.seed(parms["random_seed"])
         self.linear_activation_stack_shared.apply(self._init_weights)
         self.linear_activation_stack_stability.apply(self._init_weights)
-        self.linear_activation_stack_logGrowthRate.apply(self._init_weights)
+        self.linear_activation_stack_growthrate.apply(self._init_weights)
         self.linear_activation_stack_density.apply(self._init_weights)
         self.linear_activation_stack_flux.apply(self._init_weights)
 
@@ -166,10 +166,10 @@ class NeuralNetwork(nn.Module):
         y_shared = self.linear_activation_stack_shared(x)
 
         # evaluate each task
-        y_stability     = self.linear_activation_stack_stability(y_shared)
-        y_logGrowthRate = self.linear_activation_stack_logGrowthRate(y_shared)
-        y_dens          = self.linear_activation_stack_density(y_shared)
-        y_flux          = self.linear_activation_stack_flux(y_shared)
+        y_stability  = self.linear_activation_stack_stability(y_shared)
+        y_growthrate = self.linear_activation_stack_growthrate(y_shared)
+        y_dens       = self.linear_activation_stack_density(y_shared)
+        y_flux       = self.linear_activation_stack_flux(y_shared)
 
         # reshape into a matrix
         y_dens = y_dens.reshape(x.shape[0], 2,self.NF,2,self.NF)
@@ -194,7 +194,7 @@ class NeuralNetwork(nn.Module):
             y_dens[:,0] -= ELN_excess/2.
             y_dens[:,1] += ELN_excess/2.
 
-        return y_dens, y_flux, y_logGrowthRate, y_stability
+        return y_dens, y_flux, y_growthrate, y_stability
   
     # Use the initial F4 and the ML output to calculate the final F4
     # F4_initial must have shape [sim, xyzt, nu/nubar, flavor]
@@ -227,7 +227,7 @@ class NeuralNetwork(nn.Module):
         X = self.X_from_F4(F4_initial)
 
         # propagate through the network
-        y_dens, y_flux, y_logGrowthRate, y_stability = self.forward(X)
+        y_dens, y_flux, y_growthrate, y_stability = self.forward(X)
 
         # apply sigmoid to stability logits
         stability = torch.squeeze(torch.sigmoid(y_stability))
@@ -237,8 +237,8 @@ class NeuralNetwork(nn.Module):
 
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
-        logGrowthRate = torch.squeeze(y_logGrowthRate) + torch.log(ntotal(F4_initial))
+        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)
 
-        return F4_final, logGrowthRate, stability
+        return F4_final, growthrate, stability
 
     

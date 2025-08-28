@@ -60,11 +60,11 @@ print("N initial")
 print(before[0,3])
 
 # print the number densities predicted by the ML model
-after, logGrowthRate, stable = model.predict_all(before)
+after, growthrate, stable = model.predict_all(before)
 print()
 print("Stability prediction:", stable)
 print()
-print("Growthrate prediction:", torch.exp(logGrowthRate))
+print("Growthrate prediction:", growthrate)
 print()
 print("N predicted")
 print(after[0,3])

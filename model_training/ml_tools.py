@@ -36,14 +36,14 @@ def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     N_Nbar_final   = N_final[  :,0,:] - N_final[  :,1,:] # [sim, flavor]
     N_Nbar_difference = (N_Nbar_initial - N_Nbar_final) # [sim, flavor]
     N_Nbar_error = torch.max(torch.abs(N_Nbar_difference)/ntot[:,None]) # [sim, flavor]
-    print("N_Nbar_error = ", N_Nbar_error.item())
+    print("    N_Nbar_error = ", N_Nbar_error.item())
     #assert(N_Nbar_error < tolerance)
 
     # check for number conservation
     F4_flavorsum_initial = torch.sum(F4_initial_list, dim=(3)) # [sim, xyzt, nu/nubar]
     F4_flavorsum_final   = torch.sum(F4_final_list,   dim=(3))
     F4_flavorsum_error = torch.max(torch.abs(F4_flavorsum_initial - F4_flavorsum_final)/ntot[:,None,None])
-    print("F4_flavorsum_difference = ", F4_flavorsum_error.item())
+    print("    F4_flavorsum_difference = ", F4_flavorsum_error.item())
     assert(F4_flavorsum_error < tolerance)
 
 # assume input of size [nsims, xyzt, nu/nubar, flavor]

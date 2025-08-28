@@ -171,10 +171,10 @@ def plot_histogram(error, bins, xmin, xmax, filename):
 
 # apply the model to a dataset and create a histogram of the magnitudes of the error
 # F4 has dimensions [sim, xyzt, nu/nubar, flavor]
-def error_histogram(model, F4_initial, F4_final, logGrowthRate_true, bins, xmin, xmax, do_restrict_to_physical, filename):
+def error_histogram(model, F4_initial, F4_final, growthrate_true, bins, xmin, xmax, do_restrict_to_physical, filename):
 
     # get the predicted final F4
-    F4_pred, logGrowthRate_pred = model.predict_F4_logGrowthRate(F4_initial)
+    F4_pred, growthrate_pred = model.predict_F4_growthrate(F4_initial)
 
     # apply any relevant corrections to the distribution
     if do_restrict_to_physical:
@@ -190,7 +190,7 @@ def error_histogram(model, F4_initial, F4_final, logGrowthRate_true, bins, xmin,
     fluxmag_error = (fluxmag_true - fluxmag_pred).to('cpu').detach().numpy()
     fdotf = torch.sum(Fhat_pred * Fhat_true, dim=1)
     direction_error = (torch.ones_like(fdotf) - fdotf).to('cpu').detach().numpy()
-    logGrowthRate_error = ((logGrowthRate_true - logGrowthRate_pred)/logGrowthRate_true).detach().numpy()
+    growthrate_error = ((growthrate_true - growthrate_pred)/growthrate_true).detach().numpy()
 
     # calculate the total number density in each simulation
     N = F4_final[:,3,:,:].to('cpu').detach().numpy()
@@ -201,14 +201,14 @@ def error_histogram(model, F4_initial, F4_final, logGrowthRate_true, bins, xmin,
     ndens_error_mag = np.max(np.abs(ndens_error), dim=(1,2))/N
     fluxmag_error_mag = np.max(np.abs(fluxmag_error), dim=(1,2))/N
     direction_error_mag = np.max(np.abs(direction_error), dim=(1,2))
-    logGrowthRate_error_mag = np.max(np.abs(logGrowthRate_error), dim=(1,2))
+    growthrate_error_mag = np.max(np.abs(growthrate_error), dim=(1,2))
 
     # plot the error
     plot_histogram(       F4_error_mag, bins, xmin, xmax, filename)
     plot_histogram(    ndens_error_mag, bins, xmin, xmax, filename+"_ndens")
     plot_histogram(  fluxmag_error_mag, bins, xmin, xmax, filename+"_fluxmag")
     plot_histogram(direction_error_mag, bins, xmin, xmax, filename+"_direction")
-    plot_histogram(logGrowthRate_error_mag, bins, xmin, xmax, filename+"_logGrowthRate")
+    plot_histogram(growthrate_error_mag, bins, xmin, xmax, filename+"_growthrate")
 
     # print the max error and loss
     print()

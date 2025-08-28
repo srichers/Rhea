@@ -35,9 +35,11 @@ if __name__ == "__main__":
     parms["epochs"] = 10
     parms["print_every"] = 1
     parms["output_every"] = 10
-    parms["average_heavies_in_final_state"] = True
+    parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = "direct"
     parms["random_seed"] = 42
+    parms["batch_size"] = 32
+    parms["epoch_num_samples"] = 1000
     
     # data augmentation options
     parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
@@ -47,13 +49,13 @@ if __name__ == "__main__":
     # neural network options
     parms["nhidden_shared"]        = 1
     parms["nhidden_stability"]     = 2
-    parms["nhidden_logGrowthRate"] = 2
+    parms["nhidden_growthrate"] = 2
     parms["nhidden_asymptotic"]    = 2
     parms["nhidden_density"]       = 2
     parms["nhidden_flux"]          = 2
     parms["width_shared"]        = 128
     parms["width_stability"]     = 64
-    parms["width_logGrowthRate"] = 64
+    parms["width_growthrate"] = 64
     parms["width_density"]       = 64
     parms["width_flux"]          = 64
     parms["dropout_probability"]= 0.1 #0.1 #0.5 #0.1 # 0.5
@@ -87,10 +89,9 @@ if __name__ == "__main__":
     #===============#
     # read the data #
     #===============#
-    F4i_train, F4i_test, F4f_train, F4f_test, logGrowthRate_train, logGrowthRate_test = read_asymptotic_data(parms)
+    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
+    dataset_stable_train_list, dataset_stable_test_list = read_stable_data(parms)
 
-    F4s_train, F4s_test, stable_train, stable_test = read_stable_data(parms)
-            
     #=======================#
     # instantiate the model #
     #=======================#
@@ -99,7 +100,7 @@ if __name__ == "__main__":
     print("# SETTING UP NEURAL NETWORK #")
     print("#############################")
     model = NeuralNetwork(parms).to(parms["device"]) #nn.Tanh()
-    plotter = Plotter(parms["epochs"],["ndens","fluxmag","direction","logGrowthRate","stability","unphysical"])
+    plotter = Plotter(parms["epochs"],["ndens","fluxmag","direction","growthrate","stability","unphysical"])
     optimizer = parms["op"](model.parameters(),
                             weight_decay=parms["weight_decay"],
                             lr=parms["learning_rate"],
@@ -127,24 +128,14 @@ if __name__ == "__main__":
     print("# Training the model #")
     print("######################")
     #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
-    print(stable_train.shape, stable_test.shape)
     model, optimizer, scheduler, plotter = train_asymptotic_model(
         parms,
         model,
         optimizer,
         scheduler,
         plotter,
-        F4s_train,
-        F4s_test,
-        stable_train,
-        stable_test,
-        F4i_train,
-        F4i_test,
-        F4f_train,
-        F4f_test,
-        logGrowthRate_train,
-        logGrowthRate_test)
-    
-    # pickle the model, optimizer, and plotter
-    with open("model_optimizer_scheduler_plotter.pkl", "wb") as f:
-        pickle.dump([model, optimizer, scheduler, plotter], f)
+        dataset_asymptotic_train_list,
+        dataset_asymptotic_test_list,
+        dataset_stable_train_list,
+        dataset_stable_test_list
+    )
