@@ -11,6 +11,16 @@ import numpy as np
 from torch import nn
 from ml_tools import dot4, restrict_F4_to_physical, ntotal
 
+# constants used to get growth rate to order unity
+hbar = 1.05457266e-27 # erg s
+c = 2.99792458e10 # cm/s
+eV = 1.60218e-12 # erg
+GeV = 1e9 * eV
+GF = 1.1663787e-5 / GeV**2 * (hbar*c)**3 # erg cm^3
+ndens_to_invsec = GF/hbar
+print("ndens_to_invsec")
+print(ndens_to_invsec)
+
 # define the NN model
 class NeuralNetwork(nn.Module):
     def __init__(self, parms):
@@ -237,7 +247,8 @@ class NeuralNetwork(nn.Module):
 
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
-        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)
+        ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
+        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
 
         return F4_final, growthrate, stability
 
