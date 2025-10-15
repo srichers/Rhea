@@ -14,6 +14,9 @@ from ml_tools import *
 import pickle
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
 
+# create an empty dictionary that will eventually contain all of the loss metrics of an iteration
+loss_dict = {}
+
 def configure_loader(parms, dataset_train_list, dataset_test_list):
     assert(len(dataset_train_list) == len(dataset_test_list))
 
@@ -40,7 +43,6 @@ def train_asymptotic_model(parms,
                            model,
                            optimizer,
                            scheduler,
-                           p,
                            dataset_asymptotic_train_list,
                            dataset_asymptotic_test_list,
                            dataset_stable_train_list,
@@ -57,20 +59,20 @@ def train_asymptotic_model(parms,
     stable_true_test   = torch.cat([ds.tensors[1] for ds in dataset_stable_test.datasets], dim=0).to(parms["device"])
     ntot_test = ntotal(F4i_asymptotic_test)
     
-    def contribute_loss(epoch, p, pred, true, traintest, key, loss_fn):
+    def contribute_loss(pred, true, traintest, key, loss_fn):
         loss = loss_fn(pred, true)
-        if traintest=="train":
-            p.data[key].train_loss[epoch] += train_loss.item()
-            p.data[key].train_err[epoch]  += max_error(pred, true)
-        if traintest=="test":
-            p.data[key].test_loss[epoch] = test_loss.item()
-            p.data[key].test_err[epoch]  = max_error(pred, true)        
+        loss_dict[key+"_"+traintest+"_loss"] = train_loss.item()
+        loss_dict[key+"_"+traintest+"_max"]  = max_error(pred, true)
         return loss
 
+    # set up file for writing performance metrics
+    loss_file = open("loss.dat","w")
+    
     #===============#
     # training loop #
     #===============#
-    for epoch in range(parms["epochs"]):
+    for epoch in range(1,parms["epochs"]+1):
+        loss_dict["epoch"] = epoch
 
         # zero the gradients
         optimizer.zero_grad()
@@ -114,64 +116,64 @@ def train_asymptotic_model(parms,
             ELN_initial = F4i_asymptotic_train[:,3,0,:] - F4i_asymptotic_train[:,3,1,:]
             ELN_final   =       F4f_pred_train[:,3,0,:] -       F4f_pred_train[:,3,1,:]
             ELN_violation = torch.max(torch.abs(ELN_final-ELN_initial) / ntot_train[:,None])
+            loss_dict["ELN_violation"] = ELN_violation.item()
 
             # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
-            train_loss = train_loss + contribute_loss(epoch, p, stable_pred_train, stable_true_train, "train", "stability", stability_loss_fn)
-            test_loss  = test_loss  + contribute_loss(epoch, p, stable_pred_test , stable_true_test , "test" , "stability", stability_loss_fn)
+            train_loss = train_loss + contribute_loss(stable_pred_train, stable_true_train, "train", "stability", stability_loss_fn)
+            test_loss  = test_loss  + contribute_loss(stable_pred_test , stable_true_test , "test" , "stability", stability_loss_fn)
             
             # train on making sure the model prediction is correct [ndens]
-            train_loss = train_loss + contribute_loss(epoch, p, ndens_pred_train, ndens_true_train, "train", "ndens", comparison_loss_fn)
-            test_loss  = test_loss  + contribute_loss(epoch, p, ndens_pred_test , ndens_true_test , "test" , "ndens", comparison_loss_fn)
+            train_loss = train_loss + contribute_loss(ndens_pred_train, ndens_true_train, "train", "ndens", comparison_loss_fn)
+            test_loss  = test_loss  + contribute_loss(ndens_pred_test , ndens_true_test , "test" , "ndens", comparison_loss_fn)
             
             # train on making sure the model prediction is correct [fluxmag]
-            train_loss = train_loss + contribute_loss(epoch, p, fluxmag_pred_train, fluxmag_true_train, "train", "fluxmag", comparison_loss_fn)
-            test_loss  = test_loss  + contribute_loss(epoch, p, fluxmag_pred_test , fluxmag_true_test , "test" , "fluxmag", comparison_loss_fn)
+            train_loss = train_loss + contribute_loss(fluxmag_pred_train, fluxmag_true_train, "train", "fluxmag", comparison_loss_fn)
+            test_loss  = test_loss  + contribute_loss(fluxmag_pred_test , fluxmag_true_test , "test" , "fluxmag", comparison_loss_fn)
             
             # train on making sure the model prediction is correct [direction]
-            train_loss = train_loss + contribute_loss(epoch, p, Fhat_pred_train, Fhat_true_train, "train", "direction", direction_loss_fn)
-            test_loss  = test_loss  + contribute_loss(epoch, p, Fhat_pred_test , Fhat_true_test , "test" , "direction", direction_loss_fn)
+            train_loss = train_loss + contribute_loss(Fhat_pred_train, Fhat_true_train, "train", "direction", direction_loss_fn)
+            test_loss  = test_loss  + contribute_loss(Fhat_pred_test , Fhat_true_test , "test" , "direction", direction_loss_fn)
 
             # train on making sure the model prediction is correct [growthrate]
-            train_loss = train_loss + 0.01 * contribute_loss(epoch, p, growthrate_pred_train/ntot_train, growthrate_true_train/ntot_train, "train", "growthrate", comparison_loss_fn)
-            test_loss  = test_loss  + 0.01 * contribute_loss(epoch, p, growthrate_pred_test /ntot_test , growthrate_true_test /ntot_test , "test" , "growthrate", comparison_loss_fn)
+            train_loss = train_loss + 0.01 * contribute_loss(growthrate_pred_train/ntot_train, growthrate_true_train/ntot_train, "train", "growthrate", comparison_loss_fn)
+            test_loss  = test_loss  + 0.01 * contribute_loss(growthrate_pred_test /ntot_test , growthrate_true_test /ntot_test , "test" , "growthrate", comparison_loss_fn)
             
             # unphysical. Have experienced heavy over-training in the past if not regenerated every iteration
             if parms["do_unphysical_check"]:
-                train_loss = train_loss + 100 * contribute_loss(epoch, p, F4f_pred_train, None, "train", "unphysical", unphysical_loss_fn)
-                test_loss  = test_loss  + 100 * contribute_loss(epoch, p, F4f_pred_test , None, "test" , "unphysical", unphysical_loss_fn)
+                train_loss = train_loss + 100 * contribute_loss(F4f_pred_train, None, "train", "unphysical", unphysical_loss_fn)
+                test_loss  = test_loss  + 100 * contribute_loss(F4f_pred_test , None, "test" , "unphysical", unphysical_loss_fn)
     
         # track the total loss
-        p.data["loss"].train_loss[epoch] = train_loss.item()
-        p.data["loss"].test_loss[epoch]  =  test_loss.item()
-        
+        loss_dict["train_loss"] = train_loss.item()
+        loss_dict["test_loss"]  =  test_loss.item()        
 
         # have the optimizer take a step
         train_loss.backward()
         optimizer.step()
-        if epoch>=parms["warmup_iters"]:
+        loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
+        if epoch>parms["warmup_iters"]:
             scheduler.step(train_loss.item())
         else:
             scheduler.step()
 
-        # report max error
-        if((epoch+1)%parms["print_every"]==0):
-            print(f"Epoch {epoch+1}")
-            print("lr =",scheduler._last_lr)
-            print("net loss =", train_loss.item())
-            print("ELN violation: ",ELN_violation.item())
-            for key in p.data.keys():
-                print("{:<15} {:<18} {:<15}".format(key, np.sqrt(p.data[key].train_loss[epoch]),  np.sqrt(p.data[key].test_loss[epoch]) ))
-            print("", flush=True)
+        # print headers
+        if epoch==1:
+            for k,i in zip(loss_dict.keys(), range(len(loss_dict.keys()))):
+                loss_file.write(("{:d}:"+k+"\t").format(i+1))
+            loss_file.write('\n')
 
-        if((epoch+1)%parms["output_every"]==0):
-            outfilename = "model"+str(epoch+1)
+        # print loss values
+        for k in loss_dict.keys():
+            if k=="epoch":
+                loss_file.write("{:<12d}".format(loss_dict[k]))
+            else:
+                loss_file.write("{:<12.3e}\t".format(loss_dict[k]))
+        loss_file.write('\n')
+
+        # output
+        if(epoch%parms["output_every"]==0):
+            outfilename = "model"+str(epoch)
             save_model(model, outfilename, "cpu", F4i_asymptotic_test)
+            print("Saved",outfilename, flush=True)
 
-            # pickle the model, optimizer, scheduler, and plotter
-            with open("model_epoch"+str(epoch+1)+".pkl", "wb") as f:
-                pickle.dump([model, optimizer, scheduler, p], f)
-
-            p.plot_error("train_test_error.pdf", ymin=1e-5)
-            
-
-    return model, optimizer, scheduler, p
+    return

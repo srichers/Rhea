@@ -13,7 +13,6 @@ if __name__ == "__main__":
 
     from ml_loss import *
     from ml_neuralnet import *
-    from ml_plot import *
     from ml_trainmodel import *
     from ml_read_data import *
     from ml_tools import *
@@ -33,7 +32,6 @@ if __name__ == "__main__":
     ]
     parms["test_size"] = 0.1
     parms["epochs"] = 10
-    parms["print_every"] = 1
     parms["output_every"] = 10
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = "direct"
@@ -100,7 +98,6 @@ if __name__ == "__main__":
     print("# SETTING UP NEURAL NETWORK #")
     print("#############################")
     model = NeuralNetwork(parms).to(parms["device"]) #nn.Tanh()
-    plotter = Plotter(parms["epochs"],["ndens","fluxmag","direction","growthrate","stability","unphysical"])
     optimizer = parms["op"](model.parameters(),
                             weight_decay=parms["weight_decay"],
                             lr=parms["learning_rate"],
@@ -128,12 +125,11 @@ if __name__ == "__main__":
     print("# Training the model #")
     print("######################")
     #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
-    model, optimizer, scheduler, plotter = train_asymptotic_model(
+    train_asymptotic_model(
         parms,
         model,
         optimizer,
         scheduler,
-        plotter,
         dataset_asymptotic_train_list,
         dataset_asymptotic_test_list,
         dataset_stable_train_list,
