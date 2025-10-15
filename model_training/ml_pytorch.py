@@ -30,6 +30,8 @@ if __name__ == "__main__":
         "data/stable_random.h5",
         "data/stable_zerofluxfac.h5",
     ]
+    parms["samples_per_database"] = 1000000
+
     parms["test_size"] = 0.1
     parms["epochs"] = 10
     parms["output_every"] = 10

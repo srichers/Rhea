@@ -92,6 +92,14 @@ def read_stable_data(parms):
         print(len(stable),"points in",filename)
         print("    ",sum(stable).item(),"points are stable.")
 
+        # downsample to less data
+        if parms["samples_per_database"]>0:
+            print("     Downsampling to",parms["samples_per_database"],"samples")
+            random_indices = torch.randperm(len(stable))[:parms["samples_per_database"]]
+            F4 = F4[random_indices,...]
+            stable = stable[random_indices]
+            print("    ",sum(stable).item(),"points are stable.")
+
         # split into training and testing sets
         F4_train, F4_test, stable_train, stable_test = train_test_split(F4, stable, test_size=parms["test_size"], random_state=parms["random_seed"])
 
