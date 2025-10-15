@@ -9,7 +9,6 @@ This is the file contains the main training loop, including accumulation of the 
 import torch
 from ml_loss import *
 from ml_neuralnet import *
-from ml_plot import *
 from ml_tools import *
 import pickle
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
