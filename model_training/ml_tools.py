@@ -112,11 +112,11 @@ def restrict_F4_to_physical(F4_final):
 
 def get_ndens_fluxmag_fhat(F4):
     ntot = ntotal(F4)
-    ndens = F4[:, 3,:,:]
-    flux  = F4[:,:3,:,:]
+    ndens = F4[:, 3,:,:]/ntot[:,None,None]
+    flux  = F4[:,:3,:,:]/ntot[:,None,None,None]
     fluxmag = torch.sqrt(torch.sum(flux**2, dim=1))
     Fhat = flux/fluxmag[:,None,:,:]
-    return ndens/ntot[:,None,None], fluxmag/ntot[:,None,None], Fhat
+    return ndens, fluxmag, Fhat
 
 def save_model(model, outfilename, device, F4i_test):
     with torch.no_grad():

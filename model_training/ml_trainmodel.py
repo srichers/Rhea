@@ -60,7 +60,7 @@ def train_asymptotic_model(parms,
     
     def contribute_loss(pred, true, traintest, key, loss_fn):
         loss = loss_fn(pred, true)
-        loss_dict[key+"_"+traintest+"_loss"] = train_loss.item()
+        loss_dict[key+"_"+traintest+"_loss"] = loss.item()
         loss_dict[key+"_"+traintest+"_max"]  = max_error(pred, true)
         return loss
 
@@ -134,17 +134,17 @@ def train_asymptotic_model(parms,
             test_loss  = test_loss  + contribute_loss(Fhat_pred_test , Fhat_true_test , "test" , "direction", direction_loss_fn)
 
             # train on making sure the model prediction is correct [growthrate]
-            train_loss = train_loss + 0.01 * contribute_loss(growthrate_pred_train/ntot_train, growthrate_true_train/ntot_train, "train", "growthrate", comparison_loss_fn)
-            test_loss  = test_loss  + 0.01 * contribute_loss(growthrate_pred_test /ntot_test , growthrate_true_test /ntot_test , "test" , "growthrate", comparison_loss_fn)
+            train_loss = train_loss + 0.01 * contribute_loss(growthrate_pred_train/ntot_train, torch.log(growthrate_true_train/ntot_train/ndens_to_invsec), "train", "growthrate", comparison_loss_fn)
+            test_loss  = test_loss  + 0.01 * contribute_loss(growthrate_pred_test /ntot_test , torch.log(growthrate_true_test /ntot_test/ndens_to_invsec ), "test" , "growthrate", comparison_loss_fn)
             
             # unphysical. Have experienced heavy over-training in the past if not regenerated every iteration
             if parms["do_unphysical_check"]:
-                train_loss = train_loss + 100 * contribute_loss(F4f_pred_train, None, "train", "unphysical", unphysical_loss_fn)
-                test_loss  = test_loss  + 100 * contribute_loss(F4f_pred_test , None, "test" , "unphysical", unphysical_loss_fn)
+                train_loss = train_loss + 100 * contribute_loss(F4f_pred_train/ntot_train[:,None,None,None], None, "train", "unphysical", unphysical_loss_fn)
+                test_loss  = test_loss  + 100 * contribute_loss(F4f_pred_test /ntot_test [:,None,None,None], None, "test" , "unphysical", unphysical_loss_fn)
     
         # track the total loss
         loss_dict["train_loss"] = train_loss.item()
-        loss_dict["test_loss"]  =  test_loss.item()        
+        loss_dict["test_loss"]  =  test_loss.item()
 
         # have the optimizer take a step
         train_loss.backward()
