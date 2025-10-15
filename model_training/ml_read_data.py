@@ -14,7 +14,6 @@ import ml_tools as ml
 import sys
 from torch.utils.data import TensorDataset
 sys.path.append("data")
-import generate
 
 def read_asymptotic_data(parms):
     #===============================================#
