@@ -86,8 +86,8 @@ def read_stable_data(parms):
     
     for filename in parms["stable_database_list"]:
         f_in = h5py.File(filename,"r")
-        F4 = torch.Tensor(f_in["F4_initial(1|ccm)"][...])
-        stable = torch.Tensor(f_in["stable"][...])
+        F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
+        stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
         f_in.close()
         print(len(stable),"points in",filename)
         print("    ",sum(stable).item(),"points are stable.")
