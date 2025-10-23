@@ -168,6 +168,7 @@ def train_asymptotic_model(parms,
             else:
                 loss_file.write("{:<12.3e}\t".format(loss_dict[k]))
         loss_file.write('\n')
+        assert(loss_dict["train_loss"]==loss_dict["train_loss"])
 
         # output
         if(epoch%parms["output_every"]==0):

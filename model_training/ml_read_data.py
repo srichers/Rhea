@@ -89,6 +89,11 @@ def read_stable_data(parms):
         F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
         stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
         f_in.close()
+
+        # Ensure that there are no nans
+        assert(torch.all(F4==F4))
+
+        # print number of points
         print(len(stable),"points in",filename)
         print("    ",sum(stable).item(),"points are stable.")
 
