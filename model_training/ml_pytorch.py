@@ -82,58 +82,5 @@ if __name__ == "__main__":
     # use a GPU if available #
     #========================#
     parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    print("Using",parms["device"],"device")
-    if parms["device"] == "cuda":
-        print(torch.cuda.get_device_name(0))
-
-    #===============#
-    # read the data #
-    #===============#
-    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
-    dataset_stable_train_list, dataset_stable_test_list = read_stable_data(parms)
-
-    #=======================#
-    # instantiate the model #
-    #=======================#
-    print()
-    print("#############################")
-    print("# SETTING UP NEURAL NETWORK #")
-    print("#############################")
-    model = NeuralNetwork(parms).to(parms["device"]) #nn.Tanh()
-    optimizer = parms["op"](model.parameters(),
-                            weight_decay=parms["weight_decay"],
-                            lr=parms["learning_rate"],
-                            amsgrad=parms["amsgrad"],
-                            fused=parms["fused"]
-    )
-
-    scheduler_warmup = torch.optim.lr_scheduler.LinearLR(optimizer,
-                                                         start_factor=1.0/parms["warmup_iters"],
-                                                         end_factor=1,
-                                                         total_iters=parms["warmup_iters"])
-    scheduler_main = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-                                                                patience=parms["patience"],
-                                                                cooldown=parms["cooldown"],
-                                                                factor=parms["factor"],
-                                                                min_lr=parms["min_lr"]) #
-    scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer,
-                                                      schedulers=[scheduler_warmup, scheduler_main],
-                                                      milestones=[parms["warmup_iters"]])
-
-    print("number of parameters:", sum(p.numel() for p in model.parameters()))
-
-    print()
-    print("######################")
-    print("# Training the model #")
-    print("######################")
     #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
-    train_asymptotic_model(
-        parms,
-        model,
-        optimizer,
-        scheduler,
-        dataset_asymptotic_train_list,
-        dataset_asymptotic_test_list,
-        dataset_stable_train_list,
-        dataset_stable_test_list
-    )
+    train_asymptotic_model(parms)

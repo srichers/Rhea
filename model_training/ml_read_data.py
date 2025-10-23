@@ -19,10 +19,7 @@ def read_asymptotic_data(parms):
     #===============================================#
     # read in the database from the previous script #
     #===============================================#
-    print()
-    print("#############################")
     print("# PREPARING TEST/TRAIN DATA #")
-    print("#############################")
 
     dataset_train_list = []
     dataset_test_list = []
@@ -34,7 +31,7 @@ def read_asymptotic_data(parms):
         growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
         assert(parms["NF"] == int(np.array(f_in["nf"])) )
         f_in.close()
-        print(len(F4_initial),"points in",d)
+        print("# ",len(F4_initial),"points in",d)
 
         # fix slightly negative energy densities
         ntot = ml.ntotal(F4_initial)
@@ -69,8 +66,8 @@ def read_asymptotic_data(parms):
         dataset_train_list.append( TensorDataset(F4i_train, F4f_train, growthrate_train) )
         dataset_test_list.append(  TensorDataset(F4i_test , F4f_test , growthrate_test ) )
 
-    print("Train:",[len(d) for d in dataset_train_list])
-    print("Test:",[len(d) for d in dataset_test_list])
+    print("#    Train:",[len(d) for d in dataset_train_list])
+    print("#    Test:",[len(d) for d in dataset_test_list])
     
     return dataset_train_list, dataset_test_list
 
@@ -90,20 +87,20 @@ def read_stable_data(parms):
         stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
         f_in.close()
 
-        # Ensure that there are no nans
+        # remove invalid data points indicated by a nan in the electron neutrino density
         assert(torch.all(F4==F4))
 
         # print number of points
-        print(len(stable),"points in",filename)
-        print("    ",sum(stable).item(),"points are stable.")
+        print("# ",len(stable),"points in",filename)
+        print("#   ",sum(stable).item(),"points are stable.")
 
         # downsample to less data
         if parms["samples_per_database"]>0:
-            print("     Downsampling to",parms["samples_per_database"],"samples")
+            print("#    Downsampling to",parms["samples_per_database"],"samples")
             random_indices = torch.randperm(len(stable))[:parms["samples_per_database"]]
             F4 = F4[random_indices,...]
             stable = stable[random_indices]
-            print("    ",sum(stable).item(),"points are stable.")
+            print("#   ",sum(stable).item(),"points are stable.")
 
         # split into training and testing sets
         F4_train, F4_test, stable_train, stable_test = train_test_split(F4, stable, test_size=parms["test_size"], random_state=parms["random_seed"])
@@ -118,8 +115,8 @@ def read_stable_data(parms):
         dataset_train_list.append( TensorDataset(F4_train, stable_train) )
         dataset_test_list.append(  TensorDataset(F4_test , stable_test ) )
         
-    print("Train:",[len(d) for d in dataset_train_list])
-    print("Test:",[len(d) for d in dataset_test_list])
+    print("#  Train:",[len(d) for d in dataset_train_list])
+    print("#  Test:",[len(d) for d in dataset_test_list])
     
     return dataset_train_list, dataset_test_list
 
@@ -135,11 +132,11 @@ if __name__ == "__main__":
         "device" : 'cpu'
     }
     
-    print("reading asymptotic dataset")
+    print("#  reading asymptotic dataset")
     F4i_train, F4i_test, F4f_train, F4f_test, growthrate_train, growthrate_test = read_asymptotic_data(parms)
     print(F4i_train.shape, F4i_test.shape, F4f_train.shape, F4f_test.shape, growthrate_train.shape, growthrate_test.shape)
 
-    print("reading stable dataset")
+    print("#  reading stable dataset")
     F4_train, F4_test, stable_train, stable_test = read_stable_data(parms)
-    print(F4_train.shape, F4_test.shape, stable_train.shape, stable_test.shape)
+    print("# ",F4_train.shape, F4_test.shape, stable_train.shape, stable_test.shape)
 

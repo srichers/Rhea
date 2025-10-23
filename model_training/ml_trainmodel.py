@@ -10,6 +10,8 @@ import torch
 from ml_loss import *
 from ml_neuralnet import *
 from ml_tools import *
+from ml_read_data import *
+import torch.autograd.profiler as profiler
 import pickle
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
 
@@ -33,24 +35,63 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
     sampler = WeightedRandomSampler(weights=weights, num_samples=parms["epoch_num_samples"], replacement=True)
     loader = DataLoader(dataset_train, batch_size=parms["batch_size"], sampler=sampler)
 
-    print("Configuring loader with num_samples=",parms["epoch_num_samples"],"and batch_size=",parms["batch_size"],"for a dataset with",len(dataset_train),"samples.")
+    print("#  Configuring loader with num_samples=",parms["epoch_num_samples"],"and batch_size=",parms["batch_size"],"for a dataset with",len(dataset_train),"samples.")
 
     return loader, dataset_test
 
 
-def train_asymptotic_model(parms,
-                           model,
-                           optimizer,
-                           scheduler,
-                           dataset_asymptotic_train_list,
-                           dataset_asymptotic_test_list,
-                           dataset_stable_train_list,
-                           dataset_stable_test_list):
+def train_asymptotic_model(parms):
 
+    print("#Using",parms["device"],"device")
+    if parms["device"] == "cuda":
+        print("# ",torch.cuda.get_device_name(0))
+
+    #===============#
+    # read the data #
+    #===============#
+    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
+    dataset_stable_train_list, dataset_stable_test_list = read_stable_data(parms)
+
+    #=======================#
+    # instantiate the model #
+    #=======================#
+    print("#SETTING UP NEURAL NETWORK")
+    model = NeuralNetwork(parms).to(parms["device"]) #nn.Tanh()
+    optimizer = parms["op"](model.parameters(),
+                            weight_decay=parms["weight_decay"],
+                            lr=parms["learning_rate"],
+                            amsgrad=parms["amsgrad"],
+                            fused=parms["fused"]
+    )
+
+    print("#  number of parameters:", sum(p.numel() for p in model.parameters()))
+
+    #=======================#
+    # set up the schedulers #
+    #=======================#
+    print("#SETTING UP SCHEDULERS")
+    scheduler_warmup = torch.optim.lr_scheduler.LinearLR(optimizer,
+                                                         start_factor=1.0/parms["warmup_iters"],
+                                                         end_factor=1,
+                                                         total_iters=parms["warmup_iters"])
+    scheduler_main = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                                patience=parms["patience"],
+                                                                cooldown=parms["cooldown"],
+                                                                factor=parms["factor"],
+                                                                min_lr=parms["min_lr"]) #
+    schedulers = [scheduler_warmup, scheduler_main]
+
+    #=========================#
+    # set up the data loaders #
+    #=========================#
+    print("#SETTING UP DATA LOADERS")
     loader_asymptotic, dataset_asymptotic_test = configure_loader(parms, dataset_asymptotic_train_list, dataset_asymptotic_test_list)
     loader_stable    , dataset_stable_test     = configure_loader(parms, dataset_stable_train_list    , dataset_stable_test_list    )
 
-    # separate out test data
+    #========================#
+    # separate out test data #
+    #========================#
+    print("#SPLITTING TRAIN AND TEST DATA")
     F4i_asymptotic_test  = torch.cat([ds.tensors[0] for ds in dataset_asymptotic_test.datasets], dim=0).to(parms["device"])
     F4f_true_test        = torch.cat([ds.tensors[1] for ds in dataset_asymptotic_test.datasets], dim=0).to(parms["device"])
     growthrate_true_test = torch.cat([ds.tensors[2] for ds in dataset_asymptotic_test.datasets], dim=0).to(parms["device"])
@@ -70,6 +111,7 @@ def train_asymptotic_model(parms,
     #===============#
     # training loop #
     #===============#
+    print("#STARTING TRAINING LOOP")
     for epoch in range(1,parms["epochs"]+1):
         loss_dict["epoch"] = epoch
 
@@ -149,11 +191,14 @@ def train_asymptotic_model(parms,
         # have the optimizer take a step
         train_loss.backward()
         optimizer.step()
-        loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
-        if epoch>parms["warmup_iters"]:
-            scheduler.step(train_loss.item())
-        else:
+        if epoch<=parms["warmup_iters"]:
+            scheduler = schedulers[0]
+            loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
             scheduler.step()
+        else:
+            scheduler = schedulers[1]
+            loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
+            scheduler.step(train_loss.item())
 
         # print headers
         if epoch==1:
@@ -171,6 +216,7 @@ def train_asymptotic_model(parms,
         assert(loss_dict["train_loss"]==loss_dict["train_loss"])
 
         # output
+        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}")
         if(epoch%parms["output_every"]==0):
             outfilename = "model"+str(epoch)
             save_model(model, outfilename, "cpu", F4i_asymptotic_test)
