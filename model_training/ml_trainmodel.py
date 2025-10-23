@@ -40,17 +40,15 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
     return loader, dataset_test
 
 
-def train_asymptotic_model(parms):
+def train_asymptotic_model(parms,
+                           dataset_asymptotic_train_list,
+                           dataset_asymptotic_test_list,
+                           dataset_stable_train_list,
+                           dataset_stable_test_list):
 
     print("#Using",parms["device"],"device")
     if parms["device"] == "cuda":
         print("# ",torch.cuda.get_device_name(0))
-
-    #===============#
-    # read the data #
-    #===============#
-    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
-    dataset_stable_train_list, dataset_stable_test_list = read_stable_data(parms)
 
     #=======================#
     # instantiate the model #
