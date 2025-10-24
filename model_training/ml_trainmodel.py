@@ -13,6 +13,7 @@ from ml_tools import *
 from ml_read_data import *
 import torch.autograd.profiler as profiler
 import pickle
+import os
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
 
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
@@ -46,6 +47,12 @@ def train_asymptotic_model(parms,
                            dataset_stable_train_list,
                            dataset_stable_test_list):
 
+    # print out all parameters for the record
+    parmfile = open(os.getcwd()+"/parameters.txt","w")
+    for key in parms.keys():
+        parmfile.write(key+" = "+str(parms[key])+"\n")
+    parmfile.close()
+    
     print("#Using",parms["device"],"device")
     if parms["device"] == "cuda":
         print("# ",torch.cuda.get_device_name(0))
@@ -104,7 +111,7 @@ def train_asymptotic_model(parms,
         return loss
 
     # set up file for writing performance metrics
-    loss_file = open("loss.dat","w")
+    loss_file = open(os.getcwd()+"/loss.dat","w")
     
     #===============#
     # training loop #
@@ -216,7 +223,7 @@ def train_asymptotic_model(parms,
         # output
         print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}")
         if(epoch%parms["output_every"]==0):
-            outfilename = "model"+str(epoch)
+            outfilename = os.getcwd()+"/model"+str(epoch)
             save_model(model, outfilename, "cpu", F4i_asymptotic_test)
             print("Saved",outfilename, flush=True)
 
