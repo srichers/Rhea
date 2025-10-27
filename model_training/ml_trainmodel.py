@@ -85,7 +85,7 @@ def train_asymptotic_model(
 
     print("#  number of parameters:", sum(p.numel() for p in model.parameters()))
 
-    # =======================#
+    # ========================#
     # set up the schedulers #
     # =======================#
     print("#SETTING UP SCHEDULERS")
