@@ -11,6 +11,7 @@ from ml_loss import *
 from ml_neuralnet import *
 from ml_tools import *
 from ml_read_data import *
+from get_current_lr import current_lr
 import torch.autograd.profiler as profiler
 import pickle
 import os
@@ -307,11 +308,11 @@ def train_asymptotic_model(
         optimizer.step()
         if epoch <= parms["warmup_iters"]:
             scheduler = schedulers[0]
-            loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
+            loss_dict["learning_rate"] = current_lr(optimizer, scheduler)
             scheduler.step()
         else:
             scheduler = schedulers[1]
-            loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
+            loss_dict["learning_rate"] = current_lr(optimizer, scheduler)
             scheduler.step(train_loss.item())
 
         # print headers
