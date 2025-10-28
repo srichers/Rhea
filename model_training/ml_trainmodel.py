@@ -136,12 +136,6 @@ def train_asymptotic_model(
     ).to(parms["device"])
     ntot_test = ntotal(F4i_asymptotic_test)
 
-    def contribute_loss(pred, true, traintest, key, loss_fn):
-        loss = loss_fn(pred, true)
-        loss_dict[key + "_" + traintest + "_loss"] = loss.item()
-        loss_dict[key + "_" + traintest + "_max"] = max_error(pred, true)
-        return loss
-
     # set up file for writing performance metrics
     loss_file = open(os.getcwd() + "/loss.dat", "w")
 
@@ -213,14 +207,14 @@ def train_asymptotic_model(
             loss_dict["ELN_violation"] = ELN_violation.item()
 
             # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
-            train_loss = train_loss + parms["stable_mult"] * contribute_loss(
+            train_loss = train_loss + parms["loss_multiplier_stable"] * contribute_loss(
                 stable_pred_train,
                 stable_true_train,
                 "train",
                 "stability",
                 stability_loss_fn,
             )
-            test_loss = test_loss + parms["stable_mult"] * contribute_loss(
+            test_loss = test_loss + parms["loss_multiplier_stable"] * contribute_loss(
                 stable_pred_test,
                 stable_true_test,
                 "test",
@@ -229,22 +223,24 @@ def train_asymptotic_model(
             )
 
             # train on making sure the model prediction is correct [ndens]
-            train_loss = train_loss + parms["ndens_mult"] * contribute_loss(
+            train_loss = train_loss + parms["loss_multiplier_ndens"] * contribute_loss(
                 ndens_pred_train, ndens_true_train, "train", "ndens", comparison_loss_fn
             )
-            test_loss = test_loss + parms["ndens_mult"] * contribute_loss(
+            test_loss = test_loss + parms["loss_multiplier_ndens"] * contribute_loss(
                 ndens_pred_test, ndens_true_test, "test", "ndens", comparison_loss_fn
             )
 
             # train on making sure the model prediction is correct [fluxmag]
-            train_loss = train_loss + parms["fluxmag_mult"] * contribute_loss(
+            train_loss = train_loss + parms[
+                "loss_multiplier_fluxmag"
+            ] * contribute_loss(
                 fluxmag_pred_train,
                 fluxmag_true_train,
                 "train",
                 "fluxmag",
                 comparison_loss_fn,
             )
-            test_loss = test_loss + parms["fluxmag_mult"] * contribute_loss(
+            test_loss = test_loss + parms["loss_multiplier_fluxmag"] * contribute_loss(
                 fluxmag_pred_test,
                 fluxmag_true_test,
                 "test",
@@ -253,28 +249,36 @@ def train_asymptotic_model(
             )
 
             # train on making sure the model prediction is correct [direction]
-            train_loss = train_loss + parms["direction_mult"] * contribute_loss(
+            train_loss = train_loss + parms[
+                "loss_multiplier_direction"
+            ] * contribute_loss(
                 Fhat_pred_train,
                 Fhat_true_train,
                 "train",
                 "direction",
                 direction_loss_fn,
             )
-            test_loss = test_loss + parms["direction_mult"] * contribute_loss(
+            test_loss = test_loss + parms[
+                "loss_multiplier_direction"
+            ] * contribute_loss(
                 Fhat_pred_test, Fhat_true_test, "test", "direction", direction_loss_fn
             )
 
             # train on making sure the model prediction is correct [growthrate]
             # train_loss = train_loss + 0.01 * contribute_loss(growthrate_pred_train/ntot_train, torch.log(growthrate_true_train/ntot_train/ndens_to_invsec), "train", "growthrate", comparison_loss_fn)
             # test_loss  = test_loss  + 0.01 * contribute_loss(growthrate_pred_test /ntot_test , torch.log(growthrate_true_test /ntot_test/ndens_to_invsec ), "test" , "growthrate", comparison_loss_fn
-            train_loss = train_loss + parms["growthrate_mult"] * contribute_loss(
+            train_loss = train_loss + parms[
+                "loss_multiplier_growthrate"
+            ] * contribute_loss(
                 growthrate_pred_train / ntot_train,
                 torch.log(growthrate_true_train / ntot_train / ndens_to_invsec),
                 "train",
                 "growthrate",
                 comparison_loss_fn,
             )
-            test_loss = test_loss + parms["growthrate_mult"] * contribute_loss(
+            test_loss = test_loss + parms[
+                "loss_multiplier_growthrate"
+            ] * contribute_loss(
                 growthrate_pred_test / ntot_test,
                 torch.log(growthrate_true_test / ntot_test / ndens_to_invsec),
                 "test",
@@ -284,14 +288,18 @@ def train_asymptotic_model(
 
             # unphysical. Have experienced heavy over-training in the past if not regenerated every iteration
             if parms["do_unphysical_check"]:
-                train_loss = train_loss + parms["unphysical_mult"] * contribute_loss(
+                train_loss = train_loss + parms[
+                    "loss_multiplier_unphysical"
+                ] * contribute_loss(
                     F4f_pred_train / ntot_train[:, None, None, None],
                     None,
                     "train",
                     "unphysical",
                     unphysical_loss_fn,
                 )
-                test_loss = test_loss + parms["unphysical_mult"] * contribute_loss(
+                test_loss = test_loss + parms[
+                    "loss_multiplier_unphysical"
+                ] * contribute_loss(
                     F4f_pred_test / ntot_test[:, None, None, None],
                     None,
                     "test",

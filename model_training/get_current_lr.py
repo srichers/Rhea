@@ -3,7 +3,7 @@
 # --------->>>| rate even for different schedulers
 # ###############################################################
 def current_lr(optim, sched=None):
-    # Varlid for modern schedulers: StepLR, CosineAnnealingLR, etc.
+    # Valid for modern schedulers: StepLR, CosineAnnealingLR, etc.
     if sched is not None and hasattr(sched, "get_last_lr"):
         try:
             return sched.get_last_lr()[0]
