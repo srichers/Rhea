@@ -29,6 +29,12 @@ class NeuralNetwork(nn.Module):
         # store input arguments
         self.NF = parms["NF"]
 
+        # store loss weight parameters for tasks
+        self.log_task_weights = nn.ParameterDict({
+            name: nn.Parameter(torch.tensor(parms[f"log_task_weight_{name}"], dtype=torch.float32))
+            for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
+        })
+
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
         self.do_fdotu = parms["do_fdotu"]
