@@ -236,7 +236,7 @@ def train_asymptotic_model(parms,
         print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}")
         if(epoch%parms["output_every"]==0):
             outfilename = os.getcwd()+"/model"+str(epoch)
-            F4i = dataset_asymptotic_test_list[0].datasets[0]
+            F4i = dataset_asymptotic_test_list[0].tensors[0]
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
 
