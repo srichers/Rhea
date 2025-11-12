@@ -73,7 +73,7 @@ def train_asymptotic_model(parms,
     #=======================#
     print("#SETTING UP SCHEDULERS")
     scheduler_warmup = torch.optim.lr_scheduler.LinearLR(optimizer,
-                                                         start_factor=1.0/parms["warmup_iters"],
+                                                         start_factor=1.0/max(1,parms["warmup_iters"]),
                                                          end_factor=1,
                                                          total_iters=parms["warmup_iters"])
     scheduler_main = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
@@ -217,8 +217,9 @@ def train_asymptotic_model(parms,
         loss_dict["test_loss"]  =  test_loss.item()
 
         # track the task weights
-        for name in model.log_task_weights.keys():
-            loss_dict["weight_"+name] = torch.exp(-model.log_task_weights[name]).item()
+        if parms["do_learn_task_weights"]:
+            for name in model.log_task_weights.keys():
+                loss_dict["weight_"+name] = torch.exp(-model.log_task_weights[name]).item()
 
         #=====================================#
         # ADVANCE THE LEARNING RATE SCHEDULER #

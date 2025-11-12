@@ -41,11 +41,12 @@ if __name__ == "__main__":
     parms["batch_size"] = 32
     parms["epoch_num_samples"] = 1000
     
+    parms["do_learn_task_weights"] = False
     parms["log_task_weight_stability"] = 0
     parms["log_task_weight_ndens"] = 0
     parms["log_task_weight_fluxmag"] = 0
     parms["log_task_weight_direction"] = 0
-    parms["log_task_weight_unphysical"] = 0
+    parms["log_task_weight_unphysical"] = np.log(100.)
     parms["log_task_weight_growthrate"] = 0
 
     # data augmentation options
@@ -54,18 +55,18 @@ if __name__ == "__main__":
     parms["do_unphysical_check"]= True # True - seems to help prevent crazy results
 
     # neural network options
-    parms["nhidden_shared"]        = 1
-    parms["nhidden_stability"]     = 2
-    parms["nhidden_growthrate"] = 2
-    parms["nhidden_asymptotic"]    = 2
-    parms["nhidden_density"]       = 2
-    parms["nhidden_flux"]          = 2
+    parms["nhidden_shared"]        = 0
+    parms["nhidden_stability"]     = 3
+    parms["nhidden_growthrate"] = 3
+    parms["nhidden_asymptotic"]    = 3
+    parms["nhidden_density"]       = 3
+    parms["nhidden_flux"]          = 3
     parms["width_shared"]        = 128
-    parms["width_stability"]     = 64
-    parms["width_growthrate"] = 64
-    parms["width_density"]       = 64
-    parms["width_flux"]          = 64
-    parms["dropout_probability"]= 0.1 #0.1 #0.5 #0.1 # 0.5
+    parms["width_stability"]     = 128
+    parms["width_growthrate"] = 128
+    parms["width_density"]       = 128
+    parms["width_flux"]          = 128
+    parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
     parms["do_batchnorm"]= False
     parms["do_fdotu"]= True
     parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
@@ -73,13 +74,13 @@ if __name__ == "__main__":
     # optimizer options
     parms["op"]= torch.optim.AdamW # Adam, SGD, RMSprop
     parms["amsgrad"]= False
-    parms["weight_decay"]= 1e-2 #1e-5
+    parms["weight_decay"]= 0 #1e-2 #1e-5
     parms["learning_rate"]= 2e-4 # 1e-3
     parms["fused"]= True
     parms["patience"]= 500
     parms["cooldown"]= 500
     parms["factor"]= 0.5
-    parms["warmup_iters"]=10
+    parms["warmup_iters"]=0
     parms["min_lr"]= 0 #1e-8
 
     # the number of flavors should be 3
