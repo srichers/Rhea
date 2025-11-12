@@ -99,12 +99,12 @@ if __name__ == "__main__":
     result = generate_stable_F4_zerofluxfac(NF, n_generate, False).numpy()
     print("generate_stable_F4_zerofluxfac output: ",result.shape)
     assert(all(maxentropy.has_crossing(result, 3, 64)==False))
-    write_stable_dataset("stable_zerofluxfac_database.h5",result, torch.ones(n_generate))
+    write_stable_dataset("stable_zerofluxfac_database.h5",result, torch.ones(len(result)))
     
     result = generate_stable_F4_oneflavor(NF, n_generate, False).numpy()
     print("generate_stable_F4_oneflavor output: ",result.shape)
     assert(all(maxentropy.has_crossing(result, 3, 64)==False))
-    write_stable_dataset("stable_oneflavor_database.h5", result, torch.ones(n_generate))
+    write_stable_dataset("stable_oneflavor_database.h5", result, torch.ones(len(result)))
 
     result = generate_random_F4(NF, n_generate, False, 10, 0.95).numpy()
     hascrossing = torch.tensor(maxentropy.has_crossing(result, 3, 200))
