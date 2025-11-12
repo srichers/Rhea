@@ -26,9 +26,9 @@ if __name__ == "__main__":
         "data/dummy_asymptotic.h5",
     ]
     parms["stable_database_list"] = [
-        "data/stable_oneflavor.h5",
-        "data/stable_random.h5",
-        "data/stable_zerofluxfac.h5",
+        "data/stable_oneflavor_database.h5",
+        "data/stable_random_database.h5",
+        "data/stable_zerofluxfac_database.h5",
     ]
     parms["samples_per_database"] = 1000000
 
@@ -41,6 +41,13 @@ if __name__ == "__main__":
     parms["batch_size"] = 32
     parms["epoch_num_samples"] = 1000
     
+    parms["log_task_weight_stability"] = 0
+    parms["log_task_weight_ndens"] = 0
+    parms["log_task_weight_fluxmag"] = 0
+    parms["log_task_weight_direction"] = 0
+    parms["log_task_weight_unphysical"] = 0
+    parms["log_task_weight_growthrate"] = 0
+
     # data augmentation options
     parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
     parms["do_augment_final_stable"]= False # True
@@ -82,5 +89,13 @@ if __name__ == "__main__":
     # use a GPU if available #
     #========================#
     parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+
+    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
+    dataset_stable_train_list, dataset_stable_test_list = read_stable_data(parms)
+
     #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
-    train_asymptotic_model(parms)
+    train_asymptotic_model(parms,
+            dataset_asymptotic_train_list,
+            dataset_asymptotic_test_list,
+            dataset_stable_train_list,
+            dataset_stable_test_list)
