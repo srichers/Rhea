@@ -220,7 +220,9 @@ def train_asymptotic_model(parms,
 
                 _, _, stable_pred = model.predict_all(F4i)
 
-                total_loss = total_loss + torch.exp(-model.log_task_weights["stability"] ) * contribute_loss(stable_pred, stable_true, traintest, "stability", stability_loss_fn)
+                # accumulate stability loss using MSE instead of BCE because it is easier to interpret
+                total_loss = total_loss + torch.exp(-model.log_task_weights["stability"] ) * \
+                    contribute_loss(stable_pred, stable_true, traintest, "stability", comparison_loss_fn)
             return total_loss
         
         train_loss = train_loss + accumulate_stable_loss(dataset_stable_train_list, "train")
@@ -265,13 +267,21 @@ def train_asymptotic_model(parms,
         loss_file.flush()
         assert(loss_dict["train_loss"]==loss_dict["train_loss"])
 
+        # determine if stopping early
+        stop_early = (scheduler.get_last_lr()[0]<=parms["min_lr"]) and (epoch>parms["warmup_iters"])
+
         # output
         print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}")
-        if(epoch%parms["output_every"]==0):
+        if(epoch%parms["output_every"]==0 or stop_early):
             outfilename = os.getcwd()+"/model"+str(epoch)
             F4i = dataset_asymptotic_test_list[0].tensors[0]
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
+
+        # exit the loop if the learning rate is too low
+        if stop_early:
+            print("Learning rate below minimum threshold - stopping training")
+            break
 
     return
 
