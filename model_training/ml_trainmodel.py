@@ -141,7 +141,8 @@ def train_asymptotic_model(parms,
             # note that growthrate is predicted as (e^y)(ntot)(ndens_to_invsec) where y is the output of the ml model
             F4f_pred_train, growthrate_pred_train, _                 = model.predict_all(F4i_asymptotic_train)
             _           , _                      , stable_pred_train = model.predict_all(F4i_stable_train    )
-            print(torch.sum(torch.abs(stable_pred_train-stable_true_train)).item(),"total difference in stable points predicted in batch")
+            print(torch.sum(torch.abs(stable_pred_train-stable_true_train)).item()/stable_pred_train.shape[0],"fractional difference in stable points predicted in batch")
+            print()
 
             # convert F4 to densities and fluxes to feed to loss functions
             # note the outputs are all normalized to the total number density
@@ -157,8 +158,8 @@ def train_asymptotic_model(parms,
             batch_loss = batch_loss + torch.exp(-model.log_task_weights["ndens"]     ) * comparison_loss_fn(ndens_pred_train, ndens_true_train)
             batch_loss = batch_loss + torch.exp(-model.log_task_weights["fluxmag"]   ) * comparison_loss_fn(fluxmag_pred_train, fluxmag_true_train)
             batch_loss = batch_loss + torch.exp(-model.log_task_weights["direction"] ) *  direction_loss_fn(Fhat_pred_train, Fhat_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn(torch.log(growthrate_pred_train/ntot_invsec),
-                                                                                                            torch.log(growthrate_true_train/ntot_invsec))
+            batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn((growthrate_pred_train/ntot_invsec), #torch.log
+                                                                                                            (growthrate_true_train/ntot_invsec)) #torch.log
             if parms["do_unphysical_check"]:
                 batch_loss = batch_loss + torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_train/ntotal(F4i_asymptotic_train)[:,None,None,None], None)
 
@@ -199,13 +200,12 @@ def train_asymptotic_model(parms,
                 total_loss = total_loss + torch.exp(-model.log_task_weights["direction"] ) * contribute_loss(Fhat_pred,
                                                                                                              Fhat_true,
                                                                                                              traintest, "direction", direction_loss_fn)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss(torch.log(growthrate_pred/ntot_invsec),
-                                                                                                             torch.log(growthrate_true/ntot_invsec),
+                total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss((growthrate_pred/ntot_invsec), #torch.log
+                                                                                                             (growthrate_true/ntot_invsec), #torch.log
                                                                                                              traintest, "growthrate", comparison_loss_fn)
-                if parms["do_unphysical_check"]:
-                    total_loss = total_loss + torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
-                                                                                                                 None,
-                                                                                                                 traintest, "unphysical", unphysical_loss_fn)
+                total_loss = total_loss + torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
+                                                                                                                None,
+                                                                                                                traintest, "unphysical", unphysical_loss_fn)
             return total_loss
 
         train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")

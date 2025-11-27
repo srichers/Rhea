@@ -34,12 +34,12 @@ class NeuralNetwork(nn.Module):
         # store loss weight parameters for tasks
         if parms["do_learn_task_weights"]:
             self.log_task_weights = nn.ParameterDict({
-                name: nn.Parameter(torch.tensor(parms[f"log_task_weight_{name}"], dtype=torch.float32))
+                name: nn.Parameter(torch.tensor(np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
                 for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
             })
         else:
             self.log_task_weights = {
-                name: torch.tensor(parms[f"log_task_weight_{name}"], dtype=torch.float32)
+                name: torch.tensor(np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
                 for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
             }
 
@@ -264,7 +264,7 @@ class NeuralNetwork(nn.Module):
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
         ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
-        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
+        growthrate = (torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec # torch.exp
 
         return F4_final, growthrate, stability
 
@@ -280,7 +280,7 @@ class NeuralNetwork(nn.Module):
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
         ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
-        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
+        growthrate = (torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec # torch.exp
 
         # apply sigmoid to stability logits
         stability = torch.squeeze(torch.sigmoid(y_stability))
