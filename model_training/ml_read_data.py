@@ -31,6 +31,15 @@ def read_asymptotic_data(parms):
         growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
         assert(parms["NF"] == int(np.array(f_in["nf"])) )
         f_in.close()
+
+        # downsample to less data
+        if parms["samples_per_database"]>0:
+            print("#    Downsampling to",parms["samples_per_database"],"samples")
+            random_indices = torch.randperm(len(growthrate))[:parms["samples_per_database"]]
+            F4_initial = F4_initial[random_indices,...]
+            F4_final   = F4_final  [random_indices,...]
+            growthrate = growthrate[random_indices,...]
+
         print("# ",len(F4_initial),"points in",d)
 
         # fix slightly negative energy densities
