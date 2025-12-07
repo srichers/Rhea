@@ -25,20 +25,29 @@ def configure_loader(parms, dataset_train_list):
     for dataset in dataset_train_list:
         nsamples = len(dataset)
         weights.extend([1.0/nsamples] * nsamples)
+    weights = torch.tensor(weights, dtype=torch.double)
     
     # combine the datasets
     dataset_train = ConcatDataset(dataset_train_list)
     
     # create sampler and data loader for test data
     if parms["sampler"]==WeightedRandomSampler:
-        sampler = WeightedRandomSampler(weights=weights, num_samples=parms["weightedrandomsampler.epoch_num_samples"], replacement=True)
+        sampler = WeightedRandomSampler(weights=weights,
+                                        num_samples=parms["weightedrandomsampler.epoch_num_samples"],
+                                        replacement=True)
     elif parms["sampler"]==SequentialSampler:
         sampler = SequentialSampler(dataset_train)
     else:
         raise ValueError("Unknown sampler type "+str(parms["sampler"]))
     
     # set up the data loader
-    loader = DataLoader(dataset_train, batch_size=parms["batch_size"], sampler=sampler)
+    loader = DataLoader(dataset_train,
+                        batch_size=parms["batch_size"],
+                        sampler=sampler,
+                        num_workers=16,
+                        pin_memory=True,
+                        persistent_workers=True,
+                        prefetch_factor=16)
 
     print("#  Configuring loader with num_samples=",parms["weightedrandomsampler.epoch_num_samples"],"and batch_size=",parms["batch_size"],"for a dataset with",len(dataset_train),"samples.")
 
