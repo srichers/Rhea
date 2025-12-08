@@ -34,12 +34,12 @@ class NeuralNetwork(nn.Module):
         # store loss weight parameters for tasks
         if parms["do_learn_task_weights"]:
             self.log_task_weights = nn.ParameterDict({
-                name: nn.Parameter(torch.tensor(np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
+                name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
                 for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
             })
         else:
             self.log_task_weights = {
-                name: torch.tensor(np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
+                name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
                 for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
             }
 

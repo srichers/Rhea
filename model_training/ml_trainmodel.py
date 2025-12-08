@@ -150,8 +150,6 @@ def train_asymptotic_model(parms,
             # note that growthrate is predicted as (e^y)(ntot)(ndens_to_invsec) where y is the output of the ml model
             F4f_pred_train, growthrate_pred_train, _                 = model.predict_all(F4i_asymptotic_train)
             _           , _                      , stable_pred_train = model.predict_all(F4i_stable_train    )
-            print(torch.sum(torch.abs(stable_pred_train-stable_true_train)).item()/stable_pred_train.shape[0],"fractional difference in stable points predicted in batch")
-            print()
 
             # convert F4 to densities and fluxes to feed to loss functions
             # note the outputs are all normalized to the total number density
@@ -175,7 +173,10 @@ def train_asymptotic_model(parms,
             # add loss weights to loss
             if parms["do_learn_task_weights"]:
                 for name in model.log_task_weights.keys():
-                    batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
+                    if (not parms["do_unphysical_check"]) and name=="unphysical":
+                        continue
+                    else:
+                        batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
 
             # back propagate the batch loss
             batch_loss.backward()
@@ -212,15 +213,17 @@ def train_asymptotic_model(parms,
                 total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss((growthrate_pred/ntot_invsec), #torch.log
                                                                                                              (growthrate_true/ntot_invsec), #torch.log
                                                                                                              traintest, "growthrate", comparison_loss_fn)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
-                                                                                                                None,
-                                                                                                                traintest, "unphysical", unphysical_loss_fn)
+                if not parms["do_unphysical_check"]:
+                    total_loss = total_loss + torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
+                                                                                                                 None,
+                                                                                                                 traintest, "unphysical", unphysical_loss_fn)
             return total_loss
 
         train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
         test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
 
         # Stability losses
+        print()
         def accumulate_stable_loss(dataset_list, traintest):
             total_loss = torch.tensor(0.0, requires_grad=False)
             for dataset in dataset_list:
@@ -228,6 +231,8 @@ def train_asymptotic_model(parms,
                 stable_true = dataset.tensors[1].to(parms["device"])
 
                 _, _, stable_pred = model.predict_all(F4i)
+
+                print(torch.sum(torch.abs(stable_pred-stable_true)).item()/stable_pred.shape[0],"fractional difference in stable points")
 
                 # accumulate stability loss using MSE instead of BCE because it is easier to interpret
                 total_loss = total_loss + torch.exp(-model.log_task_weights["stability"] ) * \
@@ -280,7 +285,7 @@ def train_asymptotic_model(parms,
         stop_early = (scheduler.get_last_lr()[0]<=parms["min_lr"]) and (epoch>parms["warmup_iters"])
 
         # output
-        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}")
+        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
         if(epoch%parms["output_every"]==0 or stop_early):
             outfilename = os.getcwd()+"/model"+str(epoch)
             F4i = dataset_asymptotic_test_list[0].tensors[0]
@@ -291,6 +296,7 @@ def train_asymptotic_model(parms,
         if stop_early:
             print("Learning rate below minimum threshold - stopping training")
             break
+        
 
     return
 
