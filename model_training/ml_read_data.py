@@ -31,16 +31,16 @@ def read_asymptotic_data(parms):
         growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
         assert(parms["NF"] == int(np.array(f_in["nf"])) )
         f_in.close()
-
-        # downsample to less data
-        if parms["samples_per_database"]>0:
-            print("#    Downsampling to",parms["samples_per_database"],"samples")
-            random_indices = torch.randperm(len(growthrate))[:parms["samples_per_database"]]
-            F4_initial = F4_initial[random_indices,...]
-            F4_final   = F4_final  [random_indices,...]
-            growthrate = growthrate[random_indices,...]
-
         print("# ",len(F4_initial),"points in",d)
+
+        # remove NaNs / infs up front
+        finite_mask = torch.isfinite(F4_initial).all(dim=(1,2,3)) & torch.isfinite(F4_final).all(dim=(1,2,3)) & torch.isfinite(growthrate)
+        if torch.any(~finite_mask):
+            n_bad = (~finite_mask).sum().item()
+            print("#   removing", n_bad, "non-finite samples")
+            F4_initial = F4_initial[finite_mask]
+            F4_final   = F4_final[finite_mask]
+            growthrate = growthrate[finite_mask]
 
         # fix slightly negative energy densities
         ntot = ml.ntotal(F4_initial)
@@ -59,6 +59,15 @@ def read_asymptotic_data(parms):
             assert(parms["do_augment_permutation"]==False)
             assert(torch.allclose( torch.mean(F4_initial[:,:,:,1:], dim=3), F4_initial[:,:,:,1] ))
             F4_final[:,:,:,1:] = torch.mean(F4_final[:,:,:,1:], dim=3, keepdim=True)
+
+        # downsample if requested
+        nsample = parms.get("random_samples_per_database", -1)
+        if nsample and nsample > 0 and nsample < len(F4_initial):
+            print("#    Randomly selecting", nsample, "samples")
+            indices = torch.randperm(len(F4_initial))[:nsample]
+            F4_initial = F4_initial[indices]
+            F4_final = F4_final[indices]
+            growthrate = growthrate[indices]
 
         # split into training and testing sets
         F4i_train, F4i_test, F4f_train, F4f_test, growthrate_train, growthrate_test = train_test_split(F4_initial, F4_final, growthrate, test_size=parms["test_size"], random_state=parms["random_seed"])
@@ -96,8 +105,13 @@ def read_stable_data(parms):
         stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
         f_in.close()
 
-        # remove invalid data points indicated by a nan in the electron neutrino density
-        assert(torch.all(F4==F4))
+        # remove invalid data points (nan/inf)
+        finite_mask = torch.isfinite(F4).all(dim=(1,2,3)) & torch.isfinite(stable)
+        if torch.any(~finite_mask):
+            n_bad = (~finite_mask).sum().item()
+            print("#   removing", n_bad, "non-finite samples")
+            F4 = F4[finite_mask]
+            stable = stable[finite_mask]
 
         # print number of points
         print("# ",len(stable),"points in",filename)
@@ -105,8 +119,9 @@ def read_stable_data(parms):
 
         # downsample to less data
         if parms["samples_per_database"]>0:
-            print("#    Downsampling to",parms["samples_per_database"],"samples")
-            random_indices = torch.randperm(len(stable))[:parms["samples_per_database"]]
+            nsample = parms["samples_per_database"]
+            print("#    Downsampling to",nsample,"samples")
+            random_indices = torch.randperm(len(stable))[:nsample]
             F4 = F4[random_indices,...]
             stable = stable[random_indices]
             print("#   ",sum(stable).item(),"points are stable.")
@@ -148,4 +163,3 @@ if __name__ == "__main__":
     print("#  reading stable dataset")
     F4_train, F4_test, stable_train, stable_test = read_stable_data(parms)
     print("# ",F4_train.shape, F4_test.shape, stable_train.shape, stable_test.shape)
-

@@ -23,45 +23,45 @@ code is wired on `not-main`, what data it expects, and improvements to consider 
 - Architecture (`ml_neuralnet.py`): shared trunk + task-specific heads for stability (logit), growth rate (log of rate),
   density transfer matrix, and flux transfer matrix. Enforces number conservation across flavors/matter, optionally
   averages heavy-lepton outputs, and can enforce lepton number directly or via the y-matrix. Outputs are converted back
-  to physical four-fluxes (`F4_from_y`) and growth rates in physical units.
+  to physical four-fluxes (`F4_from_y`) and growth rates in physical units. Added `predict_WhiskyTHC` export helper
+  (y-dens/flux + stability-masked growthrate).
 - Losses (`ml_loss.py`): per-task MSEs for densities/flux magnitude/direction/growth rate, BCE-with-logits for stability,
   optional unphysical penalty (negative density, |flux|>n). `contribute_loss` logs both loss value and max error.
 - Training (`ml_trainmodel.py`):
   - Dataloaders: `configure_loader` builds `WeightedRandomSampler` over concatenated datasets with `epoch_num_samples`
-    and `batch_size`, so each source contributes equally by sample count.
-  - Loop: predicts on full test splits each epoch, then iterates over minibatches from asymptotic + stable loaders.
-    Accumulates task losses using multipliers supplied in `parms`:
-    `loss_multiplier_{stable,ndens,fluxmag,direction,growthrate,unphysical}`. **These must be set by the caller; there
-    are no defaults in this branch.**
+    (defaults to dataset length if unspecified) and `batch_size`.
+  - Loop: true minibatch loop (zip of asymptotic + stable loaders) with per-batch backward/step; test loss evaluated
+    once per epoch. Tracks ELN violation max per epoch. Scheduler still steps per epoch (warmup then ReduceLROnPlateau).
+  - Loss multipliers: defaults set in `train_asymptotic_model`
+    (`loss_multiplier_{stable,ndens,fluxmag,direction,growthrate}=1`, `unphysical=10`) and can be overridden in `parms`.
   - Optimization: AdamW (or configured op) with LinearLR warmup then ReduceLROnPlateau. `get_current_lr.py` keeps the
     logged LR in sync with the active scheduler.
   - Logging/outputs: writes `parameters.txt`, tab-separated `loss.dat` (epoch, per-task losses/max, ELN violation, LR),
     and saves `model{epoch}_{device}.pt` every `output_every`.
 - `jmcguig_tests/run_many_models.py` (hyperparameter sweep) currently:
   - Uses asymptotic `asymptotic_M1-NuLib-old.h5` and stable `stable_M1-Nulib-7ms_rl2/rl3.h5`.
-  - Sets `samples_per_database=1_000_000`, `test_size=0.5`, `epochs=10_000`, `batch_size=10_000`,
-    AdamW with `learning_rate` grid `[1e-5, 5e-6]` (overriding the base `5e-2`), warmup 10, patience/cooldown 100.
-  - Writes one subdir per LR (`model_learning_rate_*`) with `loss.dat`, model checkpoints, and `quickplot.gplt` output.
+  - Downsamples each DB to 200k (also `random_samples_per_database` cap for asymptotic), `test_size=0.2`,
+    `epoch_num_samples=200k`, `batch_size=4096`. Loss multipliers set explicitly (matches defaults above).
+  - AdamW with `learning_rate` grid `[1e-5, 5e-6]` (base `5e-2` is overridden), warmup 10, patience/cooldown 100,
+    `epochs=10_000`. Writes one subdir per LR (`model_learning_rate_*`) with `loss.dat`, model checkpoints, and
+    `quickplot.gplt` output.
 
 ## Branch context and deltas
 - `not-main` adds: explicit task loss multipliers in the parameter dict, LR logging helper, and the sweep script above.
 - Upstream `origin/main` adds (not yet merged here): `predict_WhiskyTHC` export helper, NaN filtering when loading data,
-  and an option to randomly subsample each dataset (`random_samples_per_database`). Consider cherry-picking `e4148d5`
-  (WhiskyTHC) plus the NaN/subsampling commits for cleaner data + consumer API parity.
+  and an option to randomly subsample each dataset (`random_samples_per_database`). These are now mirrored locally.
 - `origin/evolve_task_weights` prototypes per-batch optimization with learned log-task-weights (Kendall et al. style),
   proper loader iteration (`for ... in zip(loader_asymptotic, loader_stable)`) and warmup that tolerates zero steps.
   Adopting the iterator pattern from that branch would also fix the current loop repeatedly re-instantiating
   `iter(loader)` and backpropagating one giant graph at epoch end.
 
 ## Known gaps / quick wins
-- Set sane defaults for the six `loss_multiplier_*` parms in your driver scripts; otherwise training will crash.
-- Fix the batch loop to reuse a single iterator (or zip loaders) and step the optimizer per batch; the current pattern
-  repeatedly pulls the first batch and accumulates a massive graph before one backward pass.
-- Integrate upstream data hygiene: drop NaNs on read, enable random subsampling for large H5s, and keep the new
-  `predict_WhiskyTHC` export.
+- Defaults for `loss_multiplier_*` are in place; override as needed per dataset scaling.
+- Batch loop now uses proper zipped loaders with per-batch optimizer steps; monitor for stability improvements.
+- Data hygiene: NaNs are dropped on load; `random_samples_per_database` is available to cap dataset size; WhiskyTHC
+  export helper is present.
 - Capture and plot loss curves by task (and ELN violation) for LR sweeps; they currently exist only in `loss.dat`.
-- Revisit sampler settings: with `samples_per_database=1_000_000` and `test_size=0.5`, each epoch draws heavily from a
-  single batch unless `epoch_num_samples` is also tuned.
+- Revisit sampler settings if changing dataset sizes; `epoch_num_samples` now defaults to dataset length when unset.
 
 ## How to run (not-main)
 1) Install deps: CUDA-capable PyTorch + numpy, h5py, scikit-learn (see `Dockerfile` for a working set).

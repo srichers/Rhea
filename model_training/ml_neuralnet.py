@@ -10,8 +10,6 @@ import torch
 import numpy as np
 from torch import nn
 from ml_tools import dot4, restrict_F4_to_physical, ntotal
-from torchview import draw_graph
-
 
 # constants used to get growth rate to order unity
 hbar = 1.05457266e-27 # erg s
@@ -30,18 +28,6 @@ class NeuralNetwork(nn.Module):
 
         # store input arguments
         self.NF = parms["NF"]
-
-        # store loss weight parameters for tasks
-        if parms["do_learn_task_weights"]:
-            self.log_task_weights = nn.ParameterDict({
-                name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
-                for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
-            })
-        else:
-            self.log_task_weights = {
-                name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
-                for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
-            }
 
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
@@ -64,6 +50,7 @@ class NeuralNetwork(nn.Module):
             modules.append(parms["activation"]())
             if parms["dropout_probability"] > 0:
                 modules.append(nn.Dropout(parms["dropout_probability"]))
+            return modules
 
         # put together the layers of the neural network
         modules_shared = []
@@ -73,31 +60,33 @@ class NeuralNetwork(nn.Module):
         modules_flux = []
         
         # set up shared layers
-        if parms["nhidden_shared"] > 0:
-            append_full_layer(modules_shared, self.NX, parms["width_shared"])
-            for i in range(parms["nhidden_shared"]):
-                append_full_layer(modules_shared, parms["width_shared"], parms["width_shared"])
-        else:
-            modules_shared.append(nn.Identity())
+        modules_shared = append_full_layer(modules_shared, self.NX, parms["width_shared"])
+        for i in range(parms["nhidden_shared"]):
+            modules_shared = append_full_layer(modules_shared, parms["width_shared"], parms["width_shared"])
 
-        def build_task(modules_task, nhidden_task, width_task, width_final):
-            # the width at the beginning of the task is NX if no shared layers, otherwise it's the shared width
-            width_start = self.NX if parms["nhidden_shared"] == 0 else parms["width_shared"]
+        # set up stability layers. Note that output is a logit, NOT a number between 0 and 1. The loss should be BCEWithLogitsLoss
+        modules_stability = append_full_layer(modules_stability, parms["width_shared"], parms["width_stability"])
+        for i in range(parms["nhidden_stability"]):
+            modules_stability = append_full_layer(modules_stability, parms["width_stability"], parms["width_stability"])
+        modules_stability.append(nn.Linear(parms["width_stability"], 1))
 
-            # if no hidden layers, just do linear from start to final
-            if nhidden_task == 0:
-                modules_task.append(nn.Linear(width_start, width_final))
-            # otherwise, build the full set of hidden layers
-            else:
-                append_full_layer(modules_task, width_start, width_task)
-                for _ in range(nhidden_task-1):
-                    append_full_layer(modules_task, width_task, width_task)
-                modules_task.append(nn.Linear(width_task, width_final))
-        
-        build_task(modules_stability,  parms["nhidden_stability"],  parms["width_stability"],  1      )
-        build_task(modules_growthrate, parms["nhidden_growthrate"], parms["width_growthrate"], 1      )
-        build_task(modules_density,    parms["nhidden_density"],    parms["width_density"],    self.Ny)
-        build_task(modules_flux,       parms["nhidden_flux"],       parms["width_flux"],       self.Ny)
+        # set up growthrate layers
+        modules_growthrate = append_full_layer(modules_growthrate, parms["width_shared"], parms["width_growthrate"])
+        for i in range(parms["nhidden_growthrate"]):
+            modules_growthrate = append_full_layer(modules_growthrate, parms["width_growthrate"], parms["width_growthrate"])
+        modules_growthrate.append(nn.Linear(parms["width_growthrate"], 1))
+
+        # set up the density layers
+        modules_density = append_full_layer(modules_density, parms["width_shared"], parms["width_density"])
+        for i in range(parms["nhidden_density"]):
+            modules_density = append_full_layer(modules_density, parms["width_density"], parms["width_density"])
+        modules_density.append(nn.Linear(parms["width_density"], self.Ny))
+
+        # set up the flux layers
+        modules_flux = append_full_layer(modules_flux, parms["width_shared"], parms["width_flux"])
+        for i in range(parms["nhidden_flux"]):
+            modules_flux = append_full_layer(modules_flux, parms["width_flux"], parms["width_flux"])
+        modules_flux.append(nn.Linear(parms["width_flux"], self.Ny))
 
         # turn the list of modules into a sequential model
         self.linear_activation_stack_shared     = nn.Sequential(*modules_shared)
@@ -114,11 +103,6 @@ class NeuralNetwork(nn.Module):
         self.linear_activation_stack_growthrate.apply(self._init_weights)
         self.linear_activation_stack_density.apply(self._init_weights)
         self.linear_activation_stack_flux.apply(self._init_weights)
-
-        # print the model structure
-        print(self)
-        graph = draw_graph(self, torch.zeros((1, self.NX)))
-        graph.visual_graph.render("nn_model_structure", format="pdf", cleanup=True)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -264,7 +248,7 @@ class NeuralNetwork(nn.Module):
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
         ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
-        growthrate = (torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec # torch.exp
+        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
 
         return F4_final, growthrate, stability
 
@@ -280,10 +264,12 @@ class NeuralNetwork(nn.Module):
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
         ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
-        growthrate = (torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec # torch.exp
+        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
 
         # apply sigmoid to stability logits
         stability = torch.squeeze(torch.sigmoid(y_stability))
         growthrate[torch.where(stability>0.5)] = 0
         
         return [y_dens, y_flux, growthrate]
+
+    
