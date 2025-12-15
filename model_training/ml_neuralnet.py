@@ -253,3 +253,23 @@ class NeuralNetwork(nn.Module):
         return F4_final, growthrate, stability
 
     
+    @torch.jit.export
+    def predict_WhiskyTHC(self, F4_initial):
+        # get X values from input
+        X = self.X_from_F4(F4_initial)
+
+        # propagate through the network
+        y_dens, y_flux, y_growthrate, y_stability = self.forward(X)
+
+        # apply total density scaling to log growth rate
+        # expects F4 to be in units of cm^-3
+        ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
+        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
+
+        # apply sigmoid to stability logits
+        stability = torch.squeeze(torch.sigmoid(y_stability))
+        growthrate[torch.where(stability>0.5)] = 0
+        
+        return [y_dens, y_flux, growthrate]
+
+    

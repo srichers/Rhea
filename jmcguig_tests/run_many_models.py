@@ -50,24 +50,26 @@ if __name__ == "__main__":
         #"../../datasets/stable_random.h5",
         #"../../datasets/stable_zerofluxfac.h5",
     ]
-    parms["samples_per_database"] = 1000000
-    parms["test_size"] = 0.5
+    parms["samples_per_database"] = 200000
+    parms["random_samples_per_database"] = 200000
+    parms["test_size"] = 0.2
     parms["epochs"] = 10000
     parms["output_every"] = 1000
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = "direct"
     parms["random_seed"] = 42
-    parms["batch_size"] = 10000
+    parms["batch_size"] = 4096
+    parms["epoch_num_samples"] = 200000  # matches downsampled size for balanced epochs
     parms["sampler"] = torch.utils.data.WeightedRandomSampler # WeightedRandomSampler, SequentialSampler
-    parms["weightedrandomsampler.epoch_num_samples"] = 1000000 #parms["samples_per_database"]
 
     parms["do_learn_task_weights"] = False
-    parms["task_weight_stability"] = 1.0
-    parms["task_weight_ndens"] = 1.0/0.0007
-    parms["task_weight_fluxmag"] = 1.0/0.0005
-    parms["task_weight_direction"] = 1.0/0.1
-    parms["task_weight_unphysical"] = 1 #np.log(100.)
-    parms["task_weight_growthrate"] = 1.0/0.01
+    # loss multipliers tuned to keep tasks on similar scales
+    parms["loss_multiplier_stable"] = 1.0
+    parms["loss_multiplier_ndens"] = 1.0
+    parms["loss_multiplier_fluxmag"] = 1.0
+    parms["loss_multiplier_direction"] = 1.0
+    parms["loss_multiplier_growthrate"] = 1.0
+    parms["loss_multiplier_unphysical"] = 10.0
     
     # data augmentation options
     parms["do_augment_permutation"] = False #False  # this is the most expensive option to make true, and seems to make things worse...

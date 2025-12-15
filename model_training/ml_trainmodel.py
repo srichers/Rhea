@@ -7,6 +7,7 @@ This is the file contains the main training loop, including accumulation of the 
 """
 
 import torch
+import ml_loss
 from ml_loss import *
 from ml_neuralnet import *
 from ml_tools import *
@@ -16,10 +17,6 @@ import torch.autograd.profiler as profiler
 import pickle
 import os
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
-
-# create an empty dictionary that will eventually contain all of the loss metrics of an iteration
-loss_dict = {}
-
 
 def configure_loader(parms, dataset_train_list, dataset_test_list):
     assert len(dataset_train_list) == len(dataset_test_list)
@@ -35,8 +32,9 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
     dataset_test = ConcatDataset(dataset_test_list)
 
     # create sampler and data loader for test data
+    num_samples = parms.get("epoch_num_samples", len(dataset_train))
     sampler = WeightedRandomSampler(
-        weights=weights, num_samples=parms["epoch_num_samples"], replacement=True
+        weights=weights, num_samples=num_samples, replacement=True
     )
     loader = DataLoader(dataset_train, batch_size=parms["batch_size"], sampler=sampler)
 
@@ -60,6 +58,18 @@ def train_asymptotic_model(
     dataset_stable_train_list,
     dataset_stable_test_list,
 ):
+    # fill in any missing loss multipliers with reasonable defaults
+    loss_defaults = {
+        "loss_multiplier_stable": 1.0,
+        "loss_multiplier_ndens": 1.0,
+        "loss_multiplier_fluxmag": 1.0,
+        "loss_multiplier_direction": 1.0,
+        "loss_multiplier_growthrate": 1.0,
+        "loss_multiplier_unphysical": 10.0,
+    }
+    for key, value in loss_defaults.items():
+        parms.setdefault(key, value)
+
     # print out all parameters for the record
     parmfile = open(os.getcwd() + "/parameters.txt", "w")
     for key in parms.keys():
@@ -144,28 +154,18 @@ def train_asymptotic_model(
     # ===============#
     print("#STARTING TRAINING LOOP")
     for epoch in range(1, parms["epochs"] + 1):
-        loss_dict["epoch"] = epoch
-
-        # zero the gradients
-        optimizer.zero_grad()
-        train_loss = torch.tensor(0.0, requires_grad=True)
-        test_loss = torch.tensor(0.0, requires_grad=False)
-
-        # predict test values
-        model.eval()
-        F4f_pred_test, growthrate_pred_test, _ = model.predict_all(F4i_asymptotic_test)
-        _, _, stable_pred_test = model.predict_all(F4i_stable_test)
+        # reset the loss dictionary for IO (shared with contribute_loss in ml_loss)
+        ml_loss.loss_dict = {"epoch": epoch}
+        train_loss_total = 0.0
+        max_eln_violation = 0.0
 
         # loop over batches
         assert len(loader_asymptotic) == len(loader_stable)
-        nbatches = len(loader_asymptotic)
-        for i in range(len(loader_asymptotic)):
-            # get true values from data loader
-            F4i_asymptotic_train, F4f_true_train, growthrate_true_train = next(
-                iter(loader_asymptotic)
-            )
-            F4i_stable_train, stable_true_train = next(iter(loader_stable))
-
+        model.train()
+        for (
+            (F4i_asymptotic_train, F4f_true_train, growthrate_true_train),
+            (F4i_stable_train, stable_true_train),
+        ) in zip(loader_asymptotic, loader_stable):
             # move the minibatch to the device
             F4i_asymptotic_train = F4i_asymptotic_train.to(parms["device"])
             F4f_true_train = F4f_true_train.to(parms["device"])
@@ -174,7 +174,6 @@ def train_asymptotic_model(
             stable_true_train = stable_true_train.to(parms["device"])
 
             # get predicted values from the model
-            model.train()
             F4f_pred_train, growthrate_pred_train, _ = model.predict_all(
                 F4i_asymptotic_train
             )
@@ -185,14 +184,8 @@ def train_asymptotic_model(
             ndens_pred_train, fluxmag_pred_train, Fhat_pred_train = (
                 get_ndens_fluxmag_fhat(F4f_pred_train)
             )
-            ndens_pred_test, fluxmag_pred_test, Fhat_pred_test = get_ndens_fluxmag_fhat(
-                F4f_pred_test
-            )
             ndens_true_train, fluxmag_true_train, Fhat_true_train = (
                 get_ndens_fluxmag_fhat(F4f_true_train)
-            )
-            ndens_true_test, fluxmag_true_test, Fhat_true_test = get_ndens_fluxmag_fhat(
-                F4f_true_test
             )
 
             # calculate ELN violation for printout later
@@ -204,16 +197,88 @@ def train_asymptotic_model(
             ELN_violation = torch.max(
                 torch.abs(ELN_final - ELN_initial) / ntot_train[:, None]
             )
-            loss_dict["ELN_violation"] = ELN_violation.item()
+            max_eln_violation = max(max_eln_violation, ELN_violation.item())
 
-            # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
-            train_loss = train_loss + parms["loss_multiplier_stable"] * contribute_loss(
+            # accumulate losses per batch
+            batch_loss = torch.tensor(0.0, device=parms["device"])
+            batch_loss = batch_loss + parms["loss_multiplier_stable"] * contribute_loss(
                 stable_pred_train,
                 stable_true_train,
                 "train",
                 "stability",
                 stability_loss_fn,
             )
+            batch_loss = batch_loss + parms["loss_multiplier_ndens"] * contribute_loss(
+                ndens_pred_train, ndens_true_train, "train", "ndens", comparison_loss_fn
+            )
+            batch_loss = (
+                batch_loss
+                + parms["loss_multiplier_fluxmag"]
+                * contribute_loss(
+                    fluxmag_pred_train,
+                    fluxmag_true_train,
+                    "train",
+                    "fluxmag",
+                    comparison_loss_fn,
+                )
+            )
+            batch_loss = (
+                batch_loss
+                + parms["loss_multiplier_direction"]
+                * contribute_loss(
+                    Fhat_pred_train,
+                    Fhat_true_train,
+                    "train",
+                    "direction",
+                    direction_loss_fn,
+                )
+            )
+            batch_loss = (
+                batch_loss
+                + parms["loss_multiplier_growthrate"]
+                * contribute_loss(
+                    growthrate_pred_train / ntot_train,
+                    torch.log(growthrate_true_train / ntot_train / ndens_to_invsec),
+                    "train",
+                    "growthrate",
+                    comparison_loss_fn,
+                )
+            )
+            if parms["do_unphysical_check"]:
+                batch_loss = (
+                    batch_loss
+                    + parms["loss_multiplier_unphysical"]
+                    * contribute_loss(
+                        F4f_pred_train / ntot_train[:, None, None, None],
+                        None,
+                        "train",
+                        "unphysical",
+                        unphysical_loss_fn,
+                    )
+                )
+
+            # backprop and step
+            optimizer.zero_grad()
+            batch_loss.backward()
+            optimizer.step()
+            train_loss_total += batch_loss.detach().item()
+
+        # evaluation on full test data
+        model.eval()
+        with torch.no_grad():
+            F4f_pred_test, growthrate_pred_test, _ = model.predict_all(
+                F4i_asymptotic_test
+            )
+            _, _, stable_pred_test = model.predict_all(F4i_stable_test)
+            ndens_pred_test, fluxmag_pred_test, Fhat_pred_test = get_ndens_fluxmag_fhat(
+                F4f_pred_test
+            )
+            ndens_true_test, fluxmag_true_test, Fhat_true_test = get_ndens_fluxmag_fhat(
+                F4f_true_test
+            )
+            ntot_test = ntotal(F4i_asymptotic_test)
+
+            test_loss = torch.tensor(0.0)
             test_loss = test_loss + parms["loss_multiplier_stable"] * contribute_loss(
                 stable_pred_test,
                 stable_true_test,
@@ -221,126 +286,87 @@ def train_asymptotic_model(
                 "stability",
                 stability_loss_fn,
             )
-
-            # train on making sure the model prediction is correct [ndens]
-            train_loss = train_loss + parms["loss_multiplier_ndens"] * contribute_loss(
-                ndens_pred_train, ndens_true_train, "train", "ndens", comparison_loss_fn
-            )
             test_loss = test_loss + parms["loss_multiplier_ndens"] * contribute_loss(
                 ndens_pred_test, ndens_true_test, "test", "ndens", comparison_loss_fn
             )
-
-            # train on making sure the model prediction is correct [fluxmag]
-            train_loss = train_loss + parms[
-                "loss_multiplier_fluxmag"
-            ] * contribute_loss(
-                fluxmag_pred_train,
-                fluxmag_true_train,
-                "train",
-                "fluxmag",
-                comparison_loss_fn,
-            )
-            test_loss = test_loss + parms["loss_multiplier_fluxmag"] * contribute_loss(
-                fluxmag_pred_test,
-                fluxmag_true_test,
-                "test",
-                "fluxmag",
-                comparison_loss_fn,
-            )
-
-            # train on making sure the model prediction is correct [direction]
-            train_loss = train_loss + parms[
-                "loss_multiplier_direction"
-            ] * contribute_loss(
-                Fhat_pred_train,
-                Fhat_true_train,
-                "train",
-                "direction",
-                direction_loss_fn,
-            )
-            test_loss = test_loss + parms[
-                "loss_multiplier_direction"
-            ] * contribute_loss(
-                Fhat_pred_test, Fhat_true_test, "test", "direction", direction_loss_fn
-            )
-
-            # train on making sure the model prediction is correct [growthrate]
-            # train_loss = train_loss + 0.01 * contribute_loss(growthrate_pred_train/ntot_train, torch.log(growthrate_true_train/ntot_train/ndens_to_invsec), "train", "growthrate", comparison_loss_fn)
-            # test_loss  = test_loss  + 0.01 * contribute_loss(growthrate_pred_test /ntot_test , torch.log(growthrate_true_test /ntot_test/ndens_to_invsec ), "test" , "growthrate", comparison_loss_fn
-            train_loss = train_loss + parms[
-                "loss_multiplier_growthrate"
-            ] * contribute_loss(
-                growthrate_pred_train / ntot_train,
-                torch.log(growthrate_true_train / ntot_train / ndens_to_invsec),
-                "train",
-                "growthrate",
-                comparison_loss_fn,
-            )
-            test_loss = test_loss + parms[
-                "loss_multiplier_growthrate"
-            ] * contribute_loss(
-                growthrate_pred_test / ntot_test,
-                torch.log(growthrate_true_test / ntot_test / ndens_to_invsec),
-                "test",
-                "growthrate",
-                comparison_loss_fn,
-            )
-
-            # unphysical. Have experienced heavy over-training in the past if not regenerated every iteration
-            if parms["do_unphysical_check"]:
-                train_loss = train_loss + parms[
-                    "loss_multiplier_unphysical"
-                ] * contribute_loss(
-                    F4f_pred_train / ntot_train[:, None, None, None],
-                    None,
-                    "train",
-                    "unphysical",
-                    unphysical_loss_fn,
-                )
-                test_loss = test_loss + parms[
-                    "loss_multiplier_unphysical"
-                ] * contribute_loss(
-                    F4f_pred_test / ntot_test[:, None, None, None],
-                    None,
+            test_loss = (
+                test_loss
+                + parms["loss_multiplier_fluxmag"]
+                * contribute_loss(
+                    fluxmag_pred_test,
+                    fluxmag_true_test,
                     "test",
-                    "unphysical",
-                    unphysical_loss_fn,
+                    "fluxmag",
+                    comparison_loss_fn,
+                )
+            )
+            test_loss = (
+                test_loss
+                + parms["loss_multiplier_direction"]
+                * contribute_loss(
+                    Fhat_pred_test, Fhat_true_test, "test", "direction", direction_loss_fn
+                )
+            )
+            test_loss = (
+                test_loss
+                + parms["loss_multiplier_growthrate"]
+                * contribute_loss(
+                    growthrate_pred_test / ntot_test,
+                    torch.log(growthrate_true_test / ntot_test / ndens_to_invsec),
+                    "test",
+                    "growthrate",
+                    comparison_loss_fn,
+                )
+            )
+            if parms["do_unphysical_check"]:
+                test_loss = (
+                    test_loss
+                    + parms["loss_multiplier_unphysical"]
+                    * contribute_loss(
+                        F4f_pred_test / ntot_test[:, None, None, None],
+                        None,
+                        "test",
+                        "unphysical",
+                        unphysical_loss_fn,
+                    )
                 )
 
         # track the total loss
-        loss_dict["train_loss"] = train_loss.item()
-        loss_dict["test_loss"] = test_loss.item()
+        ml_loss.loss_dict["train_loss"] = train_loss_total / max(
+            1, len(loader_asymptotic)
+        )
+        ml_loss.loss_dict["test_loss"] = test_loss.item()
+        ml_loss.loss_dict["ELN_violation"] = max_eln_violation
 
-        # have the optimizer take a step
-        train_loss.backward()
-        optimizer.step()
+        # have the optimizer take a step on the scheduler
         if epoch <= parms["warmup_iters"]:
             scheduler = schedulers[0]
-            loss_dict["learning_rate"] = current_lr(optimizer, scheduler)
             scheduler.step()
         else:
             scheduler = schedulers[1]
-            loss_dict["learning_rate"] = current_lr(optimizer, scheduler)
-            scheduler.step(train_loss.item())
+            scheduler.step(ml_loss.loss_dict["train_loss"])
+        ml_loss.loss_dict["learning_rate"] = current_lr(optimizer, scheduler)
 
         # print headers
         if epoch == 1:
-            for k, i in zip(loss_dict.keys(), range(len(loss_dict.keys()))):
+            for k, i in zip(
+                ml_loss.loss_dict.keys(), range(len(ml_loss.loss_dict.keys()))
+            ):
                 loss_file.write(("{:d}:" + k + "\t").format(i + 1))
             loss_file.write("\n")
 
         # print loss values
-        for k in loss_dict.keys():
+        for k in ml_loss.loss_dict.keys():
             if k == "epoch":
-                loss_file.write("{:<12d}".format(loss_dict[k]))
+                loss_file.write("{:<12d}".format(ml_loss.loss_dict[k]))
             else:
-                loss_file.write("{:<12.3e}\t".format(loss_dict[k]))
+                loss_file.write("{:<12.3e}\t".format(ml_loss.loss_dict[k]))
         loss_file.write("\n")
-        assert loss_dict["train_loss"] == loss_dict["train_loss"]
+        assert ml_loss.loss_dict["train_loss"] == ml_loss.loss_dict["train_loss"]
 
         # output
         print(
-            f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}"
+            f"{epoch:4d}  {ml_loss.loss_dict['learning_rate']:12.5e}  {ml_loss.loss_dict['train_loss']:12.5e}  {ml_loss.loss_dict['test_loss']:12.5e}"
         )
         if epoch % parms["output_every"] == 0:
             outfilename = os.getcwd() + "/model" + str(epoch)
