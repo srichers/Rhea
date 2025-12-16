@@ -26,32 +26,61 @@ if __name__ == "__main__":
     all_nhidden = 4
     parms = {}
 
-    parms["database_list"] = [
-        #"../../datasets/asymptotic_Box3D_M1NuLib7ms_rl2_yslices_adjustLebedev.h5",
-        #"../../datasets/asymptotic_M1-NuLib-7ms.h5",
-        #"../../datasets/asymptotic_M1-NuLib.h5",
-        "../../datasets/asymptotic_M1-NuLib-old.h5",
-        #"../../datasets/asymptotic_random.h5",
+    # allow overriding dataset location via DATA_ROOT; otherwise default to ../../datasets
+    DATA_ROOT = os.environ.get(
+        "DATA_ROOT", os.path.abspath(os.path.join(HERE, "..", "..", "datasets"))
+    )
+
+    def normalize(paths):
+        result = []
+        for p in paths:
+            if os.path.isabs(p):
+                result.append(p)
+            else:
+                # strip to basename when DATA_ROOT is provided, otherwise keep relative layout
+                candidate = os.path.join(DATA_ROOT, os.path.basename(p))
+                result.append(candidate)
+        return result
+
+    parms["database_list"] = normalize(
+        [
+            #"../../datasets/asymptotic_Box3D_M1NuLib7ms_rl2_yslices_adjustLebedev.h5",
+            #"../../datasets/asymptotic_M1-NuLib-7ms.h5",
+            #"../../datasets/asymptotic_M1-NuLib.h5",
+            "../../datasets/asymptotic_M1-NuLib-old.h5",
+            #"../../datasets/asymptotic_random.h5",
+        ]
+    )
+    parms["stable_database_list"] = normalize(
+        [
+            #"../../datasets/stable_Box3D_M1NuLib7ms_rl2_yslices_adjustLebedev.h5",
+            #"../../datasets/stable_M1-LeakageRates_rl0.h5",
+            #"../../datasets/stable_M1-LeakageRates_rl1.h5",
+            #"../../datasets/stable_M1-LeakageRates_rl2.h5",
+            #"../../datasets/stable_M1-LeakageRates_rl3.h5",
+            #"../../datasets/stable_M1-Nulib-7ms_rl0.h5",
+            #"../../datasets/stable_M1-Nulib-7ms_rl1.h5",
+            "../../datasets/stable_M1-Nulib-7ms_rl2.h5",
+            "../../datasets/stable_M1-Nulib-7ms_rl3.h5",
+            #"../../datasets/stable_M1-NuLib-old_rl0.h5",
+            #"../../datasets/stable_M1-NuLib_rl0.h5",
+            #"../../datasets/stable_M1-NuLib_rl1.h5",
+            #"../../datasets/stable_M1-NuLib_rl2.h5",
+            #"../../datasets/stable_M1-NuLib_rl3.h5",
+            #"../../datasets/stable_oneflavor.h5",
+            #"../../datasets/stable_random.h5",
+            #"../../datasets/stable_zerofluxfac.h5",
+        ]
+    )
+    missing = [
+        p
+        for p in parms["database_list"] + parms["stable_database_list"]
+        if not os.path.exists(p)
     ]
-    parms["stable_database_list"] = [
-        #"../../datasets/stable_Box3D_M1NuLib7ms_rl2_yslices_adjustLebedev.h5",
-        #"../../datasets/stable_M1-LeakageRates_rl0.h5",
-        #"../../datasets/stable_M1-LeakageRates_rl1.h5",
-        #"../../datasets/stable_M1-LeakageRates_rl2.h5",
-        #"../../datasets/stable_M1-LeakageRates_rl3.h5",
-        #"../../datasets/stable_M1-Nulib-7ms_rl0.h5",
-        #"../../datasets/stable_M1-Nulib-7ms_rl1.h5",
-        "../../datasets/stable_M1-Nulib-7ms_rl2.h5",
-        "../../datasets/stable_M1-Nulib-7ms_rl3.h5",
-        #"../../datasets/stable_M1-NuLib-old_rl0.h5",
-        #"../../datasets/stable_M1-NuLib_rl0.h5",
-        #"../../datasets/stable_M1-NuLib_rl1.h5",
-        #"../../datasets/stable_M1-NuLib_rl2.h5",
-        #"../../datasets/stable_M1-NuLib_rl3.h5",
-        #"../../datasets/stable_oneflavor.h5",
-        #"../../datasets/stable_random.h5",
-        #"../../datasets/stable_zerofluxfac.h5",
-    ]
+    if missing:
+        raise FileNotFoundError(
+            f"Missing dataset files: {missing}. Set DATA_ROOT=/path/to/datasets or update paths."
+        )
     parms["samples_per_database"] = 200000
     parms["random_samples_per_database"] = 200000
     parms["test_size"] = 0.2
