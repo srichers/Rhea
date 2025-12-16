@@ -2,6 +2,7 @@ PYTHON ?= python3
 VENV ?= .venv
 REQS ?= requirements.txt
 GET_PIP_URL ?= https://bootstrap.pypa.io/get-pip.py
+GET_PIP ?= /tmp/get-pip.py
 
 .PHONY: venv clean
 
@@ -13,8 +14,14 @@ $(VENV)/bin/python:
 
 $(VENV)/bin/pip: $(VENV)/bin/python
 	@echo "Bootstrapping pip into $(VENV)..."
-	@($(VENV)/bin/python -m ensurepip --upgrade || \
-	  (curl -sSL $(GET_PIP_URL) -o /tmp/get-pip.py && $(VENV)/bin/python /tmp/get-pip.py && rm /tmp/get-pip.py))
+	@($(VENV)/bin/python -m ensurepip --upgrade) || \
+	  ( \
+	    if command -v curl >/dev/null 2>&1; then curl -sSf $(GET_PIP_URL) -o $(GET_PIP); \
+	    elif command -v wget >/dev/null 2>&1; then wget -q -O $(GET_PIP) $(GET_PIP_URL); \
+	    else echo "Need curl or wget available to download get-pip.py" && exit 1; fi; \
+	    $(VENV)/bin/python $(GET_PIP); \
+	    rm -f $(GET_PIP); \
+	  )
 	@$(VENV)/bin/pip install --upgrade pip
 
 clean:
