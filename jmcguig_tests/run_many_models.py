@@ -8,9 +8,11 @@ This is the file that is actually run to train a model. It requires access to va
 
 if __name__ == "__main__":
     import sys
+    import os
 
-    #sys.path.append("/mnt/scratch/NSM_ML_2.0/Rhea/model_training")
-    sys.path.append("/mnt/scratch/srichers/software/Rhea/model_training")
+    # use the local model_training in this repo
+    HERE = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, os.path.join(HERE, "..", "model_training"))
     import os
     import numpy as np
     import torch
