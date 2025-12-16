@@ -18,7 +18,14 @@ $(VENV)/bin/pip: $(VENV)/bin/python
 	  ( \
 	    if command -v curl >/dev/null 2>&1; then curl -sSf $(GET_PIP_URL) -o $(GET_PIP); \
 	    elif command -v wget >/dev/null 2>&1; then wget -q -O $(GET_PIP) $(GET_PIP_URL); \
-	    else echo "Need curl or wget available to download get-pip.py" && exit 1; fi; \
+	    else \
+	      echo "Downloading get-pip.py with Python stdlib"; \
+	      $(PYTHON) - <<'PY' ;\
+import urllib.request, os, sys; url="$(GET_PIP_URL)"; path="$(GET_PIP)"; \
+urllib.request.urlretrieve(url, path); \
+print(f"Downloaded {path} from {url}") \
+PY \
+	    ; fi; \
 	    $(VENV)/bin/python $(GET_PIP); \
 	    rm -f $(GET_PIP); \
 	  )
