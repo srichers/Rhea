@@ -70,6 +70,17 @@ def train_asymptotic_model(
     for key, value in loss_defaults.items():
         parms.setdefault(key, value)
 
+    # optimizer defaults
+    opt_defaults = {
+        "op": torch.optim.AdamW,
+        "weight_decay": 0.0,
+        "amsgrad": False,
+        "fused": False,
+        "learning_rate": 1e-3,
+    }
+    for key, value in opt_defaults.items():
+        parms.setdefault(key, value)
+
     # print out all parameters for the record
     parmfile = open(os.getcwd() + "/parameters.txt", "w")
     for key in parms.keys():
