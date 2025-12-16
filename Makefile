@@ -3,16 +3,18 @@ VENV ?= .venv
 REQS ?= requirements.txt
 GET_PIP_URL ?= https://bootstrap.pypa.io/get-pip.py
 GET_PIP ?= /tmp/get-pip.py
+PIP ?= $(VENV)/bin/pip
+PIP3 ?= $(VENV)/bin/pip3
 
 .PHONY: venv clean
 
-venv: $(VENV)/bin/pip
-	. $(VENV)/bin/activate && pip install -r $(REQS)
+venv: $(PIP)
+	$(PIP) install -r $(REQS)
 
 $(VENV)/bin/python:
 	$(PYTHON) -m venv --without-pip $(VENV)
 
-$(VENV)/bin/pip: $(VENV)/bin/python
+$(PIP): $(VENV)/bin/python
 	@echo "Bootstrapping pip into $(VENV)..."
 	@($(VENV)/bin/python -m ensurepip --upgrade) || ( \
 		if command -v curl >/dev/null 2>&1; then \
@@ -26,7 +28,8 @@ $(VENV)/bin/pip: $(VENV)/bin/python
 		$(VENV)/bin/python $(GET_PIP); \
 		rm -f $(GET_PIP); \
 	)
-	@$(VENV)/bin/pip install --upgrade pip
+	@if [ ! -x $(PIP) ] && [ -x $(PIP3) ]; then ln -s pip3 $(PIP); fi
+	@$(PIP) install --upgrade pip
 
 clean:
 	rm -rf $(VENV)
