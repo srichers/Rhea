@@ -10,6 +10,8 @@ import torch
 import numpy as np
 from torch import nn
 from ml_tools import dot4, restrict_F4_to_physical, ntotal
+from torchview import draw_graph
+
 
 # constants used to get growth rate to order unity
 hbar = 1.05457266e-27 # erg s
@@ -30,10 +32,16 @@ class NeuralNetwork(nn.Module):
         self.NF = parms["NF"]
 
         # store loss weight parameters for tasks
-        self.log_task_weights = nn.ParameterDict({
-            name: nn.Parameter(torch.tensor(parms[f"log_task_weight_{name}"], dtype=torch.float32))
-            for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
-        })
+        if parms["do_learn_task_weights"]:
+            self.log_task_weights = nn.ParameterDict({
+                name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
+                for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
+            })
+        else:
+            self.log_task_weights = {
+                name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
+                for name in ["stability", "growthrate", "ndens", "fluxmag", "direction", "unphysical"]
+            }
 
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
@@ -106,6 +114,11 @@ class NeuralNetwork(nn.Module):
         self.linear_activation_stack_growthrate.apply(self._init_weights)
         self.linear_activation_stack_density.apply(self._init_weights)
         self.linear_activation_stack_flux.apply(self._init_weights)
+
+        # print the model structure
+        print(self)
+        graph = draw_graph(self, torch.zeros((1, self.NX)))
+        graph.visual_graph.render("nn_model_structure", format="pdf", cleanup=True)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -251,7 +264,7 @@ class NeuralNetwork(nn.Module):
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
         ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
-        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
+        growthrate = (torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec # torch.exp
 
         return F4_final, growthrate, stability
 
@@ -267,7 +280,7 @@ class NeuralNetwork(nn.Module):
         # apply total density scaling to log growth rate
         # expects F4 to be in units of cm^-3
         ndens_to_invsec = 1.3615452913035457e-22 # must be declared a literal here or pytorch complains when exporting the model
-        growthrate = torch.exp(torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec
+        growthrate = (torch.squeeze(y_growthrate)) * ntotal(F4_initial)*ndens_to_invsec # torch.exp
 
         # apply sigmoid to stability logits
         stability = torch.squeeze(torch.sigmoid(y_stability))

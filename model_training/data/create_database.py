@@ -21,6 +21,14 @@ problematic_stddev_val = 0.05
 violation_limit = 1e-5
 #problematic_final_val = 20
 
+# constants used to get growth rate to order unity
+hbar = 1.05457266e-27 # erg s
+c = 2.99792458e10 # cm/s
+eV = 1.60218e-12 # erg
+GeV = 1e9 * eV
+GF = 1.1663787e-5 / GeV**2 * (hbar*c)**3 # erg cm^3
+ndens_to_invsec = GF/hbar
+
 #=================================================#
 # read in the stable points from the NSM snapshot #
 #=================================================#
@@ -308,7 +316,7 @@ def write_dummy_asymptotic_dataset(ngenerate, outfilename):
     #print("fluxfac:",np.max(fluxmag/ndens, axis=(1,2)))
     output = h5py.File(outfilename,"w")
     output["nf"] = NF
-    output["growthRate(1|s)"] = np.ones(ngenerate)
+    output["growthRate(1|s)"] = np.ones(ngenerate) * ndens_to_invsec
     output["F4_final(1|ccm)"] = F4_random
     output["F4_initial(1|ccm)"] = F4_random
     output.close()

@@ -38,16 +38,19 @@ if __name__ == "__main__":
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = "direct"
     parms["random_seed"] = 42
-    parms["batch_size"] = 32
-    parms["epoch_num_samples"] = 1000
+    parms["loader.batch_size"] = 10
+    parms["loader.num_workers"] = 1
+    parms["loader.prefetch_factor"] = 1
+    parms["sampler"] = torch.utils.data.WeightedRandomSampler # WeightedRandomSampler, SequentialSampler
+    parms["weightedrandomsampler.epoch_num_samples"] = 10 #parms["samples_per_database"]
     
-    parms["do_learn_task_weights"] = False
-    parms["log_task_weight_stability"] = 0
-    parms["log_task_weight_ndens"] = 0
-    parms["log_task_weight_fluxmag"] = 0
-    parms["log_task_weight_direction"] = 0
-    parms["log_task_weight_unphysical"] = np.log(100.)
-    parms["log_task_weight_growthrate"] = 0
+    parms["do_learn_task_weights"] = True
+    parms["task_weight_stability"] = 1.0
+    parms["task_weight_ndens"] = 1.0
+    parms["task_weight_fluxmag"] = 1.0
+    parms["task_weight_direction"] = 1.0
+    parms["task_weight_unphysical"] = 1
+    parms["task_weight_growthrate"] = 1.0
 
     # data augmentation options
     parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
@@ -67,16 +70,16 @@ if __name__ == "__main__":
     parms["width_density"]       = 128
     parms["width_flux"]          = 128
     parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
-    parms["do_batchnorm"]= False
+    parms["do_batchnorm"]= True
     parms["do_fdotu"]= True
     parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
     # optimizer options
     parms["op"]= torch.optim.AdamW # Adam, SGD, RMSprop
-    parms["amsgrad"]= False
-    parms["weight_decay"]= 0 #1e-2 #1e-5
+    parms["adamw.amsgrad"] = False
+    parms["adamw.weight_decay"] = 0 #0.01  # 1e-5
+    parms["adamw.fused"] = True
     parms["learning_rate"]= 2e-4 # 1e-3
-    parms["fused"]= True
     parms["patience"]= 500
     parms["cooldown"]= 500
     parms["factor"]= 0.5
