@@ -1,3 +1,6 @@
 __pycache__/
 build
 .vscode
+loss.txt
+run_summary.csv
+plots/
