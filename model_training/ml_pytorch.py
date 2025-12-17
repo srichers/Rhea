@@ -39,7 +39,8 @@ if __name__ == "__main__":
     parms["conserve_lepton_number"] = "direct"
     parms["random_seed"] = 42
     parms["batch_size"] = 32
-    parms["epoch_num_samples"] = 1000
+    parms["sampler"] = torch.utils.data.WeightedRandomSampler # WeightedRandomSampler, SequentialSampler
+    parms["weightedrandomsampler.epoch_num_samples"] = 1000 #parms["samples_per_database"]
     
     parms["do_learn_task_weights"] = False
     parms["task_weight_stability"] = 1.0
