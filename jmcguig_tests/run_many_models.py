@@ -108,17 +108,17 @@ if __name__ == "__main__":
     parms["do_unphysical_check"] = False  # True - seems to help prevent crazy results
 
     # neural network options
-    parms["nhidden_shared"] = 0 #all_nhidden
-    parms["nhidden_stability"] = all_nhidden
-    parms["nhidden_growthrate"] = all_nhidden
-    parms["nhidden_asymptotic"] = all_nhidden
-    parms["nhidden_density"] = all_nhidden
-    parms["nhidden_flux"] = all_nhidden
-    parms["width_shared"] = all_widths
-    parms["width_stability"] = all_widths
-    parms["width_growthrate"] = all_widths
-    parms["width_density"] = all_widths
-    parms["width_flux"] = all_widths
+    parms["nhidden_shared"] = 0
+    parms["nhidden_stability"] = 0
+    parms["nhidden_growthrate"] = 0
+    parms["nhidden_asymptotic"] = 0
+    parms["nhidden_density"] = 0
+    parms["nhidden_flux"] = 0
+    parms["width_shared"] = 32
+    parms["width_stability"] = 32
+    parms["width_growthrate"] = 32
+    parms["width_density"] = 32
+    parms["width_flux"] = 32
     parms["dropout_probability"] = 0.0  # 0.1 #0.5 #0.1 # 0.5
     parms["do_batchnorm"] = True
     parms["do_fdotu"] = True
@@ -152,29 +152,33 @@ if __name__ == "__main__":
     )
     dataset_stable_train_list, dataset_stable_test_list = read_stable_data(parms)
 
-    parameter_grid = {"learning_rate": [1e-5, 5e-6]}
+    summary_rows = []
 
-    keys = list(parameter_grid.keys())
-    values = list(parameter_grid.values())
+    for (lr, w, nh, seed) in product(lr_grid, width_grid, nhid_grid, seed_grid):
+        directory_name = f"model_lr_{lr}_w_{w}_nh_{nh}_seed_{seed}"
+        if args.use_pcgrad:
+            directory_name += "_pcgrad"
 
-    for combination in product(*values):
-        directory_name = "model"
-
-        print(combination)
-        print("Running new model")
-        for key, value in zip(keys, combination):
-            parms[key] = value
-            print("    ", key, value)
-            directory_name = directory_name + "_" + key + "_" + str(value)
-        print("     " + directory_name)
+        print(f"Running {directory_name}")
+        parms["learning_rate"] = lr
+        parms["width_shared"] = w
+        parms["width_stability"] = w
+        parms["width_growthrate"] = w
+        parms["width_density"] = w
+        parms["width_flux"] = w
+        parms["nhidden_shared"] = nh
+        parms["nhidden_stability"] = nh
+        parms["nhidden_growthrate"] = nh
+        parms["nhidden_asymptotic"] = nh
+        parms["nhidden_density"] = nh
+        parms["nhidden_flux"] = nh
+        parms["random_seed"] = seed
+        parms["use_pcgrad"] = args.use_pcgrad
 
         # create the new directory and go in
-        if os.path.exists(directory_name):
-            print("     ALREADY PRESENT - skipping")
-            continue
-        else:
+        if not os.path.exists(directory_name):
             os.mkdir(directory_name)
-            os.chdir(directory_name)
+        os.chdir(directory_name)
 
         # train the model
         train_asymptotic_model(
@@ -185,8 +189,55 @@ if __name__ == "__main__":
             dataset_stable_test_list,
         )
 
-        # run a command line
-        os.system("gnuplot ../../quickplot.gplt")
+        # parse final losses
+        final_train = None
+        final_test = None
+        loss_path = os.path.join(os.getcwd(), "loss.dat")
+        if os.path.exists(loss_path):
+            with open(loss_path, "r") as f:
+                lines = [l.strip() for l in f.readlines() if l.strip()]
+                if len(lines) > 1:
+                    header = [h for h in lines[0].split("\t") if h]
+                    cols = [h.split(":", 1)[-1] for h in header]
+                    last = [p for p in lines[-1].split("\t") if p]
+                    try:
+                        train_idx = cols.index("train_loss")
+                        test_idx = cols.index("test_loss")
+                        final_train = float(last[train_idx])
+                        final_test = float(last[test_idx])
+                    except Exception:
+                        pass
+        summary_rows.append(
+            {
+                "model": directory_name,
+                "learning_rate": lr,
+                "width_shared": w,
+                "nhidden_shared": nh,
+                "seed": seed,
+                "use_pcgrad": args.use_pcgrad,
+                "final_train_loss": final_train,
+                "final_test_loss": final_test,
+            }
+        )
 
         # return to the main directory
         os.chdir("..")
+
+    # write summary CSV
+    fieldnames = [
+        "model",
+        "learning_rate",
+        "width_shared",
+        "nhidden_shared",
+        "seed",
+        "use_pcgrad",
+        "final_train_loss",
+        "final_test_loss",
+    ]
+    write_header = not os.path.exists(args.summary)
+    with open(args.summary, "a", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        if write_header:
+            writer.writeheader()
+        for row in summary_rows:
+            writer.writerow(row)
