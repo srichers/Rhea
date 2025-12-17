@@ -315,44 +315,37 @@ def write_dummy_asymptotic_dataset(ngenerate, outfilename):
     
 if __name__ == "__main__":
     # stable/unstable criteria based on maximum entropy conditions applied to NSM snapshot data
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5","stable_M1-NuLib_rl0.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl1_orthonormal.h5","stable_M1-NuLib_rl1.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl2_orthonormal.h5","stable_M1-NuLib_rl2.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl3_orthonormal.h5","stable_M1-NuLib_rl3.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl0_orthonormal.h5","stable_M1-LeakageRates_rl0.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl1_orthonormal.h5","stable_M1-LeakageRates_rl1.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl2_orthonormal.h5","stable_M1-LeakageRates_rl2.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl3_orthonormal.h5","stable_M1-LeakageRates_rl3.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-old/orthonormal_distributions/model_rl0_orthonormal.h5","stable_M1-NuLib-old_rl0.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl0_orthonormal.h5","stable_M1-Nulib-7ms_rl0.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl1_orthonormal.h5","stable_M1-Nulib-7ms_rl1.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl2_orthonormal.h5","stable_M1-Nulib-7ms_rl2.h5")
-    write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl3_orthonormal.h5","stable_M1-Nulib-7ms_rl3.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5","stable_M1-NuLib_rl0.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl1_orthonormal.h5","stable_M1-NuLib_rl1.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl2_orthonormal.h5","stable_M1-NuLib_rl2.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl3_orthonormal.h5","stable_M1-NuLib_rl3.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl0_orthonormal.h5","stable_M1-LeakageRates_rl0.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl1_orthonormal.h5","stable_M1-LeakageRates_rl1.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl2_orthonormal.h5","stable_M1-LeakageRates_rl2.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl3_orthonormal.h5","stable_M1-LeakageRates_rl3.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-old/orthonormal_distributions/model_rl0_orthonormal.h5","stable_M1-NuLib-old_rl0.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl0_orthonormal.h5","stable_M1-Nulib-7ms_rl0.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl1_orthonormal.h5","stable_M1-Nulib-7ms_rl1.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl2_orthonormal.h5","stable_M1-Nulib-7ms_rl2.h5")
+    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl3_orthonormal.h5","stable_M1-Nulib-7ms_rl3.h5")
 
     # randomly generated distributions
     ngenerate = 1000
     nphi_maxentropy_check = 128
 
-    #result = generate.generate_stable_F4_zerofluxfac(NF, ngenerate, False).numpy()
-    #print("generate_stable_F4_zerofluxfac output: ",result.shape)
-    #generate.write_stable_dataset("stable_zerofluxfac.h5",result, torch.ones(ngenerate))
+    result = generate.generate_stable_F4_zerofluxfac(NF, ngenerate, False).numpy()
+    print("generate_stable_F4_zerofluxfac output: ",result.shape)
+    generate.write_stable_dataset("stable_zerofluxfac.h5",result, torch.ones(ngenerate))
     
-    #result = generate.generate_stable_F4_oneflavor(NF, ngenerate, False).numpy()
-    #print("generate_stable_F4_oneflavor output: ",result.shape)
-    #generate.write_stable_dataset("stable_oneflavor.h5", result, torch.ones(result.shape[0]))
+    result = generate.generate_stable_F4_oneflavor(NF, ngenerate, False).numpy()
+    print("generate_stable_F4_oneflavor output: ",result.shape)
+    generate.write_stable_dataset("stable_oneflavor.h5", result, torch.ones(result.shape[0]))
 
-    #result = generate.generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
-    #hascrossing = torch.tensor(maxentropy.has_crossing(result, 3, nphi_maxentropy_check))
-    #print("generate_stable_F4_oneflavor output: ",result.shape)
-    #print("nstable:",torch.sum(hascrossing))
-    #generate.write_stable_dataset("stable_random.h5", result, 1-hascrossing)
+    result = generate.generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
+    hascrossing = torch.tensor(maxentropy.has_crossing(result, 3, nphi_maxentropy_check))
+    print("generate_stable_F4_oneflavor output: ",result.shape)
+    print("nstable:",torch.sum(hascrossing))
+    generate.write_stable_dataset("stable_random.h5", result, 1-hascrossing)
 
-    #write_dummy_asymptotic_dataset(ngenerate, "dummy_asymptotic.h5")
-    
-    # datasets from many Emu simulations
-    #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-old", "asymptotic_M1-NuLib-old.h5")
-    #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib", "asymptotic_M1-NuLib.h5")
-    #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/M1-NuLib-7ms", "asymptotic_M1-NuLib-7ms.h5")
-    #write_asymptotic_dataset("/mnt/scratch/NSM_ML/Emu_merger_grid/maximum_entropy_32beam_effective2flavor", "asymptotic_random.h5")
-    
+    write_dummy_asymptotic_dataset(ngenerate, "dummy_asymptotic.h5")
     
