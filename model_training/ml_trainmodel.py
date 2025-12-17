@@ -213,7 +213,7 @@ def train_asymptotic_model(parms,
                 total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss((growthrate_pred/ntot_invsec), #torch.log
                                                                                                              (growthrate_true/ntot_invsec), #torch.log
                                                                                                              traintest, "growthrate", comparison_loss_fn)
-                if not parms["do_unphysical_check"]:
+                if parms["do_unphysical_check"]:
                     total_loss = total_loss + torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
                                                                                                                  None,
                                                                                                                  traintest, "unphysical", unphysical_loss_fn)
