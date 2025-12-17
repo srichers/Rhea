@@ -4,5 +4,6 @@ RUN apt-get update && apt-get install -y python3 python3-pip gfortran build-esse
 RUN pip3 install numpy matplotlib h5py scipy sympy yt torch scikit-learn
 RUN pip3 install torchview
 RUN wget https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.0.1%2Bcu118.zip && unzip libtorch-cxx11-abi-shared-with-deps-2.0.1+cu118.zip && mv libtorch /usr/local/libtorch
+RUN apt-get install -y graphviz
 ENV USER=jenkins
 ENV LOGNAME=jenkins
