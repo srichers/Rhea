@@ -73,10 +73,10 @@ if __name__ == "__main__":
 
     # optimizer options
     parms["op"]= torch.optim.AdamW # Adam, SGD, RMSprop
-    parms["amsgrad"]= False
-    parms["weight_decay"]= 0 #1e-2 #1e-5
+    parms["adamw.amsgrad"] = False
+    parms["adamw.weight_decay"] = 0 #0.01  # 1e-5
+    parms["adamw.fused"] = True
     parms["learning_rate"]= 2e-4 # 1e-3
-    parms["fused"]= True
     parms["patience"]= 500
     parms["cooldown"]= 500
     parms["factor"]= 0.5
