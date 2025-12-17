@@ -42,12 +42,12 @@ if __name__ == "__main__":
     parms["epoch_num_samples"] = 1000
     
     parms["do_learn_task_weights"] = False
-    parms["log_task_weight_stability"] = 0
-    parms["log_task_weight_ndens"] = 0
-    parms["log_task_weight_fluxmag"] = 0
-    parms["log_task_weight_direction"] = 0
-    parms["log_task_weight_unphysical"] = np.log(100.)
-    parms["log_task_weight_growthrate"] = 0
+    parms["task_weight_stability"] = 1.0
+    parms["task_weight_ndens"] = 1.0/0.0007
+    parms["task_weight_fluxmag"] = 1.0/0.0005
+    parms["task_weight_direction"] = 1.0/0.1
+    parms["task_weight_unphysical"] = 1 #np.log(100.)
+    parms["task_weight_growthrate"] = 1.0/0.01
 
     # data augmentation options
     parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
