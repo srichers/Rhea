@@ -49,7 +49,7 @@ def configure_loader(parms, dataset_train_list):
                         persistent_workers=True,
                         prefetch_factor=16)
 
-    print("#  Configuring loader with num_samples=",parms["weightedrandomsampler.epoch_num_samples"],"and batch_size=",parms["batch_size"],"for a dataset with",len(dataset_train),"samples.")
+    print("#  Configuring loader with num_samples=",parms["epoch_num_samples"],"and batch_size=",parms["batch_size"],"for a dataset with",len(dataset_train),"samples.")
 
     return loader
 
