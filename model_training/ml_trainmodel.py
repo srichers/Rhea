@@ -42,14 +42,14 @@ def configure_loader(parms, dataset_train_list):
     
     # set up the data loader
     loader = DataLoader(dataset_train,
-                        batch_size=parms["batch_size"],
+                        batch_size=parms["loader.batch_size"],
                         sampler=sampler,
-                        num_workers=16,
+                        num_workers=parms["loader.num_workers"],
                         pin_memory=True,
                         persistent_workers=True,
-                        prefetch_factor=16)
+                        prefetch_factor=parms["loader.prefetch_factor"])
 
-    print("#  Configuring loader with batch_size=",parms["batch_size"],"for a dataset with",len(dataset_train),"samples.")
+    print("#  Configuring loader with batch_size=",parms["loader.batch_size"],"for a dataset with",len(dataset_train),"samples.")
 
     return loader
 
