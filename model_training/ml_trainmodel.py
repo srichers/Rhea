@@ -20,12 +20,15 @@ from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
 
 def configure_loader(parms, dataset_train_list, dataset_test_list):
     assert len(dataset_train_list) == len(dataset_test_list)
+    assert len(dataset_train_list) > 0
 
     # create list of weights
-    weights = []
-    for dataset in dataset_train_list:
-        nsamples = len(dataset)
-        weights.extend([1.0 / nsamples] * nsamples)
+    weights = torch.cat(
+        [
+            torch.full((len(dataset),), 1.0 / len(dataset), dtype=torch.double)
+            for dataset in dataset_train_list
+        ]
+    )
 
     # combine the datasets
     dataset_train = ConcatDataset(dataset_train_list)
@@ -33,14 +36,23 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
 
     # create sampler and data loader for test data
     num_samples = parms.get("epoch_num_samples", len(dataset_train))
+    generator = torch.Generator().manual_seed(parms.get("random_seed", 0))
     sampler = WeightedRandomSampler(
-        weights=weights, num_samples=num_samples, replacement=True
+        weights=weights, num_samples=num_samples, replacement=True, generator=generator
     )
-    loader = DataLoader(dataset_train, batch_size=parms["batch_size"], sampler=sampler)
+    num_workers = parms.get("num_workers", 0)
+    loader = DataLoader(
+        dataset_train,
+        batch_size=parms["batch_size"],
+        sampler=sampler,
+        num_workers=num_workers,
+        pin_memory=parms.get("pin_memory", parms.get("device", "cpu") == "cuda"),
+        persistent_workers=num_workers > 0,
+    )
 
     print(
         "#  Configuring loader with num_samples=",
-        parms["epoch_num_samples"],
+        num_samples,
         "and batch_size=",
         parms["batch_size"],
         "for a dataset with",
@@ -157,6 +169,9 @@ def train_asymptotic_model(
         [ds.tensors[1] for ds in dataset_stable_test.datasets], dim=0
     ).to(parms["device"])
     ntot_test = ntotal(F4i_asymptotic_test)
+    ndens_true_test, fluxmag_true_test, Fhat_true_test = get_ndens_fluxmag_fhat(
+        F4f_true_test
+    )
 
     # set up file for writing performance metrics
     loss_file = open(os.getcwd() + "/loss.dat", "w")
@@ -189,7 +204,7 @@ def train_asymptotic_model(
             F4f_pred_train, growthrate_pred_train, _ = model.predict_all(
                 F4i_asymptotic_train
             )
-            _, _, stable_pred_train = model.predict_all(F4i_stable_train)
+            stable_pred_train = model.predict_stability(F4i_stable_train)
 
             # convert F4 to densities and fluxes to feed to loss functions
             # note the outputs are all normalized to the total number density
@@ -334,16 +349,12 @@ def train_asymptotic_model(
             F4f_pred_test, growthrate_pred_test, _ = model.predict_all(
                 F4i_asymptotic_test
             )
-            _, _, stable_pred_test = model.predict_all(F4i_stable_test)
+            stable_pred_test = model.predict_stability(F4i_stable_test)
             ndens_pred_test, fluxmag_pred_test, Fhat_pred_test = get_ndens_fluxmag_fhat(
                 F4f_pred_test
             )
-            ndens_true_test, fluxmag_true_test, Fhat_true_test = get_ndens_fluxmag_fhat(
-                F4f_true_test
-            )
-            ntot_test = ntotal(F4i_asymptotic_test)
 
-            test_loss = torch.tensor(0.0)
+            test_loss = torch.tensor(0.0, device=parms["device"])
             test_loss = test_loss + parms["loss_multiplier_stable"] * contribute_loss(
                 stable_pred_test,
                 stable_true_test,

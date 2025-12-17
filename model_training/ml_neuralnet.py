@@ -9,7 +9,7 @@ This file contains the structure of the neural network, including the means of t
 import torch
 import numpy as np
 from torch import nn
-from ml_tools import dot4, restrict_F4_to_physical, ntotal
+from ml_tools import ntotal
 
 # constants used to get growth rate to order unity
 hbar = 1.05457266e-27 # erg s
@@ -28,6 +28,9 @@ class NeuralNetwork(nn.Module):
 
         # store input arguments
         self.NF = parms["NF"]
+        pair_count = 2 * self.NF
+        self.register_buffer("pair_indices", torch.triu_indices(pair_count, pair_count))
+        self.register_buffer("minkowski_metric", torch.tensor([1.0, 1.0, 1.0, -1.0]))
 
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
@@ -121,37 +124,35 @@ class NeuralNetwork(nn.Module):
         Returns:
             torch.Tensor: Neural network input tensor. Indexed as [sim, iX]
         """
-        index = 0
         nsims = F4.shape[0]
-        X = torch.zeros((nsims, self.NX), device=F4.device)
-        F4_flat = F4.reshape((nsims, 4, 2*self.NF)) # [simulationIndex, xyzt, species]
+        if nsims == 0:
+            return torch.zeros((0, self.NX), device=F4.device, dtype=F4.dtype)
+
+        F4_flat = F4.reshape(
+            (nsims, 4, 2 * self.NF)
+        )  # [simulationIndex, xyzt, species]
 
         # calculate the total number density based on the t component of the four-vector
-        # [sim]
-        N = torch.sum(F4_flat[:,3,:], dim=1)
+        N = torch.sum(F4_flat[:, 3, :], dim=1)
+        eps = torch.finfo(F4.dtype).tiny
+        F4_flat = F4_flat / torch.clamp(N, min=eps)[:, None, None]
 
-        # normalize F4 by the total number density
-        # [sim, xyzt, 2*NF]
-        F4_flat = F4_flat / N[:,None,None]
+        metric = self.minkowski_metric.view(1, 4, 1).to(
+            device=F4.device, dtype=F4.dtype
+        )
+        dot_matrix = torch.einsum(
+            "bma,bmc->bac", F4_flat * metric, F4_flat
+        )  # [sim, species, species]
 
-        # add the dot products of each species with each other species
-        for a in range(2*self.NF):
-            for b in range(a,2*self.NF):
-                F1 = F4_flat[:,:,a]
-                F2 = F4_flat[:,:,b]
+        pairwise = dot_matrix[:, self.pair_indices[0], self.pair_indices[1]]
 
-                X[:,index] = dot4(F1,F2)
-                index += 1
-
-        # add the u dot products
         if self.do_fdotu:
-            u = torch.zeros((4), device=F4.device)
-            u[3] = 1
-            for a in range(2*self.NF):
-                X[:,index] = dot4(F4_flat[:,:,a], u[None,:])
-                index += 1
-        
-        assert(index==self.NX)
+            fdotu = -F4_flat[:, 3, :]
+            X = torch.cat([pairwise, fdotu], dim=1)
+        else:
+            X = pairwise
+
+        assert X.shape[1] == self.NX
         return X
 
 
@@ -252,7 +253,13 @@ class NeuralNetwork(nn.Module):
 
         return F4_final, growthrate, stability
 
-    
+    @torch.jit.export
+    def predict_stability(self, F4_initial):
+        X = self.X_from_F4(F4_initial)
+        y_shared = self.linear_activation_stack_shared(X)
+        stability_logits = self.linear_activation_stack_stability(y_shared)
+        return torch.squeeze(torch.sigmoid(stability_logits))
+
     @torch.jit.export
     def predict_WhiskyTHC(self, F4_initial):
         # get X values from input
