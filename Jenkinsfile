@@ -33,11 +33,12 @@ pipeline {
 	stage('training'){ steps{
             dir('model_training'){
 		sh 'python3 ml_pytorch.py'
+		sh 'python3 convert_model_to_cpu.py model10_cuda.pt model10_cpu.pt'
 	    }
 	}}
 	stage('Python Interface'){ steps{
             dir('model_training'){
-		sh 'python3 example_use_model.py ../model_training/model10_cpu.pt'
+		sh 'python3 example_use_model.py ../model_training/model10_cuda.pt'
 	    }
 	}}
 	stage('C++ Interface'){ steps{
