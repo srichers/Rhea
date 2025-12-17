@@ -77,6 +77,7 @@ def train_asymptotic_model(
         "amsgrad": False,
         "fused": False,
         "learning_rate": 1e-3,
+        "use_pcgrad": False,
     }
     for key, value in opt_defaults.items():
         parms.setdefault(key, value)
@@ -211,54 +212,53 @@ def train_asymptotic_model(
             max_eln_violation = max(max_eln_violation, ELN_violation.item())
 
             # accumulate losses per batch
-            batch_loss = torch.tensor(0.0, device=parms["device"])
-            batch_loss = batch_loss + parms["loss_multiplier_stable"] * contribute_loss(
-                stable_pred_train,
-                stable_true_train,
-                "train",
-                "stability",
-                stability_loss_fn,
-            )
-            batch_loss = batch_loss + parms["loss_multiplier_ndens"] * contribute_loss(
-                ndens_pred_train, ndens_true_train, "train", "ndens", comparison_loss_fn
-            )
-            batch_loss = (
-                batch_loss
-                + parms["loss_multiplier_fluxmag"]
+            task_losses = [
+                parms["loss_multiplier_stable"]
+                * contribute_loss(
+                    stable_pred_train,
+                    stable_true_train,
+                    "train",
+                    "stability",
+                    stability_loss_fn,
+                ),
+                parms["loss_multiplier_ndens"]
+                * contribute_loss(
+                    ndens_pred_train,
+                    ndens_true_train,
+                    "train",
+                    "ndens",
+                    comparison_loss_fn,
+                ),
+                parms["loss_multiplier_fluxmag"]
                 * contribute_loss(
                     fluxmag_pred_train,
                     fluxmag_true_train,
                     "train",
                     "fluxmag",
                     comparison_loss_fn,
-                )
-            )
-            batch_loss = (
-                batch_loss
-                + parms["loss_multiplier_direction"]
+                ),
+                parms["loss_multiplier_direction"]
                 * contribute_loss(
                     Fhat_pred_train,
                     Fhat_true_train,
                     "train",
                     "direction",
                     direction_loss_fn,
-                )
-            )
-            batch_loss = (
-                batch_loss
-                + parms["loss_multiplier_growthrate"]
+                ),
+                parms["loss_multiplier_growthrate"]
                 * contribute_loss(
                     growthrate_pred_train / ntot_train,
-                    torch.log(growthrate_true_train / ntot_train / ndens_to_invsec),
+                    torch.log(
+                        growthrate_true_train / ntot_train / ndens_to_invsec
+                    ),
                     "train",
                     "growthrate",
                     comparison_loss_fn,
-                )
-            )
+                ),
+            ]
             if parms["do_unphysical_check"]:
-                batch_loss = (
-                    batch_loss
-                    + parms["loss_multiplier_unphysical"]
+                task_losses.append(
+                    parms["loss_multiplier_unphysical"]
                     * contribute_loss(
                         F4f_pred_train / ntot_train[:, None, None, None],
                         None,
@@ -268,11 +268,65 @@ def train_asymptotic_model(
                     )
                 )
 
-            # backprop and step
-            optimizer.zero_grad()
-            batch_loss.backward()
-            optimizer.step()
-            train_loss_total += batch_loss.detach().item()
+            def pcgrad_step(losses, model, optimizer):
+                params = [p for p in model.parameters() if p.requires_grad]
+                grads = []
+                for i, loss in enumerate(losses):
+                    retain = i < len(losses) - 1
+                    g = torch.autograd.grad(
+                        loss,
+                        params,
+                        retain_graph=retain,
+                        allow_unused=True,
+                        create_graph=False,
+                    )
+                    grads.append(g)
+
+                proj_grads = [list(g) for g in grads]
+                num = len(grads)
+                for i in range(num):
+                    for j in torch.randperm(num):
+                        if j == i:
+                            continue
+                        dot = 0.0
+                        gj_norm_sq = 0.0
+                        for gi, gj in zip(proj_grads[i], grads[j]):
+                            if gi is None or gj is None:
+                                continue
+                            dot += torch.sum(gi * gj)
+                            gj_norm_sq += torch.sum(gj * gj)
+                        if gj_norm_sq == 0 or dot >= 0:
+                            continue
+                        proj_factor = dot / (gj_norm_sq + 1e-12)
+                        for k, (gi, gj) in enumerate(zip(proj_grads[i], grads[j])):
+                            if gi is None or gj is None:
+                                continue
+                            proj_grads[i][k] = gi - proj_factor * gj
+
+                optimizer.zero_grad()
+                for p in params:
+                    p.grad = None
+                for idx, p in enumerate(params):
+                    agg = None
+                    for g in proj_grads:
+                        gi = g[idx]
+                        if gi is None:
+                            continue
+                        agg = gi if agg is None else agg + gi
+                    if agg is not None:
+                        agg = agg / len(proj_grads)
+                        p.grad = agg
+                optimizer.step()
+
+            if parms.get("use_pcgrad", False):
+                pcgrad_step(task_losses, model, optimizer)
+                train_loss_total += sum([t.detach().item() for t in task_losses])
+            else:
+                batch_loss = torch.stack(task_losses).sum()
+                optimizer.zero_grad()
+                batch_loss.backward()
+                optimizer.step()
+                train_loss_total += batch_loss.detach().item()
 
         # evaluation on full test data
         model.eval()

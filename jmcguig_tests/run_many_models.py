@@ -9,11 +9,8 @@ This is the file that is actually run to train a model. It requires access to va
 if __name__ == "__main__":
     import sys
     import os
-
-    # use the local model_training in this repo
-    HERE = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, os.path.join(HERE, "..", "model_training"))
-    import os
+    import argparse
+    import csv
     import numpy as np
     import torch
     from itertools import product
@@ -21,9 +18,55 @@ if __name__ == "__main__":
     from ml_trainmodel import *
     import torch.optim
 
-    # create a list of options
-    all_widths = 32
-    all_nhidden = 4
+    # use the local model_training in this repo
+    HERE = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, os.path.join(HERE, "..", "model_training"))
+
+    parser = argparse.ArgumentParser(description="Hyperparameter sweep runner.")
+    parser.add_argument(
+        "--learning-rate",
+        default="1e-4,5e-5,1e-5",
+        help="Comma-separated learning rates to sweep.",
+    )
+    parser.add_argument(
+        "--width-shared",
+        default="32,64",
+        help="Comma-separated shared widths to sweep.",
+    )
+    parser.add_argument(
+        "--nhidden-shared",
+        default="0,1",
+        help="Comma-separated number of shared hidden layers to sweep.",
+    )
+    parser.add_argument(
+        "--seeds",
+        default="42",
+        help="Comma-separated seeds to sweep.",
+    )
+    parser.add_argument("--epochs", type=int, default=500, help="Epochs per run.")
+    parser.add_argument(
+        "--output-every", type=int, default=100, help="Checkpoint/print interval."
+    )
+    parser.add_argument(
+        "--summary",
+        default="run_summary.csv",
+        help="CSV file to append run summaries.",
+    )
+    parser.add_argument(
+        "--use-pcgrad",
+        action="store_true",
+        help="Enable PCGrad during training.",
+    )
+    args = parser.parse_args()
+
+    def parse_list(val, cast=float):
+        return [cast(x) for x in val.split(",") if x]
+
+    lr_grid = parse_list(args.learning_rate, float)
+    width_grid = parse_list(args.width_shared, int)
+    nhid_grid = parse_list(args.nhidden_shared, int)
+    seed_grid = parse_list(args.seeds, int)
+
     parms = {}
 
     # allow overriding dataset location via DATA_ROOT; otherwise default to ../../datasets
@@ -37,39 +80,19 @@ if __name__ == "__main__":
             if os.path.isabs(p):
                 result.append(p)
             else:
-                # strip to basename when DATA_ROOT is provided, otherwise keep relative layout
                 candidate = os.path.join(DATA_ROOT, os.path.basename(p))
                 result.append(candidate)
         return result
 
     parms["database_list"] = normalize(
         [
-            #"../../datasets/asymptotic_Box3D_M1NuLib7ms_rl2_yslices_adjustLebedev.h5",
-            #"../../datasets/asymptotic_M1-NuLib-7ms.h5",
-            #"../../datasets/asymptotic_M1-NuLib.h5",
             "../../datasets/asymptotic_M1-NuLib-old.h5",
-            #"../../datasets/asymptotic_random.h5",
         ]
     )
     parms["stable_database_list"] = normalize(
         [
-            #"../../datasets/stable_Box3D_M1NuLib7ms_rl2_yslices_adjustLebedev.h5",
-            #"../../datasets/stable_M1-LeakageRates_rl0.h5",
-            #"../../datasets/stable_M1-LeakageRates_rl1.h5",
-            #"../../datasets/stable_M1-LeakageRates_rl2.h5",
-            #"../../datasets/stable_M1-LeakageRates_rl3.h5",
-            #"../../datasets/stable_M1-Nulib-7ms_rl0.h5",
-            #"../../datasets/stable_M1-Nulib-7ms_rl1.h5",
             "../../datasets/stable_M1-Nulib-7ms_rl2.h5",
             "../../datasets/stable_M1-Nulib-7ms_rl3.h5",
-            #"../../datasets/stable_M1-NuLib-old_rl0.h5",
-            #"../../datasets/stable_M1-NuLib_rl0.h5",
-            #"../../datasets/stable_M1-NuLib_rl1.h5",
-            #"../../datasets/stable_M1-NuLib_rl2.h5",
-            #"../../datasets/stable_M1-NuLib_rl3.h5",
-            #"../../datasets/stable_oneflavor.h5",
-            #"../../datasets/stable_random.h5",
-            #"../../datasets/stable_zerofluxfac.h5",
         ]
     )
     missing = [
@@ -84,8 +107,8 @@ if __name__ == "__main__":
     parms["samples_per_database"] = 200000
     parms["random_samples_per_database"] = 200000
     parms["test_size"] = 0.2
-    parms["epochs"] = 10000
-    parms["output_every"] = 1000
+    parms["epochs"] = args.epochs
+    parms["output_every"] = args.output_every
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = "direct"
     parms["random_seed"] = 42
@@ -103,11 +126,11 @@ if __name__ == "__main__":
     parms["loss_multiplier_unphysical"] = 10.0
     
     # data augmentation options
-    parms["do_augment_permutation"] = False #False  # this is the most expensive option to make true, and seems to make things worse...
-    parms["do_augment_final_stable"] = False  # True
-    parms["do_unphysical_check"] = False  # True - seems to help prevent crazy results
+    parms["do_augment_permutation"] = False
+    parms["do_augment_final_stable"] = False
+    parms["do_unphysical_check"] = False
 
-    # neural network options
+    # neural network options (will be overridden per sweep)
     parms["nhidden_shared"] = 0
     parms["nhidden_stability"] = 0
     parms["nhidden_growthrate"] = 0
@@ -119,20 +142,20 @@ if __name__ == "__main__":
     parms["width_growthrate"] = 32
     parms["width_density"] = 32
     parms["width_flux"] = 32
-    parms["dropout_probability"] = 0.0  # 0.1 #0.5 #0.1 # 0.5
+    parms["dropout_probability"] = 0.0
     parms["do_batchnorm"] = True
     parms["do_fdotu"] = True
-    parms["activation"] = nn.LeakyReLU  # nn.LeakyReLU, nn.ReLU
+    parms["activation"] = nn.LeakyReLU
 
     # optimizer options
-    parms["op"] = torch.optim.AdamW  # AdamW, SGD, RMSprop
+    parms["op"] = torch.optim.AdamW
     parms["adamw.amsgrad"] = False
-    parms["adamw.weight_decay"] = 0 #0.01  # 1e-5
-    parms["learning_rate"] = 5e-2  # 1e-3
+    parms["adamw.weight_decay"] = 0
+    parms["learning_rate"] = 5e-2  # overridden per sweep
     parms["adamw.fused"] = True
     parms["factor"] = 0.5
-    parms["patience"] = 100
-    parms["cooldown"] = 100
+    parms["patience"] = 50
+    parms["cooldown"] = 20
     parms["warmup_iters"] = 10
     parms["min_lr"] = 1e-7
 
