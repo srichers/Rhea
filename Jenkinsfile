@@ -37,7 +37,7 @@ pipeline {
 	}}
 	stage('Python Interface'){ steps{
             dir('model_training'){
-		sh 'python3 example_use_model.py ../model_training/model10_cpu.pt'
+		sh 'python3 example_use_model.py ../model_training/model10_cuda.pt'
 	    }
 	}}
 	stage('C++ Interface'){ steps{
