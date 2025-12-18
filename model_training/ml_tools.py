@@ -111,10 +111,10 @@ def restrict_F4_to_physical(F4_final):
     return F4_final
 
 def get_ndens_fluxmag_fhat(F4):
-    ntot = ntotal(F4)
+    ntot = torch.clamp(ntotal(F4), min=torch.finfo(F4.dtype).tiny)
     ndens = F4[:, 3,:,:]/ntot[:,None,None]
     flux  = F4[:,:3,:,:]/ntot[:,None,None,None]
-    fluxmag = torch.sqrt(torch.sum(flux**2, dim=1))
+    fluxmag = torch.clamp(torch.sqrt(torch.sum(flux**2, dim=1)), min=torch.finfo(F4.dtype).tiny)
     Fhat = flux/fluxmag[:,None,:,:]
     return ndens, fluxmag, Fhat
 
