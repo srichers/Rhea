@@ -1,0 +1,130 @@
+create_database
+===============
+
+.. py:module:: create_database
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   create_database.NF
+   create_database.file_format
+   create_database.growthrate_minfac
+   create_database.growthrate_maxfac
+   create_database.nproc
+   create_database.average_start_tsat
+   create_database.average_min_tsat
+   create_database.problematic_stddev_val
+   create_database.violation_limit
+   create_database.hbar
+   create_database.c
+   create_database.eV
+   create_database.GeV
+   create_database.GF
+   create_database.ndens_to_invsec
+   create_database.ngenerate
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   create_database.write_NSM_stable_data
+   create_database.simulation_is_finished
+   create_database.cell_size
+   create_database.growth_properties
+   create_database.bad_data
+   create_database.final_properties
+   create_database.analyze_file
+   create_database.write_asymptotic_dataset
+   create_database.write_dummy_asymptotic_dataset
+
+
+Module Contents
+---------------
+
+.. py:data:: NF
+   :value: 3
+
+
+.. py:data:: file_format
+   :value: 'hdf5'
+
+
+.. py:data:: growthrate_minfac
+   :value: 0.001
+
+
+.. py:data:: growthrate_maxfac
+   :value: 0.1
+
+
+.. py:data:: nproc
+   :value: 32
+
+
+.. py:data:: average_start_tsat
+   :value: 2
+
+
+.. py:data:: average_min_tsat
+   :value: 3
+
+
+.. py:data:: problematic_stddev_val
+   :value: 0.05
+
+
+.. py:data:: violation_limit
+   :value: 1e-05
+
+
+.. py:data:: hbar
+   :value: 1.05457266e-27
+
+
+.. py:data:: c
+   :value: 29979245800.0
+
+
+.. py:data:: eV
+   :value: 1.60218e-12
+
+
+.. py:data:: GeV
+   :value: 0.00160218
+
+
+.. py:data:: GF
+   :value: 1.4358484395604552e-49
+
+
+.. py:data:: ndens_to_invsec
+   :value: 1.3615452913035457e-22
+
+
+.. py:function:: write_NSM_stable_data(filename, outfilename)
+
+.. py:function:: simulation_is_finished(dirname)
+
+.. py:function:: cell_size(dirname)
+
+.. py:function:: growth_properties(data)
+
+.. py:function:: bad_data(F4_initial, F4_final, F4_final_stddev)
+
+.. py:function:: final_properties(imax, growthRate, data, dz)
+
+.. py:function:: analyze_file(d)
+
+.. py:function:: write_asymptotic_dataset(directory, outfilename)
+
+.. py:function:: write_dummy_asymptotic_dataset(ngenerate, outfilename)
+
+.. py:data:: ngenerate
+   :value: 1000
+
+

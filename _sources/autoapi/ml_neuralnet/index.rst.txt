@@ -1,0 +1,131 @@
+ml_neuralnet
+============
+
+.. py:module:: ml_neuralnet
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file contains the structure of the neural network, including the means of transforming between angular moments and the actual inputs/outputs of the ML model
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   ml_neuralnet.hbar
+   ml_neuralnet.c
+   ml_neuralnet.eV
+   ml_neuralnet.GeV
+   ml_neuralnet.GF
+   ml_neuralnet.ndens_to_invsec
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ml_neuralnet.NeuralNetwork
+
+
+Module Contents
+---------------
+
+.. py:data:: hbar
+   :value: 1.05457266e-27
+
+
+.. py:data:: c
+   :value: 29979245800.0
+
+
+.. py:data:: eV
+   :value: 1.60218e-12
+
+
+.. py:data:: GeV
+   :value: 0.00160218
+
+
+.. py:data:: GF
+   :value: 1.4358484395604552e-49
+
+
+.. py:data:: ndens_to_invsec
+   :value: 1.3615452913035457e-22
+
+
+.. py:class:: NeuralNetwork(parms)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: NF
+
+
+   .. py:attribute:: do_fdotu
+
+
+   .. py:attribute:: NX
+
+
+   .. py:attribute:: average_heavies_in_final_state
+
+
+   .. py:attribute:: conserve_lepton_number
+
+
+   .. py:attribute:: Ny
+
+
+   .. py:attribute:: linear_activation_stack_shared
+
+
+   .. py:attribute:: linear_activation_stack_stability
+
+
+   .. py:attribute:: linear_activation_stack_growthrate
+
+
+   .. py:attribute:: linear_activation_stack_density
+
+
+   .. py:attribute:: linear_activation_stack_flux
+
+
+   .. py:method:: _init_weights(module)
+
+
+   .. py:method:: X_from_F4(F4)
+
+      Given the a list of four fluxes, calculate the inputs to the neural network out of dot products of four fluxes with each other and the four velocity. The four-velocity is assumed to be timelike in an orthonormal tetrad.
+
+      Args:
+          F4 (torch.Tensor): Four-flux tensor. Indexed as [sim, xyzt, nu/nubar, flavor]
+
+      Returns:
+          torch.Tensor: Neural network input tensor. Indexed as [sim, iX]
+
+
+
+   .. py:method:: convert_y_to_2flavor(y)
+
+
+   .. py:method:: forward(x)
+
+
+   .. py:method:: F4_from_y(F4_initial, y_dens, y_flux)
+
+
+   .. py:method:: predict_all(F4_initial)
+
+
+   .. py:method:: predict_WhiskyTHC(F4_initial)
+
+
