@@ -48,12 +48,11 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
     else:
         raise ValueError("Unknown sampler type "+str(parms["sampler"]))
 
-    num_workers = parms.get("num_workers", 0)
     # set up the data loader
     loader = DataLoader(dataset_train,
                         batch_size=parms["loader.batch_size"],
                         sampler=sampler,
-                        num_workers=num_workers,
+                        num_workers=parms["loader.num_workers"],
                         pin_memory=True,
                         persistent_workers=True,
                         prefetch_factor=parms["loader.prefetch_factor"])
