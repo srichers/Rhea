@@ -25,6 +25,7 @@ def read_asymptotic_data(parms):
     dataset_test_list = []
     rng = torch.Generator().manual_seed(parms["random_seed"])
     for d in parms["database_list"]:
+        print(d)
         # read from file
         with h5py.File(d,"r") as f_in:
             F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]) # [simulationIndex, xyzt, nu/nubar, flavor]
@@ -95,6 +96,7 @@ def read_stable_data(parms):
     
     rng = torch.Generator().manual_seed(parms["random_seed"])
     for filename in parms["stable_database_list"]:
+        print(filename)
         with h5py.File(filename,"r") as f_in:
             F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
             stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
@@ -103,7 +105,7 @@ def read_stable_data(parms):
 
         # print number of points
         print("# ",len(stable),"points in",filename)
-        print("#   ",sum(stable).item(),"points are stable.")
+        print("#   ",torch.sum(stable).item(),"points are stable.")
 
         # downsample to less data
         if parms["samples_per_database"]>0:
@@ -111,7 +113,7 @@ def read_stable_data(parms):
             random_indices = torch.randperm(len(stable), generator=rng)[:parms["samples_per_database"]]
             F4 = F4[random_indices,...]
             stable = stable[random_indices]
-            print("#   ",sum(stable).item(),"points are stable.")
+            print("#   ",torch.sum(stable).item(),"points are stable.")
 
         # split into training and testing sets
         F4_train, F4_test, stable_train, stable_test = train_test_split(F4, stable, test_size=parms["test_size"], random_state=parms["random_seed"])
@@ -125,10 +127,10 @@ def read_stable_data(parms):
 
         dataset_train_list.append( TensorDataset(F4_train, stable_train) )
         dataset_test_list.append(  TensorDataset(F4_test , stable_test ) )
-        
+
     print("#  Train:",[len(d) for d in dataset_train_list])
     print("#  Test:",[len(d) for d in dataset_test_list])
-    
+
     return dataset_train_list, dataset_test_list
 
 if __name__ == "__main__":
