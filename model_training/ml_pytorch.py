@@ -38,19 +38,23 @@ if __name__ == "__main__":
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = "direct"
     parms["random_seed"] = 42
-    parms["loader.batch_size"] = 10
-    parms["loader.num_workers"] = 1
-    parms["loader.prefetch_factor"] = 1
-    parms["sampler"] = torch.utils.data.WeightedRandomSampler # WeightedRandomSampler, SequentialSampler
-    parms["weightedrandomsampler.epoch_num_samples"] = 10 #parms["samples_per_database"]
-    
-    parms["do_learn_task_weights"] = True
-    parms["task_weight_stability"] = 1.0
-    parms["task_weight_ndens"] = 1.0
-    parms["task_weight_fluxmag"] = 1.0
-    parms["task_weight_direction"] = 1.0
-    parms["task_weight_unphysical"] = 1
-    parms["task_weight_growthrate"] = 1.0
+    parms["batch_size"] = 10
+    parms["num_workers"] = 1
+    parms["epoch_num_samples"] = 10
+    parms["do_learn_task_weights"] = False
+    parms["loss_multiplier_stable"] = 1.0
+    parms["loss_multiplier_ndens"] = 1.0
+    parms["loss_multiplier_fluxmag"] = 1.0
+    parms["loss_multiplier_direction"] = 1.0
+    parms["loss_multiplier_unphysical"] = 10.0
+    parms["loss_multiplier_growthrate"] = 1.0
+    parms["use_pcgrad"] = False
+    parms["task_weight_stability"] = parms["loss_multiplier_stable"]
+    parms["task_weight_ndens"] = parms["loss_multiplier_ndens"]
+    parms["task_weight_fluxmag"] = parms["loss_multiplier_fluxmag"]
+    parms["task_weight_direction"] = parms["loss_multiplier_direction"]
+    parms["task_weight_unphysical"] = parms["loss_multiplier_unphysical"]
+    parms["task_weight_growthrate"] = parms["loss_multiplier_growthrate"]
 
     # data augmentation options
     parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
@@ -76,9 +80,9 @@ if __name__ == "__main__":
 
     # optimizer options
     parms["op"]= torch.optim.AdamW # Adam, SGD, RMSprop
-    parms["adamw.amsgrad"] = False
-    parms["adamw.weight_decay"] = 0 #0.01  # 1e-5
-    parms["adamw.fused"] = True
+    parms["amsgrad"] = False
+    parms["weight_decay"] = 0 #0.01  # 1e-5
+    parms["fused"] = True
     parms["learning_rate"]= 2e-4 # 1e-3
     parms["patience"]= 500
     parms["cooldown"]= 500
