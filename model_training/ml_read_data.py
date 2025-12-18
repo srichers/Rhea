@@ -23,19 +23,27 @@ def read_asymptotic_data(parms):
 
     dataset_train_list = []
     dataset_test_list = []
+    rng = torch.Generator().manual_seed(parms.get("random_seed", 0))
     for d in parms["database_list"]:
         # read from file
-        f_in = h5py.File(d,"r")
-        F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]) # [simulationIndex, xyzt, nu/nubar, flavor]
-        F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...])
-        growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
-        assert(parms["NF"] == int(np.array(f_in["nf"])) )
-        f_in.close()
+        with h5py.File(d,"r") as f_in:
+            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]) # [simulationIndex, xyzt, nu/nubar, flavor]
+            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...])
+            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
+            assert(parms["NF"] == int(np.array(f_in["nf"])) )
+
+        finite_mask = torch.isfinite(F4_initial).all(dim=(1,2,3)) & torch.isfinite(F4_final).all(dim=(1,2,3)) & torch.isfinite(growthrate)
+        if torch.any(~finite_mask):
+            n_bad = (~finite_mask).sum().item()
+            print("#   removing", n_bad, "non-finite samples")
+            F4_initial = F4_initial[finite_mask]
+            F4_final   = F4_final[finite_mask]
+            growthrate = growthrate[finite_mask]
 
         # downsample to less data
         if parms["samples_per_database"]>0:
             print("#    Downsampling to",parms["samples_per_database"],"samples")
-            random_indices = torch.randperm(len(growthrate))[:parms["samples_per_database"]]
+            random_indices = torch.randperm(len(growthrate), generator=rng)[:parms["samples_per_database"]]
             F4_initial = F4_initial[random_indices,...]
             F4_final   = F4_final  [random_indices,...]
             growthrate = growthrate[random_indices,...]
@@ -90,14 +98,19 @@ def read_stable_data(parms):
     dataset_train_list = []
     dataset_test_list = []
     
+    rng = torch.Generator().manual_seed(parms.get("random_seed", 0))
     for filename in parms["stable_database_list"]:
-        f_in = h5py.File(filename,"r")
-        F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
-        stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
-        f_in.close()
+        with h5py.File(filename,"r") as f_in:
+            F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
+            stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
 
         # remove invalid data points indicated by a nan in the electron neutrino density
-        assert(torch.all(F4==F4))
+        finite_mask = torch.isfinite(F4).all(dim=(1,2,3)) & torch.isfinite(stable)
+        if torch.any(~finite_mask):
+            n_bad = (~finite_mask).sum().item()
+            print("#   removing", n_bad, "non-finite samples")
+            F4 = F4[finite_mask]
+            stable = stable[finite_mask]
 
         # print number of points
         print("# ",len(stable),"points in",filename)
@@ -106,7 +119,7 @@ def read_stable_data(parms):
         # downsample to less data
         if parms["samples_per_database"]>0:
             print("#    Downsampling to",parms["samples_per_database"],"samples")
-            random_indices = torch.randperm(len(stable))[:parms["samples_per_database"]]
+            random_indices = torch.randperm(len(stable), generator=rng)[:parms["samples_per_database"]]
             F4 = F4[random_indices,...]
             stable = stable[random_indices]
             print("#   ",sum(stable).item(),"points are stable.")
