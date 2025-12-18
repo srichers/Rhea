@@ -111,7 +111,7 @@ def train_asymptotic_model(parms,
     #=========================#
     print("#SETTING UP DATA LOADERS")
     loader_asymptotic = configure_loader(parms, dataset_asymptotic_train_list)
-    loader_stable     = configure_loader(parms, dataset_stable_train_list)
+    loader_stable     = configure_loader(parms, dataset_stable_train_list    )
 
 
     def contribute_loss(pred, true, traintest, key, loss_fn):
