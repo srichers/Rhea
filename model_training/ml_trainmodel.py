@@ -19,20 +19,15 @@ from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, S
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
 
-def configure_loader(parms, dataset_train_list, dataset_test_list):
-    assert len(dataset_train_list) == len(dataset_test_list)
-    assert len(dataset_train_list) > 0
+def configure_loader(parms, dataset_train_list):
     # create list of weights
-    weights = torch.cat(
-        [
-            torch.full((len(dataset),), 1.0 / len(dataset), dtype=torch.double)
-            for dataset in dataset_train_list
-        ]
-    )
+    weights = torch.cat([
+        torch.full((len(dataset),), 1.0 / len(dataset), dtype=torch.double)
+        for dataset in dataset_train_list
+    ])
     
     # combine the datasets
     dataset_train = ConcatDataset(dataset_train_list)
-    dataset_test = ConcatDataset(dataset_test_list)
 
     generator = torch.Generator().manual_seed(parms["random_seed"])
     
@@ -58,7 +53,7 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
 
     print("#  Configuring loader with batch_size=",parms["loader.batch_size"],"for a dataset with",len(dataset_train),"samples.")
 
-    return loader, dataset_test
+    return loader
 
 
 def train_asymptotic_model(parms,
@@ -115,8 +110,8 @@ def train_asymptotic_model(parms,
     # set up the data loaders #
     #=========================#
     print("#SETTING UP DATA LOADERS")
-    loader_asymptotic, dataset_asymptotic_test = configure_loader(parms, dataset_asymptotic_train_list, dataset_asymptotic_test_list)
-    loader_stable, dataset_stable_test = configure_loader(parms, dataset_stable_train_list, dataset_stable_test_list)
+    loader_asymptotic = configure_loader(parms, dataset_asymptotic_train_list)
+    loader_stable = configure_loader(parms, dataset_stable_train_list)
 
 
     def contribute_loss(pred, true, traintest, key, loss_fn):
