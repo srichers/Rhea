@@ -62,14 +62,8 @@ def read_asymptotic_data(parms):
 
         # average heavies if necessary
         if parms["average_heavies_in_final_state"]:
-            assert(parms["do_augment_permutation"]==False)
             assert(torch.allclose( torch.mean(F4_initial[:,:,:,1:], dim=3), F4_initial[:,:,:,1] ))
             F4_final[:,:,:,1:] = torch.mean(F4_final[:,:,:,1:], dim=3, keepdim=True)
-
-        if parms["do_augment_permutation"]:
-            F4_initial = ml.augment_permutation(F4_initial)
-            F4_final   = ml.augment_permutation(F4_final)
-            growthrate = ml.augment_permutation(growthrate)
 
         # add dataset to the lists
         if dind==0:
@@ -115,11 +109,6 @@ def read_stable_data(parms):
             stable = stable[random_indices]
             print("#   ",torch.sum(stable).item(),"points are stable.")
 
-        # don't need the final values because they are the same as the initial
-        if parms["do_augment_permutation"]:
-            F4 = ml.augment_permutation(F4)
-            stable = ml.augment_permutation(stable)
-
         if i==0:
             dataset_test_list.append(TensorDataset(F4, stable))
         else:
@@ -137,7 +126,6 @@ if __name__ == "__main__":
         "stable_database_list" : ["/mnt/scratch/srichers/software/Rhea/model_training/data/stable_oneflavor.h5"],
         "test_size" : 0.1,
         "random_seed" : 42,
-        "do_augment_permutation" : False,
         "average_heavies_in_final_state" : False,
         "device" : 'cpu'
     }

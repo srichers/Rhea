@@ -59,7 +59,6 @@ if __name__ == "__main__":
     parms["task_weight_growthrate"] = 1.0
 
     # data augmentation options
-    parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
     parms["do_augment_final_stable"]= False # True
     parms["do_unphysical_check"]= True # True - seems to help prevent crazy results
 

@@ -53,34 +53,6 @@ def permute_F4(F4, mperm, fperm):
     result = result[:,:,:,fperm]
     return result
 
-# create list of equivalent simulations
-# input has dimensions  [nsims              , xyzt, nu/nubar, flavor]
-# output has dimensions [nsims*npermutations, xyzt, nu/nubar, flavor]
-# each simulation should occupy a block of size nperms
-def augment_permutation(F4_list):
-    nsims = F4_list.shape[0]
-    NF = F4_list.shape[-1]
-
-    # set the number of permutations used for data augmentation
-    matter_permutations = list(permutations(range(2)))
-    flavor_permutations = list(permutations(range(NF)))
-    nmperm = len(matter_permutations)
-    nfperm = len(flavor_permutations)
-    nperms = nmperm * nfperm
-
-    F4_augmented = torch.zeros((nsims*nperms, 4, 2, NF), device=F4_list.device).float()
-    
-    for mi in range(len(matter_permutations)):
-        for fi in range(len(flavor_permutations)):
-            iperm = fi + mi*nfperm
-            mperm = matter_permutations[mi]
-            fperm = flavor_permutations[fi]
-
-            # put the permuted F4 vectors into the augmented arrays
-            F4_augmented[iperm::nperms] = permute_F4(F4_list, mperm, fperm)
-            
-    return F4_augmented
-
 def restrict_F4_to_physical(F4_final):
     NF = F4_final.shape[-1]
     avgF4 = torch.sum(F4_final, dim=3)[:,:,:,None] / NF
