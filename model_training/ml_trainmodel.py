@@ -21,25 +21,27 @@ loss_dict = {}
 
 def configure_loader(parms, dataset_train_list):
     # create list of weights
-    weights = []
-    for dataset in dataset_train_list:
-        nsamples = len(dataset)
-        weights.extend([1.0/nsamples] * nsamples)
-    weights = torch.tensor(weights, dtype=torch.double)
+    weights = torch.cat([
+        torch.full((len(dataset),), 1.0 / len(dataset), dtype=torch.double)
+        for dataset in dataset_train_list
+    ])
     
     # combine the datasets
     dataset_train = ConcatDataset(dataset_train_list)
+
+    generator = torch.Generator().manual_seed(parms["random_seed"])
     
     # create sampler and data loader for test data
     if parms["sampler"]==WeightedRandomSampler:
         sampler = WeightedRandomSampler(weights=weights,
                                         num_samples=parms["weightedrandomsampler.epoch_num_samples"],
-                                        replacement=True)
+                                        replacement=True,
+                                        generator=generator)
     elif parms["sampler"]==SequentialSampler:
         sampler = SequentialSampler(dataset_train)
     else:
         raise ValueError("Unknown sampler type "+str(parms["sampler"]))
-    
+
     # set up the data loader
     loader = DataLoader(dataset_train,
                         batch_size=parms["loader.batch_size"],
@@ -246,8 +248,9 @@ def train_asymptotic_model(parms,
 
             return total_loss
 
-        train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
-        test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
+        with torch.no_grad():
+            train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
+            test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
 
         # Stability losses
         print()
@@ -261,13 +264,13 @@ def train_asymptotic_model(parms,
 
                 print(torch.sum(torch.abs(stable_pred-stable_true)).item()/stable_pred.shape[0],"fractional difference in stable points")
 
-                # accumulate stability loss using MSE instead of BCE because it is easier to interpret
                 total_loss = total_loss + torch.exp(-model.log_task_weights["stability"] ) * \
                     contribute_loss(stable_pred, stable_true, traintest, "stability", comparison_loss_fn)
             return total_loss
         
-        train_loss = train_loss + accumulate_stable_loss(dataset_stable_train_list, "train")
-        test_loss  = test_loss  + accumulate_stable_loss(dataset_stable_test_list , "test" )
+        with torch.no_grad():
+            train_loss = train_loss + accumulate_stable_loss(dataset_stable_train_list, "train")
+            test_loss  = test_loss  + accumulate_stable_loss(dataset_stable_test_list , "test" )
 
         # track the total loss
         loss_dict["train_loss"] = train_loss.item()
@@ -326,4 +329,3 @@ def train_asymptotic_model(parms,
         
 
     return
-
