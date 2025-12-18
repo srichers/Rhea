@@ -19,39 +19,48 @@ from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, S
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
 
-def configure_loader(parms, dataset_train_list):
+def configure_loader(parms, dataset_train_list, dataset_test_list):
+    assert len(dataset_train_list) == len(dataset_test_list)
+    assert len(dataset_train_list) > 0
     # create list of weights
-    weights = []
-    for dataset in dataset_train_list:
-        nsamples = len(dataset)
-        weights.extend([1.0/nsamples] * nsamples)
-    weights = torch.tensor(weights, dtype=torch.double)
+    weights = torch.cat(
+        [
+            torch.full((len(dataset),), 1.0 / len(dataset), dtype=torch.double)
+            for dataset in dataset_train_list
+        ]
+    )
     
     # combine the datasets
     dataset_train = ConcatDataset(dataset_train_list)
+    dataset_test = ConcatDataset(dataset_test_list)
+
+    num_samples = parms.get("epoch_num_samples", len(dataset_train))
+    generator = torch.Generator().manual_seed(parms.get("random_seed", 0))
     
     # create sampler and data loader for test data
     if parms["sampler"]==WeightedRandomSampler:
         sampler = WeightedRandomSampler(weights=weights,
                                         num_samples=parms["weightedrandomsampler.epoch_num_samples"],
-                                        replacement=True)
+                                        replacement=True,
+                                        generator=generator)
     elif parms["sampler"]==SequentialSampler:
         sampler = SequentialSampler(dataset_train)
     else:
         raise ValueError("Unknown sampler type "+str(parms["sampler"]))
-    
+
+    num_workers = parms.get("num_workers", 0)
     # set up the data loader
     loader = DataLoader(dataset_train,
                         batch_size=parms["loader.batch_size"],
                         sampler=sampler,
-                        num_workers=parms["loader.num_workers"],
+                        num_workers=num_workers,
                         pin_memory=True,
                         persistent_workers=True,
                         prefetch_factor=parms["loader.prefetch_factor"])
 
-    print("#  Configuring loader with batch_size=",parms["loader.batch_size"],"for a dataset with",len(dataset_train),"samples.")
+    print("#  Configuring loader with num_samples=", num_samples,"and batch_size=",parms["loader.batch_size"],"for a dataset with",len(dataset_train),"samples.")
 
-    return loader
+    return loader, dataset_test
 
 
 def train_asymptotic_model(parms,
@@ -59,6 +68,8 @@ def train_asymptotic_model(parms,
                            dataset_asymptotic_test_list,
                            dataset_stable_train_list,
                            dataset_stable_test_list):
+    
+    
 
     # print out all parameters for the record
     parmfile = open(os.getcwd()+"/parameters.txt","w")
@@ -108,8 +119,8 @@ def train_asymptotic_model(parms,
     # set up the data loaders #
     #=========================#
     print("#SETTING UP DATA LOADERS")
-    loader_asymptotic = configure_loader(parms, dataset_asymptotic_train_list)
-    loader_stable     = configure_loader(parms, dataset_stable_train_list    )
+    loader_asymptotic, dataset_asymptotic_test = configure_loader(parms, dataset_asymptotic_train_list, dataset_asymptotic_test_list)
+    loader_stable, dataset_stable_test = configure_loader(parms, dataset_stable_train_list, dataset_stable_test_list)
 
 
     def contribute_loss(pred, true, traintest, key, loss_fn):
@@ -299,4 +310,3 @@ def train_asymptotic_model(parms,
         
 
     return
-
