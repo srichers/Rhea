@@ -229,12 +229,12 @@ def train_asymptotic_model(parms,
                 F4f_true = dataset.tensors[1].to(parms["device"])
                 growthrate_true = dataset.tensors[2].to(parms["device"])
                 ntot_invsec = ntotal(F4i) * ndens_to_invsec
-                
+
                 F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
-                
+
                 ndens_pred, fluxmag_pred, Fhat_pred = get_ndens_fluxmag_fhat(F4f_pred)
                 ndens_true, fluxmag_true, Fhat_true = get_ndens_fluxmag_fhat(F4f_true)
-                
+
                 total_loss = total_loss + torch.exp(-model.log_task_weights["ndens"]     ) * contribute_loss(ndens_pred,
                                                                                                              ndens_true,
                                                                                                              traintest, "ndens", comparison_loss_fn)
@@ -266,11 +266,11 @@ def train_asymptotic_model(parms,
             for dataset in dataset_list:
                 F4i = dataset.tensors[0].to(parms["device"])
                 stable_true = dataset.tensors[1].to(parms["device"])
-                
+
                 _, _, stable_pred = model.predict_all(F4i)
-                
+
                 print(torch.sum(torch.abs(stable_pred-stable_true)).item()/stable_pred.shape[0],"fractional difference in stable points")
-                
+
                 total_loss = total_loss + torch.exp(-model.log_task_weights["stability"] ) * \
                     contribute_loss(stable_pred, stable_true, traintest, "stability", comparison_loss_fn)
             return total_loss
