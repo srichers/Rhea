@@ -23,7 +23,7 @@ def read_asymptotic_data(parms):
 
     dataset_train_list = []
     dataset_test_list = []
-    rng = torch.Generator().manual_seed(parms.get("random_seed", 0))
+    rng = torch.Generator().manual_seed(parms["random_seed"])
     for d in parms["database_list"]:
         # read from file
         with h5py.File(d,"r") as f_in:
@@ -98,7 +98,7 @@ def read_stable_data(parms):
     dataset_train_list = []
     dataset_test_list = []
     
-    rng = torch.Generator().manual_seed(parms.get("random_seed", 0))
+    rng = torch.Generator().manual_seed(parms["random_seed"])
     for filename in parms["stable_database_list"]:
         with h5py.File(filename,"r") as f_in:
             F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
