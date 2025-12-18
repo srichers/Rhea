@@ -124,8 +124,8 @@ def train_asymptotic_model(parms,
 
     def contribute_loss(pred, true, traintest, key, loss_fn):
         loss = loss_fn(pred, true)
-        loss_dict[key+"_"+traintest+"_loss"] = loss.item()
-        loss_dict[key+"_"+traintest+"_max"]  = max_error(pred, true)
+        loss_dict[key+"_"+traintest+"_loss"] += loss.item()
+        loss_dict[key+"_"+traintest+"_max"]  = max(max_error(pred, true), loss_dict[key+"_"+traintest+"_max"])
         return loss
 
     # set up file for writing performance metrics
@@ -197,6 +197,31 @@ def train_asymptotic_model(parms,
         #============================#
         model.eval()
 
+        loss_dict["ndens_train_loss"] = 0
+        loss_dict["ndens_train_max"] = 0
+        loss_dict["ndens_test_loss"] = 0
+        loss_dict["ndens_test_max"] = 0
+        loss_dict["fluxmag_train_loss"] = 0
+        loss_dict["fluxmag_train_max"] = 0
+        loss_dict["fluxmag_test_loss"] = 0
+        loss_dict["fluxmag_test_max"] = 0
+        loss_dict["direction_train_loss"] = 0
+        loss_dict["direction_train_max"] = 0
+        loss_dict["direction_test_loss"] = 0
+        loss_dict["direction_test_max"] = 0
+        loss_dict["growthrate_train_loss"] = 0
+        loss_dict["growthrate_train_max"] = 0
+        loss_dict["growthrate_test_loss"] = 0
+        loss_dict["growthrate_test_max"] = 0
+        loss_dict["unphysical_train_loss"] = 0
+        loss_dict["unphysical_train_max"] = 0
+        loss_dict["unphysical_test_loss"] = 0
+        loss_dict["unphysical_test_max"] = 0
+        loss_dict["stability_train_loss"] = 0
+        loss_dict["stability_train_max"] = 0
+        loss_dict["stability_test_loss"] = 0
+        loss_dict["stability_test_max"] = 0
+
         # Asymptotic losses
         def accumulate_asymptotic_loss(dataset_list, traintest):
             total_loss = torch.tensor(0.0, requires_grad=False)
@@ -224,10 +249,12 @@ def train_asymptotic_model(parms,
                     total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss((growthrate_pred/ntot_invsec), #torch.log
                                                                                                                  (growthrate_true/ntot_invsec), #torch.log
                                                                                                                  traintest, "growthrate", comparison_loss_fn)
+                    unphysical_loss = torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
+                                                                                                         None,
+                                                                                                         traintest, "unphysical", unphysical_loss_fn)
                     if parms["do_unphysical_check"]:
-                        total_loss = total_loss + torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
-                                                                                                                     None,
-                                                                                                                     traintest, "unphysical", unphysical_loss_fn)
+                        total_loss = total_loss + unphysical_loss
+
             return total_loss
 
         train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
