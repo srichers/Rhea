@@ -66,8 +66,6 @@ def train_asymptotic_model(parms,
                            dataset_asymptotic_test_list,
                            dataset_stable_train_list,
                            dataset_stable_test_list):
-    
-    
 
     # print out all parameters for the record
     parmfile = open(os.getcwd()+"/parameters.txt","w")
