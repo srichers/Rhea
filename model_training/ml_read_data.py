@@ -31,14 +31,9 @@ def read_asymptotic_data(parms):
             F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...])
             growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
             assert(parms["NF"] == int(np.array(f_in["nf"])) )
-
-        finite_mask = torch.isfinite(F4_initial).all(dim=(1,2,3)) & torch.isfinite(F4_final).all(dim=(1,2,3)) & torch.isfinite(growthrate)
-        if torch.any(~finite_mask):
-            n_bad = (~finite_mask).sum().item()
-            print("#   removing", n_bad, "non-finite samples")
-            F4_initial = F4_initial[finite_mask]
-            F4_final   = F4_final[finite_mask]
-            growthrate = growthrate[finite_mask]
+            assert(torch.all(F4_initial==F4_initial))
+            assert(torch.all(F4_final==F4_final))
+            assert(torch.all(growthrate==growthrate))
 
         # downsample to less data
         if parms["samples_per_database"]>0:
@@ -103,14 +98,8 @@ def read_stable_data(parms):
         with h5py.File(filename,"r") as f_in:
             F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
             stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
-
-        # remove invalid data points indicated by a nan in the electron neutrino density
-        finite_mask = torch.isfinite(F4).all(dim=(1,2,3)) & torch.isfinite(stable)
-        if torch.any(~finite_mask):
-            n_bad = (~finite_mask).sum().item()
-            print("#   removing", n_bad, "non-finite samples")
-            F4 = F4[finite_mask]
-            stable = stable[finite_mask]
+            assert(torch.all(F4==F4))
+            assert(torch.all(stable==stable))
 
         # print number of points
         print("# ",len(stable),"points in",filename)
