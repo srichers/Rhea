@@ -24,8 +24,9 @@ def read_asymptotic_data(parms):
     dataset_train_list = []
     dataset_test_list = []
     rng = torch.Generator().manual_seed(parms["random_seed"])
-    for d in parms["database_list"]:
-        print(d)
+    for dind,d in enumerate(parms["database_list"]):
+        print()
+        print(dind,d)
         # read from file
         with h5py.File(d,"r") as f_in:
             F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]) # [simulationIndex, xyzt, nu/nubar, flavor]
@@ -35,6 +36,7 @@ def read_asymptotic_data(parms):
             assert(torch.all(F4_initial==F4_initial))
             assert(torch.all(F4_final==F4_final))
             assert(torch.all(growthrate==growthrate))
+        print("#   ",len(F4_initial),"points in",d)
 
         # downsample to less data
         if parms["samples_per_database"]>0:
@@ -44,7 +46,7 @@ def read_asymptotic_data(parms):
             F4_final   = F4_final  [random_indices,...]
             growthrate = growthrate[random_indices,...]
 
-        print("# ",len(F4_initial),"points in",d)
+        print("#   ",len(F4_initial),"points in resampled dataset")
 
         # fix slightly negative energy densities
         ntot = ml.ntotal(F4_initial)
@@ -64,23 +66,20 @@ def read_asymptotic_data(parms):
             assert(torch.allclose( torch.mean(F4_initial[:,:,:,1:], dim=3), F4_initial[:,:,:,1] ))
             F4_final[:,:,:,1:] = torch.mean(F4_final[:,:,:,1:], dim=3, keepdim=True)
 
-        # split into training and testing sets
-        F4i_train, F4i_test, F4f_train, F4f_test, growthrate_train, growthrate_test = train_test_split(F4_initial, F4_final, growthrate, test_size=parms["test_size"], random_state=parms["random_seed"])
-
         if parms["do_augment_permutation"]:
-            F4i_train = ml.augment_permutation(F4i_train)
-            F4f_train = ml.augment_permutation(F4f_train)
-            F4i_test  = ml.augment_permutation(F4i_test )
-            F4f_test  = ml.augment_permutation(F4f_test )
-            growthrate_train = ml.augment_permutation(growthrate_train)
-            growthrate_test = ml.augment_permutation(growthrate_test)
+            F4_initial = ml.augment_permutation(F4_initial)
+            F4_final   = ml.augment_permutation(F4_final)
+            growthrate = ml.augment_permutation(growthrate)
 
         # add dataset to the lists
-        dataset_train_list.append( TensorDataset(F4i_train, F4f_train, growthrate_train) )
-        dataset_test_list.append(  TensorDataset(F4i_test , F4f_test , growthrate_test ) )
+        if dind==0:
+            dataset_test_list.append( TensorDataset(F4_initial, F4_final, growthrate) )
+        else:
+            dataset_train_list.append(TensorDataset(F4_initial, F4_final, growthrate) )
 
-    print("#    Train:",[len(d) for d in dataset_train_list])
-    print("#    Test:",[len(d) for d in dataset_test_list])
+    print()
+    print("# Asymptotic Train:",[len(d) for d in dataset_train_list])
+    print("# Asymptotic Test:",[len(d) for d in dataset_test_list])
     
     return dataset_train_list, dataset_test_list
 
@@ -95,8 +94,9 @@ def read_stable_data(parms):
     dataset_test_list = []
     
     rng = torch.Generator().manual_seed(parms["random_seed"])
-    for filename in parms["stable_database_list"]:
-        print(filename)
+    for i,filename in enumerate(parms["stable_database_list"]):
+        print()
+        print(i,filename)
         with h5py.File(filename,"r") as f_in:
             F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
             stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
@@ -104,7 +104,7 @@ def read_stable_data(parms):
             assert(torch.all(stable==stable))
 
         # print number of points
-        print("# ",len(stable),"points in",filename)
+        print("#   ",len(stable),"points in",filename)
         print("#   ",torch.sum(stable).item(),"points are stable.")
 
         # downsample to less data
@@ -115,21 +115,18 @@ def read_stable_data(parms):
             stable = stable[random_indices]
             print("#   ",torch.sum(stable).item(),"points are stable.")
 
-        # split into training and testing sets
-        F4_train, F4_test, stable_train, stable_test = train_test_split(F4, stable, test_size=parms["test_size"], random_state=parms["random_seed"])
-
         # don't need the final values because they are the same as the initial
         if parms["do_augment_permutation"]:
-            F4_train = ml.augment_permutation(F4_train)
-            F4_test = ml.augment_permutation(F4_test)
-            stable_train = ml.augment_permutation(stable_train)
-            stable_test = ml.augment_permutation(stable_test)
+            F4 = ml.augment_permutation(F4)
+            stable = ml.augment_permutation(stable)
 
-        dataset_train_list.append( TensorDataset(F4_train, stable_train) )
-        dataset_test_list.append(  TensorDataset(F4_test , stable_test ) )
+        if i==0:
+            dataset_test_list.append(TensorDataset(F4, stable))
+        else:
+            dataset_train_list.append(TensorDataset(F4, stable))
 
-    print("#  Train:",[len(d) for d in dataset_train_list])
-    print("#  Test:",[len(d) for d in dataset_test_list])
+    print("# Stability Train:",[len(d) for d in dataset_train_list])
+    print("# Stability Test:",[len(d) for d in dataset_test_list])
 
     return dataset_train_list, dataset_test_list
 

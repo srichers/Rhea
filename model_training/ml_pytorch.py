@@ -22,9 +22,15 @@ if __name__ == "__main__":
     # create a list of options
     parms = {}
 
+    # list of asymptotic data
+    # First dataset is deemed test data
     parms["database_list"] = [
         "data/dummy_asymptotic.h5",
+        "data/dummy_asymptotic.h5",
     ]
+
+    # list of stability data
+    # First dataset is deemed test data
     parms["stable_database_list"] = [
         "data/stable_oneflavor_database.h5",
         "data/stable_random_database.h5",
