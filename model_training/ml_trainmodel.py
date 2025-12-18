@@ -34,8 +34,7 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
     dataset_train = ConcatDataset(dataset_train_list)
     dataset_test = ConcatDataset(dataset_test_list)
 
-    num_samples = parms.get("epoch_num_samples", len(dataset_train))
-    generator = torch.Generator().manual_seed(parms.get("random_seed", 0))
+    generator = torch.Generator().manual_seed(parms["random_seed"])
     
     # create sampler and data loader for test data
     if parms["sampler"]==WeightedRandomSampler:
@@ -57,7 +56,7 @@ def configure_loader(parms, dataset_train_list, dataset_test_list):
                         persistent_workers=True,
                         prefetch_factor=parms["loader.prefetch_factor"])
 
-    print("#  Configuring loader with num_samples=", num_samples,"and batch_size=",parms["loader.batch_size"],"for a dataset with",len(dataset_train),"samples.")
+    print("#  Configuring loader with batch_size=",parms["loader.batch_size"],"for a dataset with",len(dataset_train),"samples.")
 
     return loader, dataset_test
 
