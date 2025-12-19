@@ -61,6 +61,8 @@ def train_asymptotic_model(parms,
                            dataset_asymptotic_test_list,
                            dataset_stable_train_list,
                            dataset_stable_test_list):
+    if "do_pcgrad" not in parms:
+        parms["do_pcgrad"] = False
 
     # print out all parameters for the record
     parmfile = open(os.getcwd()+"/parameters.txt","w")
@@ -71,6 +73,7 @@ def train_asymptotic_model(parms,
     print("#Using",parms["device"],"device")
     if parms["device"] == "cuda":
         print("# ",torch.cuda.get_device_name(0))
+    print("#PCGrad", "on" if parms["do_pcgrad"] else "off")
 
     #=======================#
     # instantiate the model #
@@ -162,26 +165,47 @@ def train_asymptotic_model(parms,
             optimizer.zero_grad()
 
             # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
-            batch_loss = 0.0
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["stability"] ) * stability_loss_fn(stable_pred_train, stable_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["ndens"]     ) * comparison_loss_fn(ndens_pred_train, ndens_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["fluxmag"]   ) * comparison_loss_fn(fluxmag_pred_train, fluxmag_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["direction"] ) *  direction_loss_fn(Fhat_pred_train, Fhat_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn((growthrate_pred_train/ntot_invsec), #torch.log
-                                                                                                            (growthrate_true_train/ntot_invsec)) #torch.log
+            task_losses = []
+            task_losses.append(torch.exp(-model.log_task_weights["stability"] ) * stability_loss_fn(stable_pred_train, stable_true_train))
+            task_losses.append(torch.exp(-model.log_task_weights["ndens"]     ) * comparison_loss_fn(ndens_pred_train, ndens_true_train))
+            task_losses.append(torch.exp(-model.log_task_weights["fluxmag"]   ) * comparison_loss_fn(fluxmag_pred_train, fluxmag_true_train))
+            task_losses.append(torch.exp(-model.log_task_weights["direction"] ) *  direction_loss_fn(Fhat_pred_train, Fhat_true_train))
+            task_losses.append(torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn((growthrate_pred_train/ntot_invsec), #torch.log
+                                                                                                     (growthrate_true_train/ntot_invsec))) #torch.log
             if parms["do_unphysical_check"]:
-                batch_loss = batch_loss + torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_train/ntotal(F4i_asymptotic_train)[:,None,None,None], None)
+                task_losses.append(torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_train/ntotal(F4i_asymptotic_train)[:,None,None,None], None))
 
             # add loss weights to loss
+            weight_loss = 0.0
             if parms["do_learn_task_weights"]:
                 for name in model.log_task_weights.keys():
                     if (not parms["do_unphysical_check"]) and name=="unphysical":
                         continue
                     else:
-                        batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
+                        weight_loss = weight_loss + torch.sum(model.log_task_weights[name])
 
             # back propagate the batch loss
-            batch_loss.backward()
+            if parms["do_pcgrad"]:
+                if parms["do_learn_task_weights"]:
+                    weight_params = list(model.log_task_weights.parameters())
+                    weight_param_ids = {id(p) for p in weight_params}
+                    shared_params = [p for p in model.parameters() if id(p) not in weight_param_ids]
+                else:
+                    weight_params = []
+                    shared_params = list(model.parameters())
+
+                projected_grads = pcgrad(task_losses, shared_params)
+                for param, grad in zip(shared_params, projected_grads):
+                    param.grad = grad
+
+                if weight_params:
+                    total_loss = sum(task_losses) + weight_loss
+                    weight_grads = torch.autograd.grad(total_loss, weight_params, retain_graph=False, allow_unused=True)
+                    for param, grad in zip(weight_params, weight_grads):
+                        param.grad = grad if grad is not None else torch.zeros_like(param)
+            else:
+                batch_loss = sum(task_losses) + weight_loss
+                batch_loss.backward()
             optimizer.step()
 
         #============================#
