@@ -9,9 +9,9 @@ This file contains the structure of the neural network, including the means of t
 import torch
 import numpy as np
 from torch import nn
-from ml_tools import dot4, restrict_F4_to_physical, ntotal
-from torchview import draw_graph
-
+from ml_tools import restrict_F4_to_physical, ntotal
+from torch_geometric.data import Data, Batch
+from torch_geometric.nn import MessagePassing
 
 # constants used to get growth rate to order unity
 hbar = 1.05457266e-27 # erg s
@@ -22,6 +22,76 @@ GF = 1.1663787e-5 / GeV**2 * (hbar*c)**3 # erg cm^3
 ndens_to_invsec = GF/hbar
 print("ndens_to_invsec")
 print(ndens_to_invsec)
+
+def make_batch(x):
+    """
+    x: [nsamples, 4, 2, 3]
+    returns:
+        x_nodes:           [nsamples*6, 4]
+        edge_index_batch:  [2, nsamples*num_edges]
+        edge_type_batch:   [nsamples*num_edges]
+    """
+    nsamples = x.size(0)
+
+    # Define edges in graph to connect a flavor to each other flavor and also to its anti-flavor
+    # 0,1,2,3,4,5 = nue,numu,nutau,anue,anumu,anutau
+    edge_index = torch.tensor([
+        # same-group edges
+        [0,0,1,1,2,2, 3,3,4,4,5,5, 0,1,2, 3,4,5],
+        [1,2,0,2,0,1, 4,5,3,5,3,4, 3,4,5, 0,1,2]
+    ], dtype=torch.long).to(x.device)
+
+    # edge types: 0 = flavor, 1 = neutrino/antineutrino
+    edge_type = torch.tensor( [0]*12 + [1]*6, dtype=torch.long ).to(x.device)
+
+    # move feature dim last, then flatten nodes
+    # [nsamples, 2, 3, 4] → [nsamples*6, 4]
+    x_nodes = x.permute(0, 2, 3, 1).reshape(nsamples * 6, 4)
+
+    # repeat edge structure with offsets
+    num_edges = edge_index.size(1)
+
+    edge_index_batch = edge_index.repeat(1, nsamples)
+    offsets = (torch.arange(nsamples, device=x.device) * 6)\
+              .repeat_interleave(num_edges)
+    edge_index_batch = edge_index_batch + offsets
+
+    edge_type_batch = edge_type.repeat(nsamples)
+
+    return x_nodes, edge_index_batch, edge_type_batch
+
+# define a permutation-equivariant message passing layer
+# 0 means flavor edge, 1 means neutrino/antineutrino edge
+class PermutationEquivariantLinear(MessagePassing):
+    def __init__(self, width_in, width_out):
+        super().__init__(aggr='add')
+        self.lin_self  = nn.Linear(width_in, width_out)
+        self.lin_edges = nn.ModuleList([
+            nn.Linear(width_in, width_out)
+            for _ in range(2)])
+
+    def forward(self, x, edge_index_batch, edge_type_batch):
+        out = self.lin_self(x)
+        out += self.propagate(edge_index_batch, x=x, edge_type=edge_type_batch)
+        return out
+
+    def message(self, x_j, edge_type):
+        # prepare output tensor with size defined by output features
+        out = torch.empty(
+            x_j.size(0),
+            self.lin_self.out_features,
+            device=x_j.device,
+            dtype=x_j.dtype,
+        )
+
+        # loop through the edge types and use corresponding linear for each edge type
+        for t in range(len(self.lin_edges)):
+            mask = (edge_type == t)
+            if mask.any():
+                out[mask] = self.lin_edges[t](x_j[mask])
+
+        return out
+
 
 # define the NN model
 class NeuralNetwork(nn.Module):
@@ -45,8 +115,8 @@ class NeuralNetwork(nn.Module):
 
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
-        self.NX = 4*2*self.NF
-        self.NY = 4*2*self.NF
+        self.NX = 4
+        self.NY = 4
 
         # one y matrix for ndens, one for flux
         # add one extra to predict growth rate
@@ -55,26 +125,26 @@ class NeuralNetwork(nn.Module):
 
         # append a full layer including linear, activation, and batchnorm
         def append_full_layer(modules, in_dim, out_dim):
-            modules.append(nn.Linear(in_dim, out_dim))
-            if parms["do_batchnorm"]:
-                modules.append(nn.BatchNorm1d(out_dim))
+            modules.append(PermutationEquivariantLinear(in_dim, out_dim))
+            if parms["do_layernorm"]:
+                modules.append(nn.LayerNorm(out_dim))
             modules.append(parms["activation"]())
             if parms["dropout_probability"] > 0:
                 modules.append(nn.Dropout(parms["dropout_probability"]))
 
         # put together the layers of the neural network
-        modules_shared = []
-        modules_stability = []
-        modules_growthrate = []
-        modules_F4 = []
+        self.modules_shared = nn.ModuleList()
+        self.modules_stability = nn.ModuleList()
+        self.modules_growthrate = nn.ModuleList()
+        self.modules_F4 = nn.ModuleList()
         
         # set up shared layers
         if parms["nhidden_shared"] > 0:
-            append_full_layer(modules_shared, self.NX, parms["width_shared"])
+            append_full_layer(self.modules_shared, self.NX, parms["width_shared"])
             for i in range(parms["nhidden_shared"]):
-                append_full_layer(modules_shared, parms["width_shared"], parms["width_shared"])
+                append_full_layer(self.modules_shared, parms["width_shared"], parms["width_shared"])
         else:
-            modules_shared.append(nn.Identity())
+            self.modules_shared.append(nn.Identity())
 
         def build_task(modules_task, nhidden_task, width_task, width_final):
             # the width at the beginning of the task is NX if no shared layers, otherwise it's the shared width
@@ -82,36 +152,32 @@ class NeuralNetwork(nn.Module):
 
             # if no hidden layers, just do linear from start to final
             if nhidden_task == 0:
-                modules_task.append(nn.Linear(width_start, width_final))
+                modules_task.append(PermutationEquivariantLinear(width_start, width_final))
             # otherwise, build the full set of hidden layers
             else:
                 append_full_layer(modules_task, width_start, width_task)
                 for _ in range(nhidden_task-1):
                     append_full_layer(modules_task, width_task, width_task)
-                modules_task.append(nn.Linear(width_task, width_final))
-        
-        build_task(modules_stability,  parms["nhidden_stability"],  parms["width_stability"],  1      )
-        build_task(modules_growthrate, parms["nhidden_growthrate"], parms["width_growthrate"], 1      )
-        build_task(modules_F4,         parms["nhidden_F4"],         parms["width_F4"],         self.NY)
+                modules_task.append(PermutationEquivariantLinear(width_task, width_final))
 
-        # turn the list of modules into a sequential model
-        self.linear_activation_stack_shared     = nn.Sequential(*modules_shared)
-        self.linear_activation_stack_stability  = nn.Sequential(*modules_stability)
-        self.linear_activation_stack_growthrate = nn.Sequential(*modules_growthrate)
-        self.linear_activation_stack_F4         = nn.Sequential(*modules_F4)
-        
+        build_task(self.modules_stability,  parms["nhidden_stability"],  parms["width_stability"],  1      )
+        build_task(self.modules_growthrate, parms["nhidden_growthrate"], parms["width_growthrate"], 1      )
+        build_task(self.modules_F4,         parms["nhidden_F4"],         parms["width_F4"],         self.NY)
+
         # initialize the weights
         torch.manual_seed(parms["random_seed"])
         np.random.seed(parms["random_seed"])
-        self.linear_activation_stack_shared.apply(self._init_weights)
-        self.linear_activation_stack_stability.apply(self._init_weights)
-        self.linear_activation_stack_growthrate.apply(self._init_weights)
-        self.linear_activation_stack_F4.apply(self._init_weights)
+        for module in self.modules_shared:
+            module.apply(self._init_weights)
+        for module in self.modules_stability:
+            module.apply(self._init_weights)
+        for module in self.modules_growthrate:
+            module.apply(self._init_weights)
+        for module in self.modules_F4:
+            module.apply(self._init_weights)
 
         # print the model structure
         print(self)
-        graph = draw_graph(self, torch.zeros((1, self.NX)))
-        graph.visual_graph.render("nn_model_structure", format="pdf", cleanup=True)
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -134,20 +200,25 @@ class NeuralNetwork(nn.Module):
 
     # Push the inputs through the neural network
     # output is indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
-    def forward(self,x):             
-        # evaluate the shared portion of the network
-        y_shared = self.linear_activation_stack_shared(x)
+    def forward(self,x):
+        # create a batch for the graph network
+        x_nodes, edge_index_batch, edge_type_batch = make_batch(x)
 
-        # evaluate each task
-        y_stability  = self.linear_activation_stack_stability(y_shared)
-        y_growthrate = self.linear_activation_stack_growthrate(y_shared)
-        y_F4         = self.linear_activation_stack_F4(y_shared)
-        
-        # enforce symmetry in the heavies
-        if self.average_heavies_in_final_state:
-            y_F4[:,:,:,1:] = y_F4.clone().detach()[:,:,:,1:].mean(dim=3, keepdim=True)
+        def module_stack(modules, x):
+            for layer in modules:
+                if isinstance(layer, PermutationEquivariantLinear):
+                    x = layer(x, edge_index_batch, edge_type_batch)
+                else:
+                    x = layer(x)
+            return x
 
-        return y_F4, y_growthrate, y_stability
+        # evaluate the shared portion of the network, then each task
+        x_nodes     = module_stack(self.modules_shared    , x_nodes)
+        xStability  = module_stack(self.modules_stability , x_nodes)
+        xGrowthrate = module_stack(self.modules_growthrate, x_nodes)
+        xF4         = module_stack(self.modules_F4        , x_nodes)
+
+        return xF4, xGrowthrate, xStability
 
     # X is just F4_initial [nsamples, xyzt, 2, NF]
     @torch.jit.export
@@ -158,14 +229,17 @@ class NeuralNetwork(nn.Module):
         ntot = ntotal(F4_in)
 
         # reshape and normalize
-        F4_in = F4_in.view((nsims,self.NX))
-        X = F4_in / ntot[:,None]
+        X = F4_in / ntot[:,None,None,None]
 
         # propagate through the network
         y_F4, y_growthrate, y_stability = self.forward(X)
 
         # reshape into a matrix
         F4_out = y_F4.reshape((nsims,4,2,self.NF)) * ntot[:,None,None,None]
+
+        # enforce symmetry in the heavies
+        if self.average_heavies_in_final_state:
+            F4_out[:,:,:,1:] = F4_out.clone().detach()[:,:,:,1:].mean(dim=3, keepdim=True)
 
         # ensure the flavor-traced number is conserved
         F4_in = F4_in.view((nsims,4,2,3))
@@ -181,6 +255,10 @@ class NeuralNetwork(nn.Module):
             ELN_excess = ELN_out - ELN_in
             F4_out[:,0,0,:] -= ELN_excess / 2.0
             F4_out[:,0,1,:] += ELN_excess / 2.0
+
+        # pool the scalars to make permutation-invariants
+        y_stability = y_stability.view((nsims,6)).mean(dim=1)
+        y_growthrate = y_growthrate.view((nsims,6)).mean(dim=1)
 
         # apply sigmoid to stability logits
         stability = torch.squeeze(torch.sigmoid(y_stability))

@@ -75,7 +75,7 @@ if __name__ == "__main__":
     parms["width_density"]       = 128
     parms["width_flux"]          = 128
     parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
-    parms["do_batchnorm"]= True
+    parms["do_layernorm"]= True
     parms["do_fdotu"]= True
     parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
