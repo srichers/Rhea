@@ -42,10 +42,8 @@ def max_error(F4f_pred, F4f_true):
         return torch.max(torch.abs(F4f_pred - F4f_true))
 
 def pcgrad(task_losses, params, eps=1e-12):
-    if not params:
-        return []
-    if len(task_losses) == 0:
-        return [torch.zeros_like(p) for p in params]
+    assert params
+    assert len(task_losses) > 0
 
     task_grads = []
     for loss in task_losses:
