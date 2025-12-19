@@ -15,6 +15,16 @@ import sys
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
+# constants used to get growth rate to order unity
+hbar = 1.05457266e-27 # erg s
+c = 2.99792458e10 # cm/s
+eV = 1.60218e-12 # erg
+GeV = 1e9 * eV
+GF = 1.1663787e-5 / GeV**2 * (hbar*c)**3 # erg cm^3
+ndens_to_invsec = np.sqrt(2.0)*GF/hbar
+print("ndens_to_invsec")
+print(ndens_to_invsec)
+
 def read_asymptotic_data(parms):
     #===============================================#
     # read in the database from the previous script #
@@ -29,13 +39,15 @@ def read_asymptotic_data(parms):
         print(dind,d)
         # read from file
         with h5py.File(d,"r") as f_in:
-            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]) # [simulationIndex, xyzt, nu/nubar, flavor]
-            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...])
+            # File contains [simulationIndex, xyzt, nu/nubar, flavor]
+            # We want [simulationIndex, nu/nubar, flavor, xyzt]
+            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1) 
+            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
             growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
             assert(parms["NF"] == int(np.array(f_in["nf"])) )
-            assert(torch.all(F4_initial==F4_initial))
-            assert(torch.all(F4_final==F4_final))
-            assert(torch.all(growthrate==growthrate))
+            assert(torch.all(torch.isfinite(F4_initial)))
+            assert(torch.all(torch.isfinite(F4_final)))
+            assert(torch.all(torch.isfinite(growthrate)))
         print("#   ",len(F4_initial),"points in",d)
 
         # downsample to less data
@@ -48,13 +60,35 @@ def read_asymptotic_data(parms):
 
         print("#   ",len(F4_initial),"points in resampled dataset")
 
-        # fix slightly negative energy densities
+        # normalize by ntot
         ntot = ml.ntotal(F4_initial)
-        ndens = F4_initial[:,3,:,:]
+        F4_initial = F4_initial / ntot[:,None,None,None] # dimensionless
+        F4_final   = F4_final   / ntot[:,None,None,None] # dimensionless
+        growthrate = growthrate / (ntot*ndens_to_invsec) # dimensionless
+
+        # normalize final data, since it can have a larger error
+        ntot_final = ml.ntotal(F4_final)
+        assert torch.allclose(ntot_final, torch.ones_like(ntot_final), atol=1e-3)
+        F4_final = F4_final / ntot_final[:,None,None,None] # dimensionless
+
+        # report stats after normalization
+        ntot_initial = ml.ntotal(F4_initial)
+        ntot_final = ml.ntotal(F4_final)
+        print("#    ntot_initial min/max after normalization:", ntot_initial.min().item(), ntot_initial.max().item())
+        print("#    ntot_final min/max after normalization:", ntot_final.min().item(), ntot_final.max().item())
+        print("#    growthrate min/max after normalization:", growthrate.min().item(), growthrate.max().item())
+
+        assert torch.allclose(ntot_initial, torch.ones_like(ntot_initial))
+        assert torch.allclose(ntot_final, torch.ones_like(ntot_final))
+        assert torch.all(torch.isfinite(growthrate))
+        assert torch.all(growthrate > 0)
+
+        # fix slightly negative energy densities
+        ndens = F4_initial[:,:,:,3]
         badlocs = torch.where(ndens < 0)
-        assert(torch.all(ndens/ntot[:,None,None] > -1e10))
+        assert(torch.all(ndens > -1e10))
         for i in range(4):
-            F4_initial[:,i,:,:][badlocs] = 0
+            F4_initial[:,:,:,i][badlocs] = 0
 
         # make sure the data are good
         ml.check_conservation(F4_initial, F4_final)
@@ -62,8 +96,8 @@ def read_asymptotic_data(parms):
 
         # average heavies if necessary
         if parms["average_heavies_in_final_state"]:
-            assert(torch.allclose( torch.mean(F4_initial[:,:,:,1:], dim=3), F4_initial[:,:,:,1] ))
-            F4_final[:,:,:,1:] = torch.mean(F4_final[:,:,:,1:], dim=3, keepdim=True)
+            assert(torch.allclose( torch.mean(F4_initial[:,:,1:,:], dim=2), F4_initial[:,:,1,:] ))
+            F4_final[:,:,1:,:] = torch.mean(F4_final[:,:,1:,:], dim=2, keepdim=True)
 
         # add dataset to the lists
         if dind==0:
@@ -81,8 +115,6 @@ def read_asymptotic_data(parms):
 # read in the stable points from the NSM snapshot #
 #=================================================#
 def read_stable_data(parms):
-    F4_collected = np.zeros((0, 4, 2, parms["NF"]))
-    stable_collected = np.zeros((0))
 
     dataset_train_list = []
     dataset_test_list = []
@@ -92,9 +124,11 @@ def read_stable_data(parms):
         print()
         print(i,filename)
         with h5py.File(filename,"r") as f_in:
-            F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
+            # File contains [simulationIndex, xyzt, nu/nubar, flavor]
+            # We want [simulationIndex, nu/nubar, flavor, xyzt]
+            F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...])).permute(0,2,3,1)
             stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
-            assert(torch.all(F4==F4))
+            assert(torch.all(torch.isfinite(F4)==torch.isfinite(F4)))
             assert(torch.all(stable==stable))
 
         # print number of points
@@ -108,6 +142,14 @@ def read_stable_data(parms):
             F4 = F4[random_indices,...]
             stable = stable[random_indices]
             print("#   ",torch.sum(stable).item(),"points are stable.")
+        
+        # normalize by ntot
+        ntot = ml.ntotal(F4)
+        assert(torch.all(ntot > 0))
+        assert(torch.all(torch.isfinite(ntot)))
+        F4 = F4 / ntot[:,None,None,None]
+        ntot_new = ml.ntotal(F4)
+        assert(torch.allclose(ntot_new, torch.ones_like(ntot_new)))
 
         if i==0:
             dataset_test_list.append(TensorDataset(F4, stable))

@@ -52,9 +52,7 @@ if __name__ == "__main__":
     
     parms["do_learn_task_weights"] = True
     parms["task_weight_stability"] = 1.0
-    parms["task_weight_ndens"] = 1.0
-    parms["task_weight_fluxmag"] = 1.0
-    parms["task_weight_direction"] = 1.0
+    parms["task_weight_F4"] = 1.0
     parms["task_weight_unphysical"] = 1
     parms["task_weight_growthrate"] = 1.0
 
