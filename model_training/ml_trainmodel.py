@@ -73,7 +73,6 @@ def train_asymptotic_model(parms,
     print("#Using",parms["device"],"device")
     if parms["device"] == "cuda":
         print("# ",torch.cuda.get_device_name(0))
-    print("#PCGrad", "on" if parms["do_pcgrad"] else "off")
 
     #=======================#
     # instantiate the model #

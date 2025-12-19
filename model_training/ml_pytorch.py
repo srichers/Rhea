@@ -45,7 +45,7 @@ if __name__ == "__main__":
     parms["weightedrandomsampler.epoch_num_samples"] = 10 #parms["samples_per_database"]
     
     parms["do_learn_task_weights"] = True
-    parms["do_pcgrad"] = False
+    parms["do_pcgrad"] = True
     parms["task_weight_stability"] = 1.0
     parms["task_weight_ndens"] = 1.0
     parms["task_weight_fluxmag"] = 1.0
