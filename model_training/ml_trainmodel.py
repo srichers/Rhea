@@ -61,8 +61,7 @@ def train_asymptotic_model(parms,
                            dataset_asymptotic_test_list,
                            dataset_stable_train_list,
                            dataset_stable_test_list):
-    if "do_pcgrad" not in parms:
-        parms["do_pcgrad"] = False
+    assert "do_pcgrad" in parms
 
     # print out all parameters for the record
     parmfile = open(os.getcwd()+"/parameters.txt","w")
