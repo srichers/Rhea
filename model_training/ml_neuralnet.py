@@ -18,29 +18,39 @@ from torchview import draw_graph
 class PermutationEquivariantLinear(nn.Module):
     def __init__(self, width_in, width_out):
         super().__init__()
-        self.lin_self   = nn.Linear(width_in, width_out)
-        self.lin_flavor  = nn.Linear(width_out, width_out, bias=False)
-        self.lin_nunubar = nn.Linear(width_out, width_out, bias=False)
-        self.lin_all     = nn.Linear(width_out, width_out, bias=False)
+        self.lin_self    = nn.Linear(width_in, width_out)
+        self.lin_flavor  = nn.Linear(width_in, width_out, bias=False)
+        self.lin_nunubar = nn.Linear(width_in, width_out, bias=False)
+        self.lin_all     = nn.Linear(width_in, width_out, bias=False)
 
     # x has shape [nsamples, nunubar, flavor, features]
     def forward(self, x):
 
-        out = self.lin_self(x)
+        # compute the inputs to each node
+        # subtract self to get the messages from neighbors orthogonal to the self node
+        x_self = x
+        x_flavor  = x.sum(dim=2, keepdim=True) - x_self
+        x_nunubar = x.sum(dim=1, keepdim=True) - x_self
+        x_all = x.sum(dim=(1,2), keepdim=True) - x_self - x_flavor - x_nunubar
 
-        # compute the inputs to the edges
-        in_flavor  = out.mean(dim=2, keepdim=True)
-        in_nunubar = out.mean(dim=1, keepdim=True)
-        in_all     = out.mean(dim=(1,2), keepdim=True)
+        # normalize by the number of nodes contributing. Supposedly helps keep the scale of the activations reasonable.
+        x_flavor  = x_flavor / (x.shape[2] - 1)
+        x_nunubar = x_nunubar / (x.shape[1] - 1)
+        x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
 
-        # add the contributions from each edge type
-        out = out \
-            + self.lin_flavor(in_flavor) \
-            + self.lin_nunubar(in_nunubar) \
-            + self.lin_all(in_all)
-        
-        return out
+        # compute the outputs from each part
+        y_self = self.lin_self(x_self)
+        y_flavor = self.lin_flavor(x_flavor)
+        y_nunubar = self.lin_nunubar(x_nunubar)
+        y_all = self.lin_all(x_all)
 
+        # sum the contributions, using the residual connection when possible
+        y = y_self + y_flavor + y_nunubar + y_all
+        if x.shape[-1] == y_self.shape[-1]:
+            y = y + x
+
+        return y
+    
 # define the NN model
 class NeuralNetwork(nn.Module):
     def __init__(self, parms):

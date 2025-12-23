@@ -247,7 +247,7 @@ def train_asymptotic_model(parms,
                 print(torch.sum(torch.abs(torch.sigmoid(y_stable_pred)-stable_true)).item()/y_stable_pred.shape[0],"fractional difference in stable points")
 
                 this_loss = torch.exp(-model.log_task_weights["stability"] ) * \
-                    contribute_loss(y_stable_pred, stable_true, traintest, "stability", comparison_loss_fn)
+                    contribute_loss(y_stable_pred, stable_true, traintest, "stability", stability_loss_fn)
                 #print("  stability loss contribution:", this_loss.item())
                 total_loss = total_loss + this_loss
             return total_loss
