@@ -64,14 +64,8 @@ if __name__ == "__main__":
     parms["nhidden_shared"]        = 0
     parms["nhidden_stability"]     = 3
     parms["nhidden_growthrate"] = 3
-    parms["nhidden_asymptotic"]    = 3
-    parms["nhidden_density"]       = 3
-    parms["nhidden_flux"]          = 3
-    parms["width_shared"]        = 128
-    parms["width_stability"]     = 128
-    parms["width_growthrate"] = 128
-    parms["width_density"]       = 128
-    parms["width_flux"]          = 128
+    parms["nhidden_F4"]       = 3
+    parms["width_hidden"]        = 128
     parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
     parms["do_layernorm"]= True
     parms["do_fdotu"]= True

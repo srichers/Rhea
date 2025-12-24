@@ -98,29 +98,29 @@ class NeuralNetwork(nn.Module):
         
         # set up shared layers
         if parms["nhidden_shared"] > 0:
-            append_full_layer(modules_shared, self.NX, parms["width_shared"])
+            append_full_layer(modules_shared, self.NX, parms["width_hidden"])
             for i in range(parms["nhidden_shared"]):
-                append_full_layer(modules_shared, parms["width_shared"], parms["width_shared"])
+                append_full_layer(modules_shared, parms["width_hidden"], parms["width_hidden"])
         else:
             modules_shared.append(nn.Identity())
 
-        def build_task(modules_task, nhidden_task, width_task, width_final):
+        def build_task(modules_task, nhidden_task, width_final):
             # the width at the beginning of the task is NX if no shared layers, otherwise it's the shared width
-            width_start = self.NX if parms["nhidden_shared"] == 0 else parms["width_shared"]
+            width_start = self.NX if parms["nhidden_shared"] == 0 else parms["width_hidden"]
 
             # if no hidden layers, just do linear from start to final
             if nhidden_task == 0:
                 modules_task.append(PermutationEquivariantLinear(width_start, width_final))
             # otherwise, build the full set of hidden layers
             else:
-                append_full_layer(modules_task, width_start, width_task)
+                append_full_layer(modules_task, width_start, parms["width_hidden"])
                 for _ in range(nhidden_task-1):
-                    append_full_layer(modules_task, width_task, width_task)
-                modules_task.append(PermutationEquivariantLinear(width_task, width_final))
+                    append_full_layer(modules_task, parms["width_hidden"], parms["width_hidden"])
+                modules_task.append(PermutationEquivariantLinear(parms["width_hidden"], width_final))
 
-        build_task(modules_stability,  parms["nhidden_stability"],  parms["width_stability"],  1      )
-        build_task(modules_growthrate, parms["nhidden_growthrate"], parms["width_growthrate"], 1      )
-        build_task(modules_F4,         parms["nhidden_F4"],         parms["width_F4"],         self.NY)
+        build_task(modules_stability,  parms["nhidden_stability"],  1      )
+        build_task(modules_growthrate, parms["nhidden_growthrate"], 1      )
+        build_task(modules_F4,         parms["nhidden_F4"],         self.NY)
 
         # turn the list of modules into a sequential model
         self.linear_activation_stack_shared     = nn.Sequential(*modules_shared)
