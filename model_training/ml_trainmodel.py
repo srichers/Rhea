@@ -146,7 +146,6 @@ def train_asymptotic_model(parms,
             growthrate_true_train = growthrate_true_train.to(parms["device"])
             F4i_stable_train = F4i_stable_train.to(parms["device"])
             stable_true_train = stable_true_train.to(parms["device"])
-            ntot_invsec = ntotal(F4i_asymptotic_train) * ndens_to_invsec
 
             # get predicted values from the model
             # note that growthrate is predicted as (e^y)(ntot)(ndens_to_invsec) where y is the output of the ml model
@@ -155,8 +154,12 @@ def train_asymptotic_model(parms,
 
             # convert F4 to densities and fluxes to feed to loss functions
             # note the outputs are all normalized to the total number density
-            ndens_pred_train, fluxmag_pred_train, Fhat_pred_train = get_ndens_fluxmag_fhat(F4f_pred_train)
-            ndens_true_train, fluxmag_true_train, Fhat_true_train = get_ndens_fluxmag_fhat(F4f_true_train)
+            ntot_i = ntotal(F4i_asymptotic_train)
+            ntot_f = ntotal(F4f_true_train)
+            ntot_p = ntotal(F4f_pred_train)
+            #print("ntot_pred min/max:", ntot_p.min().item(), ntot_p.max().item())
+            assert(torch.allclose(ntot_i, torch.ones_like(ntot_i)))
+            assert(torch.allclose(ntot_f, torch.ones_like(ntot_f)))
 
             # reset the loss and gradients
             optimizer.zero_grad()
@@ -164,13 +167,10 @@ def train_asymptotic_model(parms,
             # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
             batch_loss = 0.0
             batch_loss = batch_loss + torch.exp(-model.log_task_weights["stability"] ) * stability_loss_fn(stable_pred_train, stable_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["ndens"]     ) * comparison_loss_fn(ndens_pred_train, ndens_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["fluxmag"]   ) * comparison_loss_fn(fluxmag_pred_train, fluxmag_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["direction"] ) *  direction_loss_fn(Fhat_pred_train, Fhat_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn((growthrate_pred_train/ntot_invsec), #torch.log
-                                                                                                            (growthrate_true_train/ntot_invsec)) #torch.log
+            batch_loss = batch_loss + torch.exp(-model.log_task_weights["F4"]     ) * comparison_loss_fn(F4f_pred_train, F4f_true_train)
+            batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn(growthrate_pred_train, growthrate_true_train)
             if parms["do_unphysical_check"]:
-                batch_loss = batch_loss + torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_train/ntotal(F4i_asymptotic_train)[:,None,None,None], None)
+                batch_loss = batch_loss + torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_train, None)
 
             # add loss weights to loss
             if parms["do_learn_task_weights"]:
@@ -180,7 +180,7 @@ def train_asymptotic_model(parms,
                     else:
                         batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
 
-            # back propagate the batch loss
+            
             batch_loss.backward()
             optimizer.step()
 
@@ -189,18 +189,10 @@ def train_asymptotic_model(parms,
         #============================#
         model.eval()
 
-        loss_dict["ndens_train_loss"] = 0
-        loss_dict["ndens_train_max"] = 0
-        loss_dict["ndens_test_loss"] = 0
-        loss_dict["ndens_test_max"] = 0
-        loss_dict["fluxmag_train_loss"] = 0
-        loss_dict["fluxmag_train_max"] = 0
-        loss_dict["fluxmag_test_loss"] = 0
-        loss_dict["fluxmag_test_max"] = 0
-        loss_dict["direction_train_loss"] = 0
-        loss_dict["direction_train_max"] = 0
-        loss_dict["direction_test_loss"] = 0
-        loss_dict["direction_test_max"] = 0
+        loss_dict["F4_train_loss"] = 0
+        loss_dict["F4_train_max"] = 0
+        loss_dict["F4_test_loss"] = 0
+        loss_dict["F4_test_max"] = 0
         loss_dict["growthrate_train_loss"] = 0
         loss_dict["growthrate_train_max"] = 0
         loss_dict["growthrate_test_loss"] = 0
@@ -221,26 +213,16 @@ def train_asymptotic_model(parms,
                 F4i = dataset.tensors[0].to(parms["device"])
                 F4f_true = dataset.tensors[1].to(parms["device"])
                 growthrate_true = dataset.tensors[2].to(parms["device"])
-                ntot_invsec = ntotal(F4i) * ndens_to_invsec
 
                 F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
 
-                ndens_pred, fluxmag_pred, Fhat_pred = get_ndens_fluxmag_fhat(F4f_pred)
-                ndens_true, fluxmag_true, Fhat_true = get_ndens_fluxmag_fhat(F4f_true)
-
-                total_loss = total_loss + torch.exp(-model.log_task_weights["ndens"]     ) * contribute_loss(ndens_pred,
-                                                                                                             ndens_true,
-                                                                                                             traintest, "ndens", comparison_loss_fn)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["fluxmag"]   ) * contribute_loss(fluxmag_pred,
-                                                                                                             fluxmag_true,
-                                                                                                             traintest, "fluxmag", comparison_loss_fn)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["direction"] ) * contribute_loss(Fhat_pred,
-                                                                                                             Fhat_true,
-                                                                                                             traintest, "direction", direction_loss_fn)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss((growthrate_pred/ntot_invsec), #torch.log
-                                                                                                             (growthrate_true/ntot_invsec), #torch.log
+                total_loss = total_loss + torch.exp(-model.log_task_weights["F4"]     ) * contribute_loss(F4f_pred,
+                                                                                                          F4f_true,
+                                                                                                          traintest, "F4", comparison_loss_fn)
+                total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss(growthrate_pred, #torch.log
+                                                                                                             growthrate_true, #torch.log
                                                                                                              traintest, "growthrate", comparison_loss_fn)
-                unphysical_loss = torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred/ntotal(F4i)[:,None,None,None],
+                unphysical_loss = torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred,
                                                                                                      None,
                                                                                                      traintest, "unphysical", unphysical_loss_fn)
                 if parms["do_unphysical_check"]:
@@ -260,12 +242,14 @@ def train_asymptotic_model(parms,
                 F4i = dataset.tensors[0].to(parms["device"])
                 stable_true = dataset.tensors[1].to(parms["device"])
 
-                _, _, stable_pred = model.predict_all(F4i)
+                _, _, y_stable_pred = model.predict_all(F4i)
 
-                print(torch.sum(torch.abs(stable_pred-stable_true)).item()/stable_pred.shape[0],"fractional difference in stable points")
+                print(torch.sum(torch.abs(torch.sigmoid(y_stable_pred)-stable_true)).item()/y_stable_pred.shape[0],"fractional difference in stable points")
 
-                total_loss = total_loss + torch.exp(-model.log_task_weights["stability"] ) * \
-                    contribute_loss(stable_pred, stable_true, traintest, "stability", comparison_loss_fn)
+                this_loss = torch.exp(-model.log_task_weights["stability"] ) * \
+                    contribute_loss(y_stable_pred, stable_true, traintest, "stability", stability_loss_fn)
+                #print("  stability loss contribution:", this_loss.item())
+                total_loss = total_loss + this_loss
             return total_loss
         
         with torch.no_grad():

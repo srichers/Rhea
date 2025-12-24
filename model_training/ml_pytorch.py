@@ -22,9 +22,15 @@ if __name__ == "__main__":
     # create a list of options
     parms = {}
 
+    # list of asymptotic data
+    # First dataset is deemed test data
     parms["database_list"] = [
         "data/dummy_asymptotic.h5",
+        "data/dummy_asymptotic.h5",
     ]
+
+    # list of stability data
+    # First dataset is deemed test data
     parms["stable_database_list"] = [
         "data/stable_oneflavor_database.h5",
         "data/stable_random_database.h5",
@@ -46,14 +52,11 @@ if __name__ == "__main__":
     
     parms["do_learn_task_weights"] = True
     parms["task_weight_stability"] = 1.0
-    parms["task_weight_ndens"] = 1.0
-    parms["task_weight_fluxmag"] = 1.0
-    parms["task_weight_direction"] = 1.0
+    parms["task_weight_F4"] = 1.0
     parms["task_weight_unphysical"] = 1
     parms["task_weight_growthrate"] = 1.0
 
     # data augmentation options
-    parms["do_augment_permutation"]=False # this is the most expensive option to make true, and seems to make things worse...
     parms["do_augment_final_stable"]= False # True
     parms["do_unphysical_check"]= True # True - seems to help prevent crazy results
 
@@ -70,7 +73,7 @@ if __name__ == "__main__":
     parms["width_density"]       = 128
     parms["width_flux"]          = 128
     parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
-    parms["do_batchnorm"]= True
+    parms["do_layernorm"]= True
     parms["do_fdotu"]= True
     parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
