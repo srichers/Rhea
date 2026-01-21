@@ -18,10 +18,11 @@ import e3nn.nn
 # define a permutation-equivariant message passing layer
 # 0 means flavor edge, 1 means neutrino/antineutrino edge
 class PermutationEquivariantLinear(nn.Module):
-    def __init__(self, irreps_in, irreps_out):
+    def __init__(self, irreps_in, irreps_out, do_layernorm=False):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
+        self.layernorm = e3nn.nn.LayerNorm(irreps_in) if do_layernorm else None
         self.lin_self    = e3nn.o3.Linear(irreps_in, irreps_out)
         self.lin_flavor  = e3nn.o3.Linear(irreps_in, irreps_out)
         self.lin_nunubar = e3nn.o3.Linear(irreps_in, irreps_out)
@@ -42,11 +43,65 @@ class PermutationEquivariantLinear(nn.Module):
         x_nunubar = x_nunubar / (x.shape[1] - 1)
         x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
 
+        # optional per-irrep normalization before the linear maps
+        if self.layernorm is not None:
+            x_self = self.layernorm(x_self)
+            x_flavor = self.layernorm(x_flavor)
+            x_nunubar = self.layernorm(x_nunubar)
+            x_all = self.layernorm(x_all)
+
         # compute the outputs from each part
         y_self = self.lin_self(x_self)
         y_flavor = self.lin_flavor(x_flavor)
         y_nunubar = self.lin_nunubar(x_nunubar)
         y_all = self.lin_all(x_all)
+
+        # sum the contributions, using the residual connection when possible
+        y = y_self + y_flavor + y_nunubar + y_all
+        return y
+
+class PermutationEquivariantScalarTensorProduct(nn.Module):
+    def __init__(self, irreps_in, irreps_out, do_layernorm=False):
+        super().__init__()
+        self.irreps_in = irreps_in
+        self.irreps_out = irreps_out
+        self.layernorm = e3nn.nn.LayerNorm(irreps_in) if do_layernorm else None
+        self.norm = e3nn.o3.Norm(irreps_in)
+        self.tp_self    = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
+        self.tp_flavor  = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
+        self.tp_nunubar = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
+        self.tp_all     = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
+
+    # x has shape [nsamples, nunubar, flavor, features]
+    def forward(self, x):
+        # compute the inputs to each node
+        # subtract self to get the messages from neighbors orthogonal to the self node
+        x_self = x
+        x_flavor  = x.sum(dim=2, keepdim=True) - x_self
+        x_nunubar = x.sum(dim=1, keepdim=True) - x_self
+        x_all = x.sum(dim=(1,2), keepdim=True) - x_self - x_flavor - x_nunubar
+
+        # normalize by the number of nodes contributing. Supposedly helps keep the scale of the activations reasonable.
+        x_flavor  = x_flavor / (x.shape[2] - 1)
+        x_nunubar = x_nunubar / (x.shape[1] - 1)
+        x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
+
+        # optional per-irrep normalization before the tensor product
+        if self.layernorm is not None:
+            x_self = self.layernorm(x_self)
+            x_flavor = self.layernorm(x_flavor)
+            x_nunubar = self.layernorm(x_nunubar)
+            x_all = self.layernorm(x_all)
+
+        # compute invariant scalars and apply scalar-gated tensor products
+        s_self = self.norm(x_self)
+        s_flavor = self.norm(x_flavor)
+        s_nunubar = self.norm(x_nunubar)
+        s_all = self.norm(x_all)
+        y_self = self.tp_self(x_self, s_self)
+        y_flavor = self.tp_flavor(x_flavor, s_flavor)
+        y_nunubar = self.tp_nunubar(x_nunubar, s_nunubar)
+        y_all = self.tp_all(x_all, s_all)
 
         # sum the contributions, using the residual connection when possible
         y = y_self + y_flavor + y_nunubar + y_all
@@ -62,9 +117,11 @@ class PermutationEquivariantGatedBlock(nn.Module):
         irreps_gates = e3nn.o3.Irreps(f"{irreps_nonscalars.num_irreps}x0e")
         irreps_with_gates = irreps_scalars + irreps_gates + irreps_nonscalars
 
-        self.lin = PermutationEquivariantLinear(irreps_in, irreps_with_gates)
-
-        self.layernorm = e3nn.nn.LayerNorm(irreps_with_gates) if do_layernorm else None
+        self.lin = PermutationEquivariantScalarTensorProduct(
+            irreps_in,
+            irreps_with_gates,
+            do_layernorm=do_layernorm,
+        )
 
         self.gate = e3nn.nn.Gate(
             irreps_scalars = irreps_scalars,
@@ -77,10 +134,6 @@ class PermutationEquivariantGatedBlock(nn.Module):
     def forward(self, x):
         # get the full output (scalars + gates + nonscalars) from one linear
         y = self.lin(x)
-
-        # apply layernorm
-        if self.layernorm is not None:
-            y = self.layernorm(y)
 
         # apply the gate. If input and output irreps are the same, add residual connection
         y = self.gate(y)
@@ -196,11 +249,10 @@ class NeuralNetwork(nn.Module):
     # Push the inputs through the neural network
     # output is indexed as [sim, nu/nubar(out), flavor(out), nu/nubar(in), flavor(in)]
     def forward(self,x):
-        #assert torch.all(torch.isfinite(x))
 
         # evaluate the shared portion of the network
         y_shared = self.linear_activation_stack_shared(x)
-        #assert torch.all(torch.isfinite(y_shared))
+
         # evaluate each task
         y_stability  = self.linear_activation_stack_stability(y_shared)
         y_growthrate = self.linear_activation_stack_growthrate(y_shared)
@@ -208,14 +260,14 @@ class NeuralNetwork(nn.Module):
 
         #assert torch.all(torch.isfinite(y_stability))
         #assert torch.all(torch.isfinite(y_growthrate))
-        #assert torch.all(torch.isfinite(y_F4)) # HERE
+        #assert torch.all(torch.isfinite(y_F4))
 
         return y_F4, y_growthrate, y_stability
 
     # X is just F4_initial [nsamples, 2, NF, xyzt]
     @torch.jit.export
     def predict_all(self, F4_in):
-        #assert torch.all(torch.isfinite(F4_in))
+
         # get the total density
         nsims = F4_in.shape[0]
         F4_in = F4_in.view((nsims,2,self.NF,4))
@@ -223,41 +275,27 @@ class NeuralNetwork(nn.Module):
         # propagate through the network
         y_F4, y_growthrate, y_stability = self.forward(F4_in)
 
-        #assert torch.all(torch.isfinite(y_F4))
-        #print("y_F4 min/max:", y_F4.min().item(), y_F4.max().item())
-
         # reshape into a matrix
-        #print("y_F4 min/max before reshape:", y_F4.min().item(), y_F4.max().item())
         F4_out = F4_in + y_F4.reshape((nsims,2,self.NF,4))
-        #print("F4_out min/max:", F4_out.min().item(), F4_out.max().item())
 
         # enforce symmetry in the heavies
-        #if self.average_heavies_in_final_state:
-        #    F4_out[:,:,1:,:] = F4_out.clone().detach()[:,:,1:,:].mean(dim=3, keepdim=True)
-        ntot_new = ntotal(F4_out)
-        ntot_y = ntotal(y_F4.reshape((nsims,2,self.NF,4)))
-
-        #assert torch.all(torch.isfinite(F4_out))
+        if self.average_heavies_in_final_state:
+            F4_out[:,:,1:,:] = F4_out.clone().detach()[:,:,1:,:].mean(dim=3, keepdim=True)
 
         # ensure the flavor-traced number is conserved
-        #F4_in = F4_in.view((nsims,2,self.NF,4))
-        #F4_in_flavortrace = torch.sum(F4_in, dim=2, keepdim=True)
-        #F4_out_flavortrace = torch.sum(F4_out, dim=2, keepdim=True)
-        #F4_out_excess = F4_out_flavortrace - F4_in_flavortrace
-        #F4_out[:,:,:,:] -= F4_out_excess / self.NF
-        ###print("ntot_y min/max/mean:", ntot_y.min().item(), ntot_y.max().item(), ntot_y.mean().item())
-        #print("ntot_old min/max:", ntot.min().item(), ntot.max().item())
-        #print("ntot_new min/max:", ntot_new.min().item(), ntot_new.max().item())
-        #print("F4_out min/max:", F4_out.min().item(), F4_out.max().item())
-        #assert torch.all(torch.isfinite(F4_out))
+        F4_in = F4_in.view((nsims,2,self.NF,4))
+        F4_in_flavortrace = torch.sum(F4_in, dim=2, keepdim=True)
+        F4_out_flavortrace = torch.sum(F4_out, dim=2, keepdim=True)
+        F4_out_excess = F4_out_flavortrace - F4_in_flavortrace
+        F4_out[:,:,:,:] -= F4_out_excess / self.NF
 
         # ensure that ELN is conserved
-        #if self.conserve_lepton_number:
-        #    ELN_in  = F4_in[:,0,:,0]  - F4_in[:,1,:,0]
-        #    ELN_out = F4_out[:,0,:,0] - F4_out[:,1,:,0]
-        #    ELN_excess = ELN_out - ELN_in
-        #    F4_out[:,0,:,0] -= ELN_excess / 2.0
-        #    F4_out[:,1,:,0] += ELN_excess / 2.0
+        if self.conserve_lepton_number:
+            ELN_in  = F4_in[:,0,:,0]  - F4_in[:,1,:,0]
+            ELN_out = F4_out[:,0,:,0] - F4_out[:,1,:,0]
+            ELN_excess = ELN_out - ELN_in
+            F4_out[:,0,:,0] -= ELN_excess / 2.0
+            F4_out[:,1,:,0] += ELN_excess / 2.0
 
         # pool over features to get permutation-invariant output
         y_stability = torch.mean(y_stability, dim=(1,2))
