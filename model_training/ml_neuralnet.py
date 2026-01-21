@@ -53,7 +53,7 @@ class PermutationEquivariantLinear(nn.Module):
         return y
 
 class PermutationEquivariantGatedBlock(nn.Module):
-    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates):
+    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, do_layernorm=False):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
@@ -63,7 +63,9 @@ class PermutationEquivariantGatedBlock(nn.Module):
         irreps_with_gates = irreps_scalars + irreps_gates + irreps_nonscalars
 
         self.lin = PermutationEquivariantLinear(irreps_in, irreps_with_gates)
-        
+
+        self.layernorm = e3nn.nn.LayerNorm(irreps_with_gates) if do_layernorm else None
+
         self.gate = e3nn.nn.Gate(
             irreps_scalars = irreps_scalars,
             act_scalars = [act_scalars] * len(irreps_scalars),
@@ -75,6 +77,10 @@ class PermutationEquivariantGatedBlock(nn.Module):
     def forward(self, x):
         # get the full output (scalars + gates + nonscalars) from one linear
         y = self.lin(x)
+
+        # apply layernorm
+        if self.layernorm is not None:
+            y = self.layernorm(y)
 
         # apply the gate. If input and output irreps are the same, add residual connection
         y = self.gate(y)
@@ -116,14 +122,13 @@ class NeuralNetwork(nn.Module):
         # append a full layer including linear, activation, and layernorm/dropout if desired
         def append_full_layer(modules, in_irreps, out_irreps):
 
-            #TODO add layernorm?
-
             # for gated layers, add separate gate scalars to the main output
             modules.append(PermutationEquivariantGatedBlock(
                 in_irreps,
                 out_irreps,
                 parms["scalar_activation"   ],
-                parms["nonscalar_activation"]
+                parms["nonscalar_activation"],
+                do_layernorm=parms["do_layernorm"],
             ))
             
             if parms["dropout_probability"] > 0:
