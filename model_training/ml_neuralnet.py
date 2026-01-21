@@ -175,16 +175,7 @@ class NeuralNetwork(nn.Module):
 
         # print the model structure
         print(self)
-        #graph = draw_graph(self, torch.zeros((1, 2, self.NF, 4)))
-        #graph.visual_graph.render("nn_model_structure", format="pdf", cleanup=True)
 
-    #def _init_weights(self, module):
-    #    if isinstance(module, nn.Linear):
-    #        torch.nn.init.kaiming_normal_(module.weight)
-    #        if module.bias is not None:
-    #            module.bias.data.zero_()
-    
-    
     # convert the 3-flavor matrix into an effective 2-flavor matrix
     # input and output are indexed as [sim, nu/nubar, flavor, xyzt]
     # This assumes that the x flavors will represent the SUM of mu and tau flavors.
