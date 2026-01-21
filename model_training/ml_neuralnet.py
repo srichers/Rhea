@@ -50,46 +50,45 @@ class PermutationEquivariantLinear(nn.Module):
 
         # sum the contributions, using the residual connection when possible
         y = y_self + y_flavor + y_nunubar + y_all
-        if self.irreps_in == self.irreps_out:
-            y = y + x
-
         return y
 
 class PermutationEquivariantGatedBlock(nn.Module):
     def __init__(self, irreps_in, irreps_out, act_scalars, act_gates):
         super().__init__()
+        self.irreps_in = irreps_in
+        self.irreps_out = irreps_out
         irreps_scalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l == 0)
         irreps_nonscalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l > 0)
         irreps_gates = e3nn.o3.Irreps(f"{irreps_nonscalars.num_irreps}x0e")
+        irreps_with_gates = irreps_scalars + irreps_gates + irreps_nonscalars
 
-        self.scalars_dim = irreps_scalars.dim
-        self.lin_main = PermutationEquivariantLinear(irreps_in, irreps_out)
-        self.lin_gates = PermutationEquivariantLinear(irreps_in, irreps_gates)
+        self.lin = PermutationEquivariantLinear(irreps_in, irreps_with_gates)
+        
         self.gate = e3nn.nn.Gate(
             irreps_scalars = irreps_scalars,
-            act_scalars = act_scalars,
+            act_scalars = [act_scalars] * len(irreps_scalars),
             irreps_gates = irreps_gates,
-            act_gates = act_gates,
+            act_gates = [act_gates] * len(irreps_gates),
             irreps_gated = irreps_nonscalars,
         )
 
     def forward(self, x):
-        # get the main output and the gates from seprate linear layers
-        y_main = self.lin_main(x)
-        y_gates = self.lin_gates(x)
+        # get the full output (scalars + gates + nonscalars) from one linear
+        y = self.lin(x)
 
-        # split the main output into scalars and non-scalars, then sandwich the gates to make expected input for e3nn Gate
-        y_scalars = y_main[..., :self.scalars_dim]
-        y_nonscalars = y_main[..., self.scalars_dim:]
-        y = torch.cat([y_scalars, y_gates, y_nonscalars], dim=-1)
-
-        # apply the gate
-        return self.gate(y)
+        # apply the gate. If input and output irreps are the same, add residual connection
+        y = self.gate(y)
+        if self.irreps_in == self.irreps_out:
+            y = x + y
+        return y
     
 # define the NN model
 class NeuralNetwork(nn.Module):
     def __init__(self, parms):
         super().__init__()
+
+        # make sure the irreps are scalar first to make sure it is consistent with the output of Gate
+        assert parms["irreps_hidden"] == parms["irreps_hidden"].sort().irreps, "Hidden irreps must have scalars first"
 
         # store input arguments
         self.NF = parms["NF"]
@@ -106,8 +105,7 @@ class NeuralNetwork(nn.Module):
                 for name in ["stability", "growthrate", "F4", "unphysical"]
             }
 
-        # construct number of X and y values
-        # one X for each pair of species, and one for each product with u
+        # The input irreps for each node are just the 4 components of F4
         self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e")
         
         # one y matrix for ndens, one for flux
@@ -117,34 +115,16 @@ class NeuralNetwork(nn.Module):
 
         # append a full layer including linear, activation, and layernorm/dropout if desired
         def append_full_layer(modules, in_irreps, out_irreps):
-            # make sure the irreps are scalar first to make sure it is consistent with the output of Gate
-            assert parms["irreps_hidden"] == parms["irreps_hidden"].sort().irreps, "Hidden irreps must have scalars first"
-
-            # get the scalar and non-scalar irreps
-            irreps_scalars = out_irreps.filter(lambda mul_ir: mul_ir.ir.l == 0)
-            irreps_nonscalars = out_irreps.filter(lambda mul_ir: mul_ir.ir.l > 0)
-
-            # define the activations
-            act_scalars = [parms["scalar_activation"   ]] * len(irreps_scalars)
-            act_gates   = [parms["nonscalar_activation"]] * len(irreps_nonscalars)
-
-            # some sanity checks
-            assert len(act_scalars) == len(irreps_scalars)
-            assert len(act_gates)   == len(irreps_nonscalars)
 
             #TODO add layernorm?
 
             # for gated layers, add separate gate scalars to the main output
-            if irreps_nonscalars.num_irreps == 0:
-                modules.append(PermutationEquivariantLinear(in_irreps, out_irreps))
-                modules.append(e3nn.nn.Activation(irreps_scalars, act_scalars))
-            else:
-                modules.append(PermutationEquivariantGatedBlock(
-                    in_irreps,
-                    out_irreps,
-                    act_scalars,
-                    act_gates,
-                ))
+            modules.append(PermutationEquivariantGatedBlock(
+                in_irreps,
+                out_irreps,
+                parms["scalar_activation"   ],
+                parms["nonscalar_activation"]
+            ))
             
             if parms["dropout_probability"] > 0:
                 modules.append(e3nn.o3.Dropout(parms["dropout_probability"]))
