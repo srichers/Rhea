@@ -65,7 +65,7 @@ if __name__ == "__main__":
     parms["nhidden_stability"]     = 3
     parms["nhidden_growthrate"] = 3
     parms["nhidden_F4"]       = 3
-    parms["width_hidden"]        = 128
+    parms["irreps_hidden"]        = e3nn.o3.Irreps("4x0e + 4x1o")
     parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
     parms["do_layernorm"]= True
     parms["do_fdotu"]= True

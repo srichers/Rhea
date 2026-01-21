@@ -12,16 +12,20 @@ from torch import nn
 from ml_tools import restrict_F4_to_physical, ntotal
 from ml_tools import dot4, restrict_F4_to_physical, ntotal
 from torchview import draw_graph
+import e3nn.o3
+import e3nn.nn
 
 # define a permutation-equivariant message passing layer
 # 0 means flavor edge, 1 means neutrino/antineutrino edge
 class PermutationEquivariantLinear(nn.Module):
-    def __init__(self, width_in, width_out):
+    def __init__(self, irreps_in, irreps_out):
         super().__init__()
-        self.lin_self    = nn.Linear(width_in, width_out)
-        self.lin_flavor  = nn.Linear(width_in, width_out, bias=False)
-        self.lin_nunubar = nn.Linear(width_in, width_out, bias=False)
-        self.lin_all     = nn.Linear(width_in, width_out, bias=False)
+        self.irreps_in = irreps_in
+        self.irreps_out = irreps_out
+        self.lin_self    = e3nn.o3.Linear(irreps_in, irreps_out)
+        self.lin_flavor  = e3nn.o3.Linear(irreps_in, irreps_out)
+        self.lin_nunubar = e3nn.o3.Linear(irreps_in, irreps_out)
+        self.lin_all     = e3nn.o3.Linear(irreps_in, irreps_out)
 
     # x has shape [nsamples, nunubar, flavor, features]
     def forward(self, x):
@@ -46,10 +50,41 @@ class PermutationEquivariantLinear(nn.Module):
 
         # sum the contributions, using the residual connection when possible
         y = y_self + y_flavor + y_nunubar + y_all
-        if x.shape[-1] == y_self.shape[-1]:
+        if self.irreps_in == self.irreps_out:
             y = y + x
 
         return y
+
+class PermutationEquivariantGatedBlock(nn.Module):
+    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates):
+        super().__init__()
+        irreps_scalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l == 0)
+        irreps_nonscalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l > 0)
+        irreps_gates = e3nn.o3.Irreps(f"{irreps_nonscalars.num_irreps}x0e")
+
+        self.scalars_dim = irreps_scalars.dim
+        self.lin_main = PermutationEquivariantLinear(irreps_in, irreps_out)
+        self.lin_gates = PermutationEquivariantLinear(irreps_in, irreps_gates)
+        self.gate = e3nn.nn.Gate(
+            irreps_scalars = irreps_scalars,
+            act_scalars = act_scalars,
+            irreps_gates = irreps_gates,
+            act_gates = act_gates,
+            irreps_gated = irreps_nonscalars,
+        )
+
+    def forward(self, x):
+        # get the main output and the gates from seprate linear layers
+        y_main = self.lin_main(x)
+        y_gates = self.lin_gates(x)
+
+        # split the main output into scalars and non-scalars, then sandwich the gates to make expected input for e3nn Gate
+        y_scalars = y_main[..., :self.scalars_dim]
+        y_nonscalars = y_main[..., self.scalars_dim:]
+        y = torch.cat([y_scalars, y_gates, y_nonscalars], dim=-1)
+
+        # apply the gate
+        return self.gate(y)
     
 # define the NN model
 class NeuralNetwork(nn.Module):
@@ -73,54 +108,80 @@ class NeuralNetwork(nn.Module):
 
         # construct number of X and y values
         # one X for each pair of species, and one for each product with u
-        self.NX = 4
-        self.NY = 4
-
+        self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e")
+        
         # one y matrix for ndens, one for flux
         # add one extra to predict growth rate
         self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
         self.conserve_lepton_number = parms["conserve_lepton_number"]
 
         # append a full layer including linear, activation, and layernorm/dropout if desired
-        def append_full_layer(modules, in_dim, out_dim):
-            modules.append(PermutationEquivariantLinear(in_dim, out_dim))
-            if parms["do_layernorm"]:
-                modules.append(nn.LayerNorm(out_dim))
-            modules.append(parms["activation"]())
+        def append_full_layer(modules, in_irreps, out_irreps):
+            # make sure the irreps are scalar first to make sure it is consistent with the output of Gate
+            assert parms["irreps_hidden"] == parms["irreps_hidden"].sort().irreps, "Hidden irreps must have scalars first"
+
+            # get the scalar and non-scalar irreps
+            irreps_scalars = out_irreps.filter(lambda mul_ir: mul_ir.ir.l == 0)
+            irreps_nonscalars = out_irreps.filter(lambda mul_ir: mul_ir.ir.l > 0)
+
+            # define the activations
+            act_scalars = [parms["scalar_activation"   ]] * len(irreps_scalars)
+            act_gates   = [parms["nonscalar_activation"]] * len(irreps_nonscalars)
+
+            # some sanity checks
+            assert len(act_scalars) == len(irreps_scalars)
+            assert len(act_gates)   == len(irreps_nonscalars)
+
+            #TODO add layernorm?
+
+            # for gated layers, add separate gate scalars to the main output
+            if irreps_nonscalars.num_irreps == 0:
+                modules.append(PermutationEquivariantLinear(in_irreps, out_irreps))
+                modules.append(e3nn.nn.Activation(irreps_scalars, act_scalars))
+            else:
+                modules.append(PermutationEquivariantGatedBlock(
+                    in_irreps,
+                    out_irreps,
+                    act_scalars,
+                    act_gates,
+                ))
+            
             if parms["dropout_probability"] > 0:
-                modules.append(nn.Dropout(parms["dropout_probability"]))
+                modules.append(e3nn.o3.Dropout(parms["dropout_probability"]))
+        
+        # set up shared layers
+        def build_shared(modules_shared):
+            if parms["nhidden_shared"] > 0:
+                append_full_layer(modules_shared, self.irreps_in, parms["irreps_hidden"])
+                for i in range(parms["nhidden_shared"]):
+                    append_full_layer(modules_shared, parms["irreps_hidden"], parms["irreps_hidden"])
+            else:
+                modules_shared.append(nn.Identity())
+
+        # set up task-specific layers
+        def build_task(modules_task, nhidden_task, irreps_final):
+            # the width at the beginning of the task is NX if no shared layers, otherwise it's the shared width
+            irreps_start = self.irreps_in if parms["nhidden_shared"] == 0 else parms["irreps_hidden"]
+
+            # if no hidden layers, just do linear from start to final
+            if nhidden_task == 0:
+                modules_task.append(PermutationEquivariantLinear(irreps_start, irreps_final))
+            # otherwise, build the full set of hidden layers
+            else:
+                append_full_layer(modules_task, irreps_start, parms["irreps_hidden"])
+                for _ in range(nhidden_task-1):
+                    append_full_layer(modules_task, parms["irreps_hidden"], parms["irreps_hidden"])
+                modules_task.append(PermutationEquivariantLinear(parms["irreps_hidden"], irreps_final))
 
         # put together the layers of the neural network
         modules_shared = []
         modules_stability = []
         modules_growthrate = []
         modules_F4 = []
-        
-        # set up shared layers
-        if parms["nhidden_shared"] > 0:
-            append_full_layer(modules_shared, self.NX, parms["width_hidden"])
-            for i in range(parms["nhidden_shared"]):
-                append_full_layer(modules_shared, parms["width_hidden"], parms["width_hidden"])
-        else:
-            modules_shared.append(nn.Identity())
-
-        def build_task(modules_task, nhidden_task, width_final):
-            # the width at the beginning of the task is NX if no shared layers, otherwise it's the shared width
-            width_start = self.NX if parms["nhidden_shared"] == 0 else parms["width_hidden"]
-
-            # if no hidden layers, just do linear from start to final
-            if nhidden_task == 0:
-                modules_task.append(PermutationEquivariantLinear(width_start, width_final))
-            # otherwise, build the full set of hidden layers
-            else:
-                append_full_layer(modules_task, width_start, parms["width_hidden"])
-                for _ in range(nhidden_task-1):
-                    append_full_layer(modules_task, parms["width_hidden"], parms["width_hidden"])
-                modules_task.append(PermutationEquivariantLinear(parms["width_hidden"], width_final))
-
-        build_task(modules_stability,  parms["nhidden_stability"],  1      )
-        build_task(modules_growthrate, parms["nhidden_growthrate"], 1      )
-        build_task(modules_F4,         parms["nhidden_F4"],         self.NY)
+        build_shared(modules_shared)
+        build_task(modules_stability,  parms["nhidden_stability"],  e3nn.o3.Irreps("1x0e"       ))
+        build_task(modules_growthrate, parms["nhidden_growthrate"], e3nn.o3.Irreps("1x0e"       ))
+        build_task(modules_F4,         parms["nhidden_F4"],         e3nn.o3.Irreps("1x1o + 1x0e"))
 
         # turn the list of modules into a sequential model
         self.linear_activation_stack_shared     = nn.Sequential(*modules_shared)
@@ -131,21 +192,17 @@ class NeuralNetwork(nn.Module):
         # initialize the weights
         torch.manual_seed(parms["random_seed"])
         np.random.seed(parms["random_seed"])
-        self.linear_activation_stack_shared.apply(self._init_weights)
-        self.linear_activation_stack_stability.apply(self._init_weights)
-        self.linear_activation_stack_growthrate.apply(self._init_weights)
-        self.linear_activation_stack_F4.apply(self._init_weights)
 
         # print the model structure
         print(self)
-        graph = draw_graph(self, torch.zeros((1, 2, self.NF, 4)))
-        graph.visual_graph.render("nn_model_structure", format="pdf", cleanup=True)
+        #graph = draw_graph(self, torch.zeros((1, 2, self.NF, 4)))
+        #graph.visual_graph.render("nn_model_structure", format="pdf", cleanup=True)
 
-    def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
-            torch.nn.init.kaiming_normal_(module.weight)
-            if module.bias is not None:
-                module.bias.data.zero_()
+    #def _init_weights(self, module):
+    #    if isinstance(module, nn.Linear):
+    #        torch.nn.init.kaiming_normal_(module.weight)
+    #        if module.bias is not None:
+    #            module.bias.data.zero_()
     
     
     # convert the 3-flavor matrix into an effective 2-flavor matrix
