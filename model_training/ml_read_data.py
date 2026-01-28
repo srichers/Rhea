@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 import torch
 import ml_tools as ml
 import sys
+import ml_constants as const
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
@@ -24,16 +25,21 @@ def read_asymptotic_data(parms):
     dataset_train_list = []
     dataset_test_list = []
     rng = torch.Generator().manual_seed(parms["random_seed"])
-    for d in parms["database_list"]:
+    for dind,d in enumerate(parms["database_list"]):
+        print()
+        print(dind,d)
         # read from file
         with h5py.File(d,"r") as f_in:
-            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]) # [simulationIndex, xyzt, nu/nubar, flavor]
-            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...])
+            # File contains [simulationIndex, xyzt, nu/nubar, flavor]
+            # We want [simulationIndex, nu/nubar, flavor, xyzt]
+            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1) 
+            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
             growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
             assert(parms["NF"] == int(np.array(f_in["nf"])) )
-            assert(torch.all(F4_initial==F4_initial))
-            assert(torch.all(F4_final==F4_final))
-            assert(torch.all(growthrate==growthrate))
+            assert(torch.all(torch.isfinite(F4_initial)))
+            assert(torch.all(torch.isfinite(F4_final)))
+            assert(torch.all(torch.isfinite(growthrate)))
+        print("#   ",len(F4_initial),"points in",d)
 
         # downsample to less data
         if parms["samples_per_database"]>0:
@@ -43,15 +49,37 @@ def read_asymptotic_data(parms):
             F4_final   = F4_final  [random_indices,...]
             growthrate = growthrate[random_indices,...]
 
-        print("# ",len(F4_initial),"points in",d)
+        print("#   ",len(F4_initial),"points in resampled dataset")
+
+        # normalize by ntot
+        ntot = ml.ntotal(F4_initial)
+        F4_initial = F4_initial / ntot[:,None,None,None] # dimensionless
+        F4_final   = F4_final   / ntot[:,None,None,None] # dimensionless
+        growthrate = growthrate / (ntot*const.ndens_to_invsec) # dimensionless
+
+        # normalize final data, since it can have a larger error
+        ntot_final = ml.ntotal(F4_final)
+        assert torch.allclose(ntot_final, torch.ones_like(ntot_final), atol=1e-3)
+        F4_final = F4_final / ntot_final[:,None,None,None] # dimensionless
+
+        # report stats after normalization
+        ntot_initial = ml.ntotal(F4_initial)
+        ntot_final = ml.ntotal(F4_final)
+        print("#    ntot_initial min/max after normalization:", ntot_initial.min().item(), ntot_initial.max().item())
+        print("#    ntot_final min/max after normalization:", ntot_final.min().item(), ntot_final.max().item())
+        print("#    growthrate min/max after normalization:", growthrate.min().item(), growthrate.max().item())
+
+        assert torch.allclose(ntot_initial, torch.ones_like(ntot_initial))
+        assert torch.allclose(ntot_final, torch.ones_like(ntot_final))
+        assert torch.all(torch.isfinite(growthrate))
+        assert torch.all(growthrate > 0)
 
         # fix slightly negative energy densities
-        ntot = ml.ntotal(F4_initial)
-        ndens = F4_initial[:,3,:,:]
+        ndens = F4_initial[:,:,:,3]
         badlocs = torch.where(ndens < 0)
-        assert(torch.all(ndens/ntot[:,None,None] > -1e10))
+        assert(torch.all(ndens > -1e10))
         for i in range(4):
-            F4_initial[:,i,:,:][badlocs] = 0
+            F4_initial[:,:,:,i][badlocs] = 0
 
         # make sure the data are good
         ml.check_conservation(F4_initial, F4_final)
@@ -59,27 +87,18 @@ def read_asymptotic_data(parms):
 
         # average heavies if necessary
         if parms["average_heavies_in_final_state"]:
-            assert(parms["do_augment_permutation"]==False)
-            assert(torch.allclose( torch.mean(F4_initial[:,:,:,1:], dim=3), F4_initial[:,:,:,1] ))
-            F4_final[:,:,:,1:] = torch.mean(F4_final[:,:,:,1:], dim=3, keepdim=True)
-
-        # split into training and testing sets
-        F4i_train, F4i_test, F4f_train, F4f_test, growthrate_train, growthrate_test = train_test_split(F4_initial, F4_final, growthrate, test_size=parms["test_size"], random_state=parms["random_seed"])
-
-        if parms["do_augment_permutation"]:
-            F4i_train = ml.augment_permutation(F4i_train)
-            F4f_train = ml.augment_permutation(F4f_train)
-            F4i_test  = ml.augment_permutation(F4i_test )
-            F4f_test  = ml.augment_permutation(F4f_test )
-            growthrate_train = ml.augment_permutation(growthrate_train)
-            growthrate_test = ml.augment_permutation(growthrate_test)
+            assert(torch.allclose( torch.mean(F4_initial[:,:,1:,:], dim=2), F4_initial[:,:,1,:] ))
+            F4_final[:,:,1:,:] = torch.mean(F4_final[:,:,1:,:], dim=2, keepdim=True)
 
         # add dataset to the lists
-        dataset_train_list.append( TensorDataset(F4i_train, F4f_train, growthrate_train) )
-        dataset_test_list.append(  TensorDataset(F4i_test , F4f_test , growthrate_test ) )
+        if dind==0:
+            dataset_test_list.append( TensorDataset(F4_initial, F4_final, growthrate) )
+        else:
+            dataset_train_list.append(TensorDataset(F4_initial, F4_final, growthrate) )
 
-    print("#    Train:",[len(d) for d in dataset_train_list])
-    print("#    Test:",[len(d) for d in dataset_test_list])
+    print()
+    print("# Asymptotic Train:",[len(d) for d in dataset_train_list])
+    print("# Asymptotic Test:",[len(d) for d in dataset_test_list])
     
     return dataset_train_list, dataset_test_list
 
@@ -87,23 +106,25 @@ def read_asymptotic_data(parms):
 # read in the stable points from the NSM snapshot #
 #=================================================#
 def read_stable_data(parms):
-    F4_collected = np.zeros((0, 4, 2, parms["NF"]))
-    stable_collected = np.zeros((0))
 
     dataset_train_list = []
     dataset_test_list = []
     
     rng = torch.Generator().manual_seed(parms["random_seed"])
-    for filename in parms["stable_database_list"]:
+    for i,filename in enumerate(parms["stable_database_list"]):
+        print()
+        print(i,filename)
         with h5py.File(filename,"r") as f_in:
-            F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...]))
+            # File contains [simulationIndex, xyzt, nu/nubar, flavor]
+            # We want [simulationIndex, nu/nubar, flavor, xyzt]
+            F4 = torch.squeeze(torch.Tensor(f_in["F4_initial(1|ccm)"][...])).permute(0,2,3,1)
             stable = torch.squeeze(torch.Tensor(f_in["stable"][...]))
-            assert(torch.all(F4==F4))
+            assert(torch.all(torch.isfinite(F4)==torch.isfinite(F4)))
             assert(torch.all(stable==stable))
 
         # print number of points
-        print("# ",len(stable),"points in",filename)
-        print("#   ",sum(stable).item(),"points are stable.")
+        print("#   ",len(stable),"points in",filename)
+        print("#   ",torch.sum(stable).item(),"points are stable.")
 
         # downsample to less data
         if parms["samples_per_database"]>0:
@@ -111,24 +132,24 @@ def read_stable_data(parms):
             random_indices = torch.randperm(len(stable), generator=rng)[:parms["samples_per_database"]]
             F4 = F4[random_indices,...]
             stable = stable[random_indices]
-            print("#   ",sum(stable).item(),"points are stable.")
-
-        # split into training and testing sets
-        F4_train, F4_test, stable_train, stable_test = train_test_split(F4, stable, test_size=parms["test_size"], random_state=parms["random_seed"])
-
-        # don't need the final values because they are the same as the initial
-        if parms["do_augment_permutation"]:
-            F4_train = ml.augment_permutation(F4_train)
-            F4_test = ml.augment_permutation(F4_test)
-            stable_train = ml.augment_permutation(stable_train)
-            stable_test = ml.augment_permutation(stable_test)
-
-        dataset_train_list.append( TensorDataset(F4_train, stable_train) )
-        dataset_test_list.append(  TensorDataset(F4_test , stable_test ) )
+            print("#   ",torch.sum(stable).item(),"points are stable.")
         
-    print("#  Train:",[len(d) for d in dataset_train_list])
-    print("#  Test:",[len(d) for d in dataset_test_list])
-    
+        # normalize by ntot
+        ntot = ml.ntotal(F4)
+        assert(torch.all(ntot > 0))
+        assert(torch.all(torch.isfinite(ntot)))
+        F4 = F4 / ntot[:,None,None,None]
+        ntot_new = ml.ntotal(F4)
+        assert(torch.allclose(ntot_new, torch.ones_like(ntot_new)))
+
+        if i==0:
+            dataset_test_list.append(TensorDataset(F4, stable))
+        else:
+            dataset_train_list.append(TensorDataset(F4, stable))
+
+    print("# Stability Train:",[len(d) for d in dataset_train_list])
+    print("# Stability Test:",[len(d) for d in dataset_test_list])
+
     return dataset_train_list, dataset_test_list
 
 if __name__ == "__main__":
@@ -138,7 +159,6 @@ if __name__ == "__main__":
         "stable_database_list" : ["/mnt/scratch/srichers/software/Rhea/model_training/data/stable_oneflavor.h5"],
         "test_size" : 0.1,
         "random_seed" : 42,
-        "do_augment_permutation" : False,
         "average_heavies_in_final_state" : False,
         "device" : 'cpu'
     }

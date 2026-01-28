@@ -35,9 +35,9 @@ int main(int argc, const char* argv[]){
   //==================================================//
   // Create a sample tensor to pass through the model //
   //==================================================//
-  // dimensions are [ngridzones, xyzt, nu/nubar, NF]
+  // dimensions are [ngridzones, nu/nubar, NF, xyzt]
   const int ngridzones = 1;
-  torch::Tensor F4_in = torch::zeros({ngridzones,4,2,3}, options);
+  torch::Tensor F4_in = torch::zeros({ngridzones,2,3,4}, options);
   std::cout << "tensor device: " << F4_in.device() << std::endl;
   std::cout << std::endl;
   // Fiducial
@@ -45,37 +45,37 @@ int main(int argc, const char* argv[]){
   //F4_in.index_put_({Slice(), 3, 1, 0},  1.0  );
   //F4_in.index_put_({Slice(), 2, 0, 0},  1./3.);
   //F4_in.index_put_({Slice(), 2, 1, 0}, -1./3.);
-  F4_in.index_put_({Slice(), 3, 0, 0},  1.4220e+33  ); //Nee
-  F4_in.index_put_({Slice(), 3, 1, 0},  1.9146e+33  ); //Neebar
-  F4_in.index_put_({Slice(), 3, 0, 1},  4.9113e+32  ); //Nmumu
-  F4_in.index_put_({Slice(), 3, 1, 1},  4.9113e+32  ); //Nmumubar
-  F4_in.index_put_({Slice(), 3, 0, 2},  4.9113e+32  ); //Ntautau
-  F4_in.index_put_({Slice(), 3, 1, 2},  4.9113e+32  ); //Ntautaubar
+  F4_in.index_put_({Slice(), 0, 0, 3},  1.4220e+33  ); //Nee
+  F4_in.index_put_({Slice(), 1, 0, 3},  1.9146e+33  ); //Neebar
+  F4_in.index_put_({Slice(), 0, 1, 3},  4.9113e+32  ); //Nmumu
+  F4_in.index_put_({Slice(), 1, 1, 3},  4.9113e+32  ); //Nmumubar
+  F4_in.index_put_({Slice(), 0, 2, 3},  4.9113e+32  ); //Ntautau
+  F4_in.index_put_({Slice(), 1, 2, 3},  4.9113e+32  ); //Ntautaubar
 
   F4_in.index_put_({Slice(), 0, 0, 0},  1.3850e+32  ); //Fee_x
-  F4_in.index_put_({Slice(), 0, 1, 0},  1.3843e+32  ); //Feebar_x
-  F4_in.index_put_({Slice(), 0, 0, 1},  -1.0608e+31 ); //Fmumu_x
-  F4_in.index_put_({Slice(), 0, 1, 1},  -1.0608e+31 ); //Fmumubar_x
-  F4_in.index_put_({Slice(), 0, 0, 2},  -1.0608e+31 ); //Ftautau_x
-  F4_in.index_put_({Slice(), 0, 1, 2},  -1.0608e+31 ); //Ftautaubar_x
+  F4_in.index_put_({Slice(), 1, 0, 0},  1.3843e+32  ); //Feebar_x
+  F4_in.index_put_({Slice(), 0, 1, 0},  -1.0608e+31 ); //Fmumu_x
+  F4_in.index_put_({Slice(), 1, 1, 0},  -1.0608e+31 ); //Fmumubar_x
+  F4_in.index_put_({Slice(), 0, 2, 0},  -1.0608e+31 ); //Ftautau_x
+  F4_in.index_put_({Slice(), 1, 2, 0},  -1.0608e+31 ); //Ftautaubar_x
   
-  F4_in.index_put_({Slice(), 1, 0, 0},  5.9866e+31  ); //Fee_y
-  F4_in.index_put_({Slice(), 1, 1, 0},  5.9927e+31  ); //Feebar_y
-  F4_in.index_put_({Slice(), 1, 0, 1},  3.6491e+31  ); //Fmumu_y
+  F4_in.index_put_({Slice(), 0, 0, 1},  5.9866e+31  ); //Fee_y
+  F4_in.index_put_({Slice(), 1, 0, 1},  5.9927e+31  ); //Feebar_y
+  F4_in.index_put_({Slice(), 0, 1, 1},  3.6491e+31  ); //Fmumu_y
   F4_in.index_put_({Slice(), 1, 1, 1},  3.6491e+31  ); //Fmumubar_y
-  F4_in.index_put_({Slice(), 1, 0, 2},  3.6491e+31  ); //Ftautau_y
-  F4_in.index_put_({Slice(), 1, 1, 2},  3.6491e+31  ); //Ftautaubar_y
+  F4_in.index_put_({Slice(), 0, 2, 1},  3.6491e+31  ); //Ftautau_y
+  F4_in.index_put_({Slice(), 1, 2, 1},  3.6491e+31  ); //Ftautaubar_y
   
-  F4_in.index_put_({Slice(), 2, 0, 0},  -1.9097e+32  ); //Fee_z
-  F4_in.index_put_({Slice(), 2, 1, 0},  -6.5977e+32  ); //Feebar_z
-  F4_in.index_put_({Slice(), 2, 0, 1},  -2.6295e+32  ); //Fmumu_z
-  F4_in.index_put_({Slice(), 2, 1, 1},  -2.6295e+32  ); //Fmumubar_z
-  F4_in.index_put_({Slice(), 2, 0, 2},  -2.6295e+32  ); //Ftautau_z
-  F4_in.index_put_({Slice(), 2, 1, 2},  -2.6295e+32  ); //Ftautaubar_z*/
+  F4_in.index_put_({Slice(), 0, 0, 2},  -1.9097e+32  ); //Fee_z
+  F4_in.index_put_({Slice(), 1, 0, 2},  -6.5977e+32  ); //Feebar_z
+  F4_in.index_put_({Slice(), 0, 1, 2},  -2.6295e+32  ); //Fmumu_z
+  F4_in.index_put_({Slice(), 1, 1, 2},  -2.6295e+32  ); //Fmumubar_z
+  F4_in.index_put_({Slice(), 0, 2, 2},  -2.6295e+32  ); //Ftautau_z
+  F4_in.index_put_({Slice(), 1, 2, 2},  -2.6295e+32  ); //Ftautaubar_z*/
 
   std::cout << std::endl;
   std::cout << "Input number densities" << std::endl;
-  std::cout << F4_in.index({0,3,Slice(),Slice()}) << std::endl;
+  std::cout << F4_in.index({0,Slice(),Slice(),3}) << std::endl;
 
   // fetch output
   torch::IValue output = model.model.get_method("predict_all")({F4_in});
@@ -90,7 +90,7 @@ int main(int argc, const char* argv[]){
 
   std::cout << std::endl;
   std::cout << "Output number densities" << std::endl;
-  std::cout << F4_out.index({0,3,Slice(),Slice()}) << std::endl;
+  std::cout << F4_out.index({0,Slice(),Slice(),3}) << std::endl;
   std::cout << "Stability: " << stability << std::endl;
   std::cout << "logGrowthRate: " << torch::exp(logGrowthRate) << std::endl;
   std::cout << std::endl << "==========================" << std::endl;
