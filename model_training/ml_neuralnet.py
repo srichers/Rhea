@@ -303,10 +303,11 @@ class NeuralNetwork(nn.Module):
             F4_out[:,1,:,0] += ELN_excess / 2.0
 
         # pool over features to get permutation-invariant output
+        # Averaging over nodes in the graph
         y_stability = torch.mean(y_stability, dim=(1,2))
         y_growthrate = torch.mean(y_growthrate, dim=(1,2))
 
-        # apply sigmoid to stability logits
+        # squeeze stability logit (NOT passed through sigmoid yet)
         stability = torch.squeeze(y_stability)
 
         # apply total density scaling to log growth rate
