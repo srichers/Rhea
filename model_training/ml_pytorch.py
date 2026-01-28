@@ -42,15 +42,17 @@ if __name__ == "__main__":
     parms["epochs"] = 10
     parms["output_every"] = 10
     parms["average_heavies_in_final_state"] = False
-    parms["conserve_lepton_number"] = "direct"
+    parms["conserve_lepton_number"] = True
     parms["random_seed"] = 42
     parms["loader.batch_size"] = 10
     parms["loader.num_workers"] = 1
     parms["loader.prefetch_factor"] = 1
     parms["sampler"] = torch.utils.data.WeightedRandomSampler # WeightedRandomSampler, SequentialSampler
     parms["weightedrandomsampler.epoch_num_samples"] = 10 #parms["samples_per_database"]
+    parms["scalar_activation"] = nn.functional.silu
+    parms["nonscalar_activation"] = torch.sigmoid
     
-    parms["do_learn_task_weights"] = True
+    parms["do_learn_task_weights"] = False
     parms["task_weight_stability"] = 1.0
     parms["task_weight_F4"] = 1.0
     parms["task_weight_unphysical"] = 1
@@ -67,7 +69,7 @@ if __name__ == "__main__":
     parms["nhidden_F4"]       = 3
     parms["irreps_hidden"]        = e3nn.o3.Irreps("4x0e + 4x1o")
     parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
-    parms["do_layernorm"]= True
+    parms["do_layernorm"]= False
     parms["do_fdotu"]= True
     parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 
