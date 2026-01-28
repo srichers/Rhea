@@ -78,3 +78,75 @@ print("Emu expected:")
 print(" [[ 9.95460068e+32  7.85471511e+32  6.23293031e+32]")
 print("  [ 1.48812960e+33  7.85471511e+32  6.23293016e+32]]")
 
+# check rotational equivariance on the spatial components by swapping the x and y components
+print()
+print("###############################")
+print("# Testing rotational equivariance #")
+print("###############################")
+before_rotated = before.clone()
+before_rotated[:,:,:,0] = before[:,:,:,1]
+before_rotated[:,:,:,1] = before[:,:,:,0]
+after_rotated = after.clone()
+after_rotated[:,:,:,0] = after[:,:,:,1]
+after_rotated[:,:,:,1] = after[:,:,:,0]
+after2, growthrate2, stable2 = model.predict_all(before_rotated)
+print()
+print("Stability prediction (rotated):", stable2)
+print("equivariance_error =", torch.max(torch.abs(stable - stable2)).item())
+print()
+print("Growthrate prediction (rotated):", growthrate2)
+print("equivariance_error =", torch.max(torch.abs(growthrate - growthrate2)).item())
+print()
+print("N predicted (rotated)")
+print(after2[0,:,:,3])
+print("equivariance_error =", torch.max(torch.abs(after_rotated - after2)).item())
+print()
+
+
+# check permutation invariance by swapping nu and nubar
+print()
+print("###############################")
+print("# Testing nu/nubar permutation invariance #")
+print("###############################")
+before_permuted = before.clone()
+before_permuted[:,0,:,:] = before[:,1,:,:]
+before_permuted[:,1,:,:] = before[:,0,:,:]
+after_permuted = after.clone()
+after_permuted[:,0,:,:] = after[:,1,:,:]
+after_permuted[:,1,:,:] = after[:,0,:,:]
+after3, growthrate3, stable3 = model.predict_all(before_permuted)
+print()
+print("Stability prediction (permuted):", stable3)
+print("invariance_error =", torch.max(torch.abs(stable - stable3)).item())
+print()
+print("Growthrate prediction (permuted):", growthrate3)
+print("invariance_error =", torch.max(torch.abs(growthrate - growthrate3)).item())
+print()
+print("N predicted (permuted)")
+print(after3[0,:,:,3])
+print("invariance_error =", torch.max(torch.abs(after_permuted - after3)).item())
+print()
+
+# check flavor permutation invariance by swapping flavor 0 and flavor 1
+print()
+print("###############################")
+print("# Testing flavor permutation invariance #")
+print("###############################")
+before_flavor_permuted = before.clone()
+before_flavor_permuted[:, :, 0, :] = before[:, :, 1, :]
+before_flavor_permuted[:, :, 1, :] = before[:, :, 0, :]
+after_flavor_permuted = after.clone()
+after_flavor_permuted[:, :, 0, :] = after[:, :, 1, :]
+after_flavor_permuted[:, :, 1, :] = after[:, :, 0, :]
+after4, growthrate4, stable4 = model.predict_all(before_flavor_permuted)
+print()
+print("Stability prediction (flavor permuted):", stable4)
+print("invariance_error =", torch.max(torch.abs(stable - stable4)).item())
+print()
+print("Growthrate prediction (flavor permuted):", growthrate4)
+print("invariance_error =", torch.max(torch.abs(growthrate - growthrate4)).item())
+print()
+print("N predicted (flavor permuted)")
+print(after4[0,:,:,3])
+print("invariance_error =", torch.max(torch.abs(after_flavor_permuted - after4)).item())
+print()
