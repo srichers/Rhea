@@ -11,7 +11,7 @@ import numpy as np
 from torch import nn
 from ml_tools import restrict_F4_to_physical, ntotal
 from ml_tools import dot4, restrict_F4_to_physical, ntotal
-from torchview import draw_graph
+import ml_constants as const
 import e3nn.o3
 import e3nn.nn
 
@@ -137,8 +137,9 @@ class PermutationEquivariantGatedBlock(nn.Module):
 
         # apply the gate. If input and output irreps are the same, add residual connection
         y = self.gate(y)
-        if self.irreps_in == self.irreps_out:
-            y = x + y
+        #TODO implement residual connection - the below fails during scripting
+        #if self.irreps_in == self.irreps_out:
+        #    y = x + y
         return y
     
 # define the NN model
@@ -271,6 +272,10 @@ class NeuralNetwork(nn.Module):
         # get the total density
         nsims = F4_in.shape[0]
         F4_in = F4_in.view((nsims,2,self.NF,4))
+        ntot = ntotal(F4_in) # [nsims]
+
+        # normalize the inputs by the total density
+        F4_in = F4_in / ntot[:,None,None,None]
 
         # propagate through the network
         y_F4, y_growthrate, y_stability = self.forward(F4_in)
@@ -306,6 +311,10 @@ class NeuralNetwork(nn.Module):
 
         # apply total density scaling to log growth rate
         growthrate = torch.squeeze(y_growthrate)
+
+        # rescale F4_out to the original total density
+        F4_out = F4_out * ntot[:,None,None,None]
+        growthrate = growthrate * ntot*const.ndens_to_invsec
 
         #assert torch.all(torch.isfinite(F4_out))
         #assert torch.all(torch.isfinite(growthrate))

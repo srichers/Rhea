@@ -9,6 +9,7 @@ This file contains a variety of utilities used in the model training process.
 import numpy as np
 import torch
 import e3nn
+from e3nn.util.jit import script, trace
 import copy
 
 # set e3nn to trace without scripting. Scripting e3nn seems to make it fail
@@ -83,17 +84,6 @@ def restrict_F4_to_physical(F4_final):
 
 def save_model(model, outfilename, device, F4i_test):
     with torch.no_grad():
-        # run around tracing/scripting issues by creating a copy of the model and turning off gradients
-        model_to_trace = copy.deepcopy(model)
-        model_to_trace.eval()
-        model_to_trace.to(device)
-        for param in model_to_trace.parameters():
-            param.requires_grad_(False)
-
-        # evaluate the trace
-        example = F4i_test[:1].to(device)
-        def forward_fn(x):
-            return model_to_trace(x)
-        traced_fn = torch.jit.trace(forward_fn, example, strict=False)
-        torch.jit.save(traced_fn, outfilename+"_"+device+".pt")
+        scripted_model = e3nn.util.jit.script(model)
+        torch.jit.save(scripted_model, outfilename+"_"+device+".pt")
         print("Saving to",outfilename+"_"+device+".pt")

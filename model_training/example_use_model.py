@@ -52,12 +52,14 @@ F4_test[1, :, 1:] = 0.0743 * F4_test[3, 0, 1]
 F4_test[2, :, 1:] = -0.5354 * F4_test[3, 0, 1]
 
 # set the tensor to have the correct dimensions (first index is used to evaluate many data points at the same time)
+# we want to shuffle to get the index ordering [simulationIndex, nu/nubar, flavor, xyzt]
 before = torch.Tensor(F4_test[None,:,:,:]).to(device)
+before = before.permute(0,2,3,1) # [sim, nu/nubar, flavor, xyzt]
 
 # print the number densities of each species before transforming
 print()
 print("N initial")
-print(before[0,3])
+print(before[0,:,:,3])
 
 # print the number densities predicted by the ML model
 after, growthrate, stable = model.predict_all(before)
@@ -66,8 +68,9 @@ print("Stability prediction:", stable)
 print()
 print("Growthrate prediction:", growthrate)
 print()
+
 print("N predicted")
-print(after[0,3])
+print(after[0,:,:,3])
 
 # print the number densities predicted by Emu
 print()
