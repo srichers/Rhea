@@ -152,11 +152,7 @@ class NeuralNetwork(nn.Module):
 
         # store input arguments
         self.NF = parms["NF"]
-        # allow legacy configs that used do_layernorm
-        do_batchnorm = parms.get("do_batchnorm", parms.get("do_layernorm", False))
-        # optionally scale predicted growthrate back to physical units
-        # default False because growthrate labels are already normalized in the dataset
-        self.scale_growthrate_by_ntot = parms.get("scale_growthrate_by_ntot", False)
+        do_batchnorm = parms.get("do_batchnorm", False)
 
         # store loss weight parameters for tasks
         if parms["do_learn_task_weights"]:
@@ -320,8 +316,8 @@ class NeuralNetwork(nn.Module):
 
         # rescale F4_out to the original total density
         F4_out = F4_out * ntot[:,None,None,None]
-        if self.scale_growthrate_by_ntot:
-            growthrate = growthrate * ntot*const.ndens_to_invsec
+        # always return growthrate in physical units (1/s)
+        growthrate = growthrate * ntot*const.ndens_to_invsec
 
         #assert torch.all(torch.isfinite(F4_out))
         #assert torch.all(torch.isfinite(growthrate))

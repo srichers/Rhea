@@ -158,8 +158,8 @@ def train_asymptotic_model(parms,
             ntot_f = ntotal(F4f_true_train)
             ntot_p = ntotal(F4f_pred_train)
             #print("ntot_pred min/max:", ntot_p.min().item(), ntot_p.max().item())
-            assert(torch.allclose(ntot_i, torch.ones_like(ntot_i)))
-            assert(torch.allclose(ntot_f, torch.ones_like(ntot_f)))
+            assert torch.all(ntot_i > 0)
+            assert torch.all(ntot_f > 0)
 
             # reset the loss and gradients
             optimizer.zero_grad()

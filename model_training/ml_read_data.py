@@ -12,7 +12,6 @@ from sklearn.model_selection import train_test_split
 import torch
 import ml_tools as ml
 import sys
-import ml_constants as const
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
@@ -51,26 +50,15 @@ def read_asymptotic_data(parms):
 
         print("#   ",len(F4_initial),"points in resampled dataset")
 
-        # normalize by ntot
-        ntot = ml.ntotal(F4_initial)
-        F4_initial = F4_initial / ntot[:,None,None,None] # dimensionless
-        F4_final   = F4_final   / ntot[:,None,None,None] # dimensionless
-        growthrate = growthrate / (ntot*const.ndens_to_invsec) # dimensionless
-
-        # normalize final data, since it can have a larger error
-        ntot_final = ml.ntotal(F4_final)
-        assert torch.allclose(ntot_final, torch.ones_like(ntot_final), atol=1e-3)
-        F4_final = F4_final / ntot_final[:,None,None,None] # dimensionless
-
-        # report stats after normalization
+        # compute stats (all physical units)
         ntot_initial = ml.ntotal(F4_initial)
         ntot_final = ml.ntotal(F4_final)
-        print("#    ntot_initial min/max after normalization:", ntot_initial.min().item(), ntot_initial.max().item())
-        print("#    ntot_final min/max after normalization:", ntot_final.min().item(), ntot_final.max().item())
-        print("#    growthrate min/max after normalization:", growthrate.min().item(), growthrate.max().item())
+        print("#    ntot_initial min/max (physical):", ntot_initial.min().item(), ntot_initial.max().item())
+        print("#    ntot_final min/max (physical):", ntot_final.min().item(), ntot_final.max().item())
+        print("#    growthrate min/max (physical 1/s):", growthrate.min().item(), growthrate.max().item())
 
-        assert torch.allclose(ntot_initial, torch.ones_like(ntot_initial))
-        assert torch.allclose(ntot_final, torch.ones_like(ntot_final))
+        assert torch.all(ntot_initial > 0)
+        assert torch.all(ntot_final > 0)
         assert torch.all(torch.isfinite(growthrate))
         assert torch.all(growthrate > 0)
 
@@ -134,13 +122,10 @@ def read_stable_data(parms):
             stable = stable[random_indices]
             print("#   ",torch.sum(stable).item(),"points are stable.")
         
-        # normalize by ntot
+        # basic sanity checks (physical units)
         ntot = ml.ntotal(F4)
         assert(torch.all(ntot > 0))
         assert(torch.all(torch.isfinite(ntot)))
-        F4 = F4 / ntot[:,None,None,None]
-        ntot_new = ml.ntotal(F4)
-        assert(torch.allclose(ntot_new, torch.ones_like(ntot_new)))
 
         if i==0:
             dataset_test_list.append(TensorDataset(F4, stable))
@@ -170,4 +155,3 @@ if __name__ == "__main__":
     print("#  reading stable dataset")
     F4_train, F4_test, stable_train, stable_test = read_stable_data(parms)
     print("# ",F4_train.shape, F4_test.shape, stable_train.shape, stable_test.shape)
-
