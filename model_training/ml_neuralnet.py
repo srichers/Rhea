@@ -18,11 +18,11 @@ import e3nn.nn
 # define a permutation-equivariant message passing layer
 # 0 means flavor edge, 1 means neutrino/antineutrino edge
 class PermutationEquivariantLinear(nn.Module):
-    def __init__(self, irreps_in, irreps_out, do_layernorm=False):
+    def __init__(self, irreps_in, irreps_out, do_batchnorm=False):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
-        self.layernorm = e3nn.nn.LayerNorm(irreps_in) if do_layernorm else None
+        self.batchnorm = e3nn.nn.BatchNorm(irreps_in) if do_batchnorm else None
         self.lin_self    = e3nn.o3.Linear(irreps_in, irreps_out)
         self.lin_flavor  = e3nn.o3.Linear(irreps_in, irreps_out)
         self.lin_nunubar = e3nn.o3.Linear(irreps_in, irreps_out)
@@ -44,11 +44,11 @@ class PermutationEquivariantLinear(nn.Module):
         x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
 
         # optional per-irrep normalization before the linear maps
-        if self.layernorm is not None:
-            x_self = self.layernorm(x_self)
-            x_flavor = self.layernorm(x_flavor)
-            x_nunubar = self.layernorm(x_nunubar)
-            x_all = self.layernorm(x_all)
+        if self.batchnorm is not None:
+            x_self = self.batchnorm(x_self)
+            x_flavor = self.batchnorm(x_flavor)
+            x_nunubar = self.batchnorm(x_nunubar)
+            x_all = self.batchnorm(x_all)
 
         # compute the outputs from each part
         y_self = self.lin_self(x_self)
@@ -61,11 +61,11 @@ class PermutationEquivariantLinear(nn.Module):
         return y
 
 class PermutationEquivariantScalarTensorProduct(nn.Module):
-    def __init__(self, irreps_in, irreps_out, do_layernorm=False):
+    def __init__(self, irreps_in, irreps_out, do_batchnorm=False):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
-        self.layernorm = e3nn.nn.LayerNorm(irreps_in) if do_layernorm else None
+        self.batchnorm = e3nn.nn.BatchNorm(irreps_in) if do_batchnorm else None
         self.norm = e3nn.o3.Norm(irreps_in)
         self.tp_self    = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
         self.tp_flavor  = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
@@ -87,11 +87,11 @@ class PermutationEquivariantScalarTensorProduct(nn.Module):
         x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
 
         # optional per-irrep normalization before the tensor product
-        if self.layernorm is not None:
-            x_self = self.layernorm(x_self)
-            x_flavor = self.layernorm(x_flavor)
-            x_nunubar = self.layernorm(x_nunubar)
-            x_all = self.layernorm(x_all)
+        if self.batchnorm is not None:
+            x_self = self.batchnorm(x_self)
+            x_flavor = self.batchnorm(x_flavor)
+            x_nunubar = self.batchnorm(x_nunubar)
+            x_all = self.batchnorm(x_all)
 
         # compute invariant scalars and apply scalar-gated tensor products
         s_self = self.norm(x_self)
@@ -108,7 +108,7 @@ class PermutationEquivariantScalarTensorProduct(nn.Module):
         return y
 
 class PermutationEquivariantGatedBlock(nn.Module):
-    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, do_layernorm=False):
+    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, do_batchnorm=False):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
@@ -120,7 +120,7 @@ class PermutationEquivariantGatedBlock(nn.Module):
         self.lin = PermutationEquivariantScalarTensorProduct(
             irreps_in,
             irreps_with_gates,
-            do_layernorm=do_layernorm,
+            do_batchnorm=do_batchnorm,
         )
 
         self.gate = e3nn.nn.Gate(
@@ -152,6 +152,11 @@ class NeuralNetwork(nn.Module):
 
         # store input arguments
         self.NF = parms["NF"]
+        # allow legacy configs that used do_layernorm
+        do_batchnorm = parms.get("do_batchnorm", parms.get("do_layernorm", False))
+        # optionally scale predicted growthrate back to physical units
+        # default False because growthrate labels are already normalized in the dataset
+        self.scale_growthrate_by_ntot = parms.get("scale_growthrate_by_ntot", False)
 
         # store loss weight parameters for tasks
         if parms["do_learn_task_weights"]:
@@ -173,7 +178,7 @@ class NeuralNetwork(nn.Module):
         self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
         self.conserve_lepton_number = parms["conserve_lepton_number"]
 
-        # append a full layer including linear, activation, and layernorm/dropout if desired
+        # append a full layer including linear, activation, and batchnorm/dropout if desired
         def append_full_layer(modules, in_irreps, out_irreps):
 
             # for gated layers, add separate gate scalars to the main output
@@ -182,11 +187,11 @@ class NeuralNetwork(nn.Module):
                 out_irreps,
                 parms["scalar_activation"   ],
                 parms["nonscalar_activation"],
-                do_layernorm=parms["do_layernorm"],
+                do_batchnorm=do_batchnorm,
             ))
-            
+
             if parms["dropout_probability"] > 0:
-                modules.append(e3nn.o3.Dropout(parms["dropout_probability"]))
+                modules.append(e3nn.nn.Dropout(out_irreps, p=parms["dropout_probability"]))
         
         # set up shared layers
         def build_shared(modules_shared):
@@ -315,7 +320,8 @@ class NeuralNetwork(nn.Module):
 
         # rescale F4_out to the original total density
         F4_out = F4_out * ntot[:,None,None,None]
-        growthrate = growthrate * ntot*const.ndens_to_invsec
+        if self.scale_growthrate_by_ntot:
+            growthrate = growthrate * ntot*const.ndens_to_invsec
 
         #assert torch.all(torch.isfinite(F4_out))
         #assert torch.all(torch.isfinite(growthrate))
