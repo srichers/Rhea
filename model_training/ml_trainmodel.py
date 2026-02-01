@@ -14,19 +14,20 @@ from ml_read_data import *
 import torch.autograd.profiler as profiler
 import pickle
 import os
-from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler, Sampler
-
-class _FullSliceSampler(Sampler):
-    def __iter__(self):
-        yield slice(None)
-
-    def __len__(self):
-        return 1
+from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler
+from custom_dataset import _FullSliceSampler, _SubsetSampler
 
 def configure_eval_loader(parms, dataset):
+    eval_frac = parms.get("eval_frac", 1.0)
+    if eval_frac >= 1.0:
+        sampler = _FullSliceSampler()
+    else:
+        eval_count = max(1, int(len(dataset) * eval_frac))
+        generator = torch.Generator().manual_seed(parms["random_seed"])
+        sampler = _SubsetSampler(len(dataset), eval_count, generator)
     return DataLoader(dataset,
                       batch_size=1,
-                      sampler=_FullSliceSampler(),
+                      sampler=sampler,
                       num_workers=parms["loader.num_workers"],
                       pin_memory=True,
                       persistent_workers=True,

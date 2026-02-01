@@ -57,6 +57,7 @@ if __name__ == "__main__":
     parms["task_weight_F4"] = 1.0
     parms["task_weight_unphysical"] = 1
     parms["task_weight_growthrate"] = 1.0
+    parms["eval_frac"] = 1.0
 
     # data augmentation options
     parms["do_augment_final_stable"]= False # True
