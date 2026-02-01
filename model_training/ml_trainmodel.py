@@ -16,6 +16,15 @@ import pickle
 import os
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler
 
+def configure_eval_loader(parms, dataset):
+    return DataLoader(dataset,
+                      batch_size=parms["loader.batch_size"],
+                      sampler=SequentialSampler(dataset),
+                      num_workers=parms["loader.num_workers"],
+                      pin_memory=True,
+                      persistent_workers=True,
+                      prefetch_factor=parms["loader.prefetch_factor"])
+
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
 
@@ -210,23 +219,25 @@ def train_asymptotic_model(parms,
         def accumulate_asymptotic_loss(dataset_list, traintest):
             total_loss = torch.tensor(0.0, requires_grad=False)
             for dataset in dataset_list:
-                F4i = dataset.tensors[0].to(parms["device"])
-                F4f_true = dataset.tensors[1].to(parms["device"])
-                growthrate_true = dataset.tensors[2].to(parms["device"])
+                loader_eval = configure_eval_loader(parms, dataset)
+                for F4i, F4f_true, growthrate_true in loader_eval:
+                    F4i = F4i.to(parms["device"])
+                    F4f_true = F4f_true.to(parms["device"])
+                    growthrate_true = growthrate_true.to(parms["device"])
 
-                F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
+                    F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
 
-                total_loss = total_loss + torch.exp(-model.log_task_weights["F4"]     ) * contribute_loss(F4f_pred,
-                                                                                                          F4f_true,
-                                                                                                          traintest, "F4", comparison_loss_fn)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss(growthrate_pred, #torch.log
-                                                                                                             growthrate_true, #torch.log
-                                                                                                             traintest, "growthrate", comparison_loss_fn)
-                unphysical_loss = torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred,
-                                                                                                     None,
-                                                                                                     traintest, "unphysical", unphysical_loss_fn)
-                if parms["do_unphysical_check"]:
-                    total_loss = total_loss + unphysical_loss
+                    total_loss = total_loss + torch.exp(-model.log_task_weights["F4"]     ) * contribute_loss(F4f_pred,
+                                                                                                              F4f_true,
+                                                                                                              traintest, "F4", comparison_loss_fn)
+                    total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss(growthrate_pred, #torch.log
+                                                                                                                 growthrate_true, #torch.log
+                                                                                                                 traintest, "growthrate", comparison_loss_fn)
+                    unphysical_loss = torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred,
+                                                                                                         None,
+                                                                                                         traintest, "unphysical", unphysical_loss_fn)
+                    if parms["do_unphysical_check"]:
+                        total_loss = total_loss + unphysical_loss
 
             return total_loss
 
@@ -239,17 +250,19 @@ def train_asymptotic_model(parms,
         def accumulate_stable_loss(dataset_list, traintest):
             total_loss = torch.tensor(0.0, requires_grad=False)
             for dataset in dataset_list:
-                F4i = dataset.tensors[0].to(parms["device"])
-                stable_true = dataset.tensors[1].to(parms["device"])
+                loader_eval = configure_eval_loader(parms, dataset)
+                for F4i, stable_true in loader_eval:
+                    F4i = F4i.to(parms["device"])
+                    stable_true = stable_true.to(parms["device"])
 
-                _, _, y_stable_pred = model.predict_all(F4i)
+                    _, _, y_stable_pred = model.predict_all(F4i)
 
-                #print(torch.sum(torch.abs(torch.sigmoid(y_stable_pred)-stable_true)).item()/y_stable_pred.shape[0],"fractional difference in stable points")
+                    #print(torch.sum(torch.abs(torch.sigmoid(y_stable_pred)-stable_true)).item()/y_stable_pred.shape[0],"fractional difference in stable points")
 
-                this_loss = torch.exp(-model.log_task_weights["stability"] ) * \
-                    contribute_loss(y_stable_pred, stable_true, traintest, "stability", stability_loss_fn)
-                #print("  stability loss contribution:", this_loss.item())
-                total_loss = total_loss + this_loss
+                    this_loss = torch.exp(-model.log_task_weights["stability"] ) * \
+                        contribute_loss(y_stable_pred, stable_true, traintest, "stability", stability_loss_fn)
+                    #print("  stability loss contribution:", this_loss.item())
+                    total_loss = total_loss + this_loss
             return total_loss
         
         with torch.no_grad():
@@ -302,7 +315,7 @@ def train_asymptotic_model(parms,
         print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
         if(epoch%parms["output_every"]==0 or stop_early):
             outfilename = os.getcwd()+"/model"+str(epoch)
-            F4i = dataset_asymptotic_test_list[0].tensors[0]
+            F4i = dataset_asymptotic_test_list[0][0][0]
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
 
