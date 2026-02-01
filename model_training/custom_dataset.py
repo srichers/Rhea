@@ -21,4 +21,6 @@ class CustomDataset(Dataset):
         return self.tensors[0].shape[0]
 
     def __getitem__(self, index):
+        if isinstance(index, slice):
+            return self.tensors
         return tuple(t[index] for t in self.tensors)
