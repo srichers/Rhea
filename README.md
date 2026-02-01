@@ -133,7 +133,6 @@ You’ll see parameters along these lines (non-exhaustive):
   - `scalar_activation`, `nonscalar_activation`
   - `dropout_probability`
   - `do_batchnorm` (preferred)
-  - `do_layernorm` (legacy; being phased out)
 
 - **Physics/data handling**
   - internal normalization via `ntot`
@@ -142,7 +141,6 @@ You’ll see parameters along these lines (non-exhaustive):
 - **Training loop**
   - `epoch_num_samples` (used with `WeightedRandomSampler`)
   - loss multipliers (kept in the parameter dictionary)
-  - `pcgrad` (PCGrad on/off; default is intended to be `True`)
 
 ### Running training
 
