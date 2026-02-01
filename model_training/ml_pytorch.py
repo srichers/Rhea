@@ -11,7 +11,6 @@ if __name__ == "__main__":
     import torch
     from torch import nn
 
-    from ml_loss import *
     from ml_neuralnet import *
     from ml_trainmodel import *
     from ml_read_data import *
