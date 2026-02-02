@@ -18,13 +18,12 @@ The architecture is built to respect relevant structure in the data (e.g., rotat
   Custom permutation-equivariant layers (e.g., “self/flavor/ν–ν̄/all” mixing patterns) for species-indexed data.
 
 - **Multi-task training support**
-  The training loop supports multiple loss terms (e.g., flux magnitude, flux direction, growth rate). There is support for
+  The training loop supports multiple loss terms (asymptotic four flux, growth rate). There is support for
   task-specific weighting via learned log-weights.
 
 - **Physically consistent normalization & rescaling**
   - Training data are normalized by total number density (`ntot`).
-  - During inference, outputs are rescaled back to physical units.
-  - **Growth rate scaling is always applied inside prediction** so returned growth rates are in **1/s**.
+  - During inference, outputs are rescaled back to number density units.
 
 - **Two entry points**
   - `model_training/`: training + evaluation utilities
@@ -56,29 +55,9 @@ Rhea/
 
 ---
 
-## Requirements
-
-You’ll need, at minimum:
-
-- Python 3.10+ (older may work, but you’re on your own)
-- PyTorch (CPU or CUDA)
-- e3nn
-- common scientific Python packages (NumPy, etc.)
-
 ### Recommended install pattern
 
-Create an isolated environment (venv/conda) and install dependencies:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-
-# Install PyTorch as appropriate for your platform/CUDA setup, then:
-pip install e3nn numpy
-```
-
-> PyTorch install commands vary by platform/CUDA version. Use the official PyTorch install.
+Although it has been tested to work in a number of environments, the only supported environment is that described by the `Dockerfile`. Follow the `Dockerfile` to install required dependencies, but note that there are some features in the `Dockerfile` that are not actually needed by `Rhea`.
 
 ---
 
@@ -86,34 +65,27 @@ pip install e3nn numpy
 
 ### Core tensor: `F4`
 
-Most of the pipeline is built around a tensor commonly named `F4`, representing a 4-component quantity (e.g., time component + 3 spatial components) across neutrino species axes.
+Most of the pipeline is built around a tensor commonly named `F4`, representing a 4-component quantity (i.e., 3 spatial components + time component) across neutrino species axes.
 
 In the training code, `F4` is typically treated as having the logical shape:
 
 ```text
-[nsamples, 4, n_nunubar, n_flavor]
+[nsamples, n_nunubar, n_flavor, n_xyzt]
 ```
 
 where commonly:
 
 - `n_nunubar = 2` (ν and ν̄)
 - `n_flavor = 3` (flavor triplet)
-
-### Labels/targets
-
-Depending on the dataset/reader, the code supports targets such as:
-
-- `F4_final` (asymptotic/final state corresponding to `F4_initial`)
-- `growthrate` (positive, finite; enforced with asserts and/or penalties)
-- `stable` flags for stability classification datasets
+- `n_xyzt = 4` (number flux spacetime indices)
 
 ### Normalization rules (important)
 
-`model_training/ml_read_data.py` normalizes by total density `ntot` and asserts it worked:
+`model_training/ml_read_data.py` expects data to be sane:
 
-- After normalization, both `ntot_initial` and `ntot_final` are expected to be ~1 everywhere (within tolerance).
+- After normalization, both `ntot_initial` and `ntot_final` are expected to be the same (within tolerance).
 - `ntot` must be positive.
-- growth rates are asserted finite and positive.
+- growth rates must be finite and positive.
 
 If your dataset violates these assumptions, training will (intentionally) fail loudly.
 
@@ -144,17 +116,7 @@ You’ll see parameters along these lines (non-exhaustive):
 
 ### Running training
 
-Because setups differ (data paths, config patterns, cluster quirks), the repo does not force a single rigid CLI. Start from the driver/example script(s) and adapt:
-
-- `model_training/ml_pytorch.py` typically serves as a training driver / hyperparameter stub.
-- `model_training/ml_read_data.py` contains dataset readers and normalization checks.
-- `model_training/ml_trainmodel.py` contains the training loop and multi-task loss composition.
-
-A common workflow is:
-
-1. Implement/provide your dataset in the format expected by `ml_read_data.py`
-2. Define your `parms` dictionary (either inline in a driver script or loaded from your preferred config system)
-3. Run the training driver on CPU/GPU
+Because setups differ (data paths, config patterns, cluster quirks), the repo does not force a single rigid CLI. Start from the `model_training/ml_pytorch` and adjust the input parameters listed in the script.
 
 ---
 
@@ -162,13 +124,12 @@ A common workflow is:
 
 Inference is handled in the model code (see `model_training/ml_neuralnet.py`).
 
-### What “predict” returns
+### What “predict_all” returns
 
-Prediction utilities rescale outputs back to physical units:
+Prediction utilities rescale outputs back to number density units:
 
 - `F4_out` is rescaled to match the original total density of the input (`ntot`)
-- `growthrate` is **always** returned in **physical units (1/s)** via:
-  - multiplication by `ntot` and a conversion constant like `const.ndens_to_invsec`
+- `growthrate` is also returned in units of `ntot`. It must be rescaled by `sqrt(2.)*G_F` to get units of 1/s.
 
 This is intentional: callers should not have to remember hidden unit conversions.
 
@@ -179,15 +140,15 @@ Exact loading/saving utilities depend on how you train/save the model in your wo
 ```python
 import torch
 
-# F4_in: torch.Tensor shaped like [N, 4, 2, 3] in physical units
+# F4_in: torch.Tensor shaped like [N, 2, 3, 4] in physical units
 # model: your trained NeuralNetwork (nn.Module)
 
 model.eval()
 with torch.no_grad():
     F4_out, growthrate = model.predict_all(F4_in)
 
-# F4_out: physical units
-# growthrate: physical units (1/s)
+# F4_out: number density units
+# growthrate: number density units
 ```
 
 ---
