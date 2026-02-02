@@ -18,7 +18,7 @@ import e3nn.nn
 # define a permutation-equivariant message passing layer
 # 0 means flavor edge, 1 means neutrino/antineutrino edge
 class PermutationEquivariantLinear(nn.Module):
-    def __init__(self, irreps_in, irreps_out, do_batchnorm=False):
+    def __init__(self, irreps_in, irreps_out, do_batchnorm):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
@@ -61,7 +61,7 @@ class PermutationEquivariantLinear(nn.Module):
         return y
 
 class PermutationEquivariantScalarTensorProduct(nn.Module):
-    def __init__(self, irreps_in, irreps_out, do_batchnorm=False):
+    def __init__(self, irreps_in, irreps_out, do_batchnorm):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
@@ -108,7 +108,7 @@ class PermutationEquivariantScalarTensorProduct(nn.Module):
         return y
 
 class PermutationEquivariantGatedBlock(nn.Module):
-    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, do_batchnorm=False):
+    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, do_batchnorm):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
@@ -120,7 +120,7 @@ class PermutationEquivariantGatedBlock(nn.Module):
         self.lin = PermutationEquivariantScalarTensorProduct(
             irreps_in,
             irreps_with_gates,
-            do_batchnorm=do_batchnorm,
+            do_batchnorm,
         )
 
         self.gate = e3nn.nn.Gate(
@@ -152,7 +152,7 @@ class NeuralNetwork(nn.Module):
 
         # store input arguments
         self.NF = parms["NF"]
-        do_batchnorm = parms.get("do_batchnorm", False)
+        do_batchnorm = parms.get("do_batchnorm")
 
         # store loss weight parameters for tasks
         if parms["do_learn_task_weights"]:
@@ -183,7 +183,7 @@ class NeuralNetwork(nn.Module):
                 out_irreps,
                 parms["scalar_activation"   ],
                 parms["nonscalar_activation"],
-                do_batchnorm=do_batchnorm,
+                do_batchnorm,
             ))
 
             if parms["dropout_probability"] > 0:
@@ -205,13 +205,13 @@ class NeuralNetwork(nn.Module):
 
             # if no hidden layers, just do linear from start to final
             if nhidden_task == 0:
-                modules_task.append(PermutationEquivariantLinear(irreps_start, irreps_final))
+                modules_task.append(PermutationEquivariantLinear(irreps_start, irreps_final, do_batchnorm))
             # otherwise, build the full set of hidden layers
             else:
                 append_full_layer(modules_task, irreps_start, parms["irreps_hidden"])
                 for _ in range(nhidden_task-1):
                     append_full_layer(modules_task, parms["irreps_hidden"], parms["irreps_hidden"])
-                modules_task.append(PermutationEquivariantLinear(parms["irreps_hidden"], irreps_final))
+                modules_task.append(PermutationEquivariantLinear(parms["irreps_hidden"], irreps_final, do_batchnorm))
 
         # put together the layers of the neural network
         modules_shared = []
@@ -316,8 +316,10 @@ class NeuralNetwork(nn.Module):
 
         # rescale F4_out to the original total density
         F4_out = F4_out * ntot[:,None,None,None]
-        # always return growthrate in physical units (1/s)
-        growthrate = growthrate * ntot*const.ndens_to_invsec
+
+        # return growthrate in the same units (number density)
+        # Multiplying by sqrt(2) G_F not done here because it causes issues with single-precision floats
+        growthrate = growthrate * ntot
 
         #assert torch.all(torch.isfinite(F4_out))
         #assert torch.all(torch.isfinite(growthrate))
