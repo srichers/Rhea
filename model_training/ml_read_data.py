@@ -53,9 +53,9 @@ def read_asymptotic_data(parms):
         # compute stats (all physical units)
         ntot_initial = ml.ntotal(F4_initial)
         ntot_final = ml.ntotal(F4_final)
-        print("#    ntot_initial min/max (physical):", ntot_initial.min().item(), ntot_initial.max().item())
-        print("#    ntot_final min/max (physical):", ntot_final.min().item(), ntot_final.max().item())
-        print("#    growthrate min/max (physical 1/s):", growthrate.min().item(), growthrate.max().item())
+        print("#    ntot_initial min/max:", ntot_initial.min().item(), ntot_initial.max().item())
+        print("#    ntot_final   min/max:", ntot_final.min().item(), ntot_final.max().item())
+        print("#    growthrate   min/max:", growthrate.min().item(), growthrate.max().item())
 
         assert torch.all(ntot_initial > 0)
         assert torch.all(ntot_final > 0)
@@ -122,7 +122,7 @@ def read_stable_data(parms):
             stable = stable[random_indices]
             print("#   ",torch.sum(stable).item(),"points are stable.")
         
-        # basic sanity checks (physical units)
+        # basic sanity checks
         ntot = ml.ntotal(F4)
         assert(torch.all(ntot > 0))
         assert(torch.all(torch.isfinite(ntot)))
