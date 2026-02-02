@@ -69,7 +69,7 @@ if __name__ == "__main__":
     parms["nhidden_F4"]       = 3
     parms["irreps_hidden"]        = e3nn.o3.Irreps("4x0e + 4x1o")
     parms["dropout_probability"]= 0.0 #0.1 #0.5 #0.1 # 0.5
-    parms["do_layernorm"]= False
+    parms["do_batchnorm"]= False
     parms["do_fdotu"]= True
     parms["activation"]= nn.LeakyReLU # nn.LeakyReLU, nn.ReLU
 

@@ -148,18 +148,23 @@ def train_asymptotic_model(parms,
             stable_true_train = stable_true_train.to(parms["device"])
 
             # get predicted values from the model
-            # note that growthrate is predicted as (e^y)(ntot)(ndens_to_invsec) where y is the output of the ml model
             F4f_pred_train, growthrate_pred_train, _                 = model.predict_all(F4i_asymptotic_train)
             _           , _                      , stable_pred_train = model.predict_all(F4i_stable_train    )
 
             # convert F4 to densities and fluxes to feed to loss functions
             # note the outputs are all normalized to the total number density
-            ntot_i = ntotal(F4i_asymptotic_train)
-            ntot_f = ntotal(F4f_true_train)
+            #ntot_i = ntotal(F4i_asymptotic_train)
+            ntot_t = ntotal(F4f_true_train)
             ntot_p = ntotal(F4f_pred_train)
             #print("ntot_pred min/max:", ntot_p.min().item(), ntot_p.max().item())
-            assert(torch.allclose(ntot_i, torch.ones_like(ntot_i)))
-            assert(torch.allclose(ntot_f, torch.ones_like(ntot_f)))
+            assert torch.all(ntot_t > 0)
+            assert torch.all(ntot_p > 0)
+
+            # normalize quantities before computing losses
+            F4f_true_train = F4f_true_train / ntot_t[:,None,None,None]
+            F4f_pred_train = F4f_pred_train / ntot_p[:,None,None,None]
+            growthrate_true_train = growthrate_true_train / ntot_t
+            growthrate_pred_train = growthrate_pred_train / ntot_p
 
             # reset the loss and gradients
             optimizer.zero_grad()
@@ -180,7 +185,6 @@ def train_asymptotic_model(parms,
                     else:
                         batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
 
-            
             batch_loss.backward()
             optimizer.step()
 
@@ -214,8 +218,20 @@ def train_asymptotic_model(parms,
                 F4f_true = dataset.tensors[1].to(parms["device"])
                 growthrate_true = dataset.tensors[2].to(parms["device"])
 
+                # get predicted values from the model
                 F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
 
+                # normalize quantities by ntotal before computing losses to avoid floating point issues
+                ntot_t = ntotal(F4f_true)
+                ntot_p = ntotal(F4f_pred)
+                assert torch.all(ntot_t > 0)
+                assert torch.all(ntot_p > 0)
+                F4f_true = F4f_true / ntot_t[:,None,None,None]
+                F4f_pred = F4f_pred / ntot_p[:,None,None,None]
+                growthrate_true = growthrate_true / ntot_t
+                growthrate_pred = growthrate_pred / ntot_p
+
+                # accumulate losses
                 total_loss = total_loss + torch.exp(-model.log_task_weights["F4"]     ) * contribute_loss(F4f_pred,
                                                                                                           F4f_true,
                                                                                                           traintest, "F4", comparison_loss_fn)
@@ -235,7 +251,6 @@ def train_asymptotic_model(parms,
             test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
 
         # Stability losses
-        print()
         def accumulate_stable_loss(dataset_list, traintest):
             total_loss = torch.tensor(0.0, requires_grad=False)
             for dataset in dataset_list:
