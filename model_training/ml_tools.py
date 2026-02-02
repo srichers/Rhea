@@ -84,6 +84,10 @@ def restrict_F4_to_physical(F4_final):
 
 def save_model(model, outfilename, device, F4i_test):
     with torch.no_grad():
-        scripted_model = e3nn.util.jit.script(model)
+        # create a copy of the model so scripting doesn't modify the original
+        modelcopy = copy.deepcopy(model)
+        
+        # script the model and save it
+        scripted_model = e3nn.util.jit.script(modelcopy.to(device))
         torch.jit.save(scripted_model, outfilename+"_"+device+".pt")
         print("Saving to",outfilename+"_"+device+".pt")
