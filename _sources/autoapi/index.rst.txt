@@ -1,0 +1,23 @@
+API Reference
+=============
+
+This page contains auto-generated API reference documentation [#f1]_.
+
+.. toctree::
+   :titlesonly:
+
+   /autoapi/conf/index
+   /autoapi/ml_loss/index
+   /autoapi/ml_tools/index
+   /autoapi/generate/index
+   /autoapi/ml_pytorch/index
+   /autoapi/maxentropy/index
+   /autoapi/ml_read_data/index
+   /autoapi/ml_constants/index
+   /autoapi/ml_neuralnet/index
+   /autoapi/ml_trainmodel/index
+   /autoapi/create_database/index
+   /autoapi/example_use_model/index
+   /autoapi/convert_model_to_cpu/index
+
+.. [#f1] Created with `sphinx-autoapi <https://github.com/readthedocs/sphinx-autoapi>`_

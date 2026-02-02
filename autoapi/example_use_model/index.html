@@ -1,0 +1,262 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>example_use_model &mdash; Rhea  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="convert_model_to_cpu" href="../convert_model_to_cpu/index.html" />
+    <link rel="prev" title="create_database" href="../create_database/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Rhea
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../conf/index.html">conf</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_loss/index.html">ml_loss</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_tools/index.html">ml_tools</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../generate/index.html">generate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_pytorch/index.html">ml_pytorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../maxentropy/index.html">maxentropy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_read_data/index.html">ml_read_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_constants/index.html">ml_constants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_neuralnet/index.html">ml_neuralnet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_trainmodel/index.html">ml_trainmodel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../create_database/index.html">create_database</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">example_use_model</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#attributes">Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-contents">Module Contents</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.model_filename"><code class="docutils literal notranslate"><span class="pre">model_filename</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.model"><code class="docutils literal notranslate"><span class="pre">model</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.device"><code class="docutils literal notranslate"><span class="pre">device</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.NF"><code class="docutils literal notranslate"><span class="pre">NF</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.F4_test"><code class="docutils literal notranslate"><span class="pre">F4_test</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.before"><code class="docutils literal notranslate"><span class="pre">before</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">before</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.before_rotated"><code class="docutils literal notranslate"><span class="pre">before_rotated</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.after_rotated"><code class="docutils literal notranslate"><span class="pre">after_rotated</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.before_permuted"><code class="docutils literal notranslate"><span class="pre">before_permuted</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.after_permuted"><code class="docutils literal notranslate"><span class="pre">after_permuted</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.before_flavor_permuted"><code class="docutils literal notranslate"><span class="pre">before_flavor_permuted</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example_use_model.after_flavor_permuted"><code class="docutils literal notranslate"><span class="pre">after_flavor_permuted</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../convert_model_to_cpu/index.html">convert_model_to_cpu</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Rhea</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">API Reference</a></li>
+      <li class="breadcrumb-item active">example_use_model</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/autoapi/example_use_model/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-example_use_model">
+<span id="example-use-model"></span><h1>example_use_model<a class="headerlink" href="#module-example_use_model" title="Link to this heading"></a></h1>
+<p>Author: Sherwood Richers</p>
+<p>Copyright: GPLv3 (see LICENSE file)</p>
+<p>This reads a trained model and passes a sample data point through it.</p>
+<section id="attributes">
+<h2>Attributes<a class="headerlink" href="#attributes" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#example_use_model.model_filename" title="example_use_model.model_filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_filename</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#example_use_model.model" title="example_use_model.model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#example_use_model.device" title="example_use_model.device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">device</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#example_use_model.NF" title="example_use_model.NF"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NF</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#example_use_model.F4_test" title="example_use_model.F4_test"><code class="xref py py-obj docutils literal notranslate"><span class="pre">F4_test</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#id0" title="example_use_model.before"><code class="xref py py-obj docutils literal notranslate"><span class="pre">before</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#id0" title="example_use_model.before"><code class="xref py py-obj docutils literal notranslate"><span class="pre">before</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#example_use_model.before_rotated" title="example_use_model.before_rotated"><code class="xref py py-obj docutils literal notranslate"><span class="pre">before_rotated</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#example_use_model.after_rotated" title="example_use_model.after_rotated"><code class="xref py py-obj docutils literal notranslate"><span class="pre">after_rotated</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#example_use_model.before_permuted" title="example_use_model.before_permuted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">before_permuted</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#example_use_model.after_permuted" title="example_use_model.after_permuted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">after_permuted</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#example_use_model.before_flavor_permuted" title="example_use_model.before_flavor_permuted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">before_flavor_permuted</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#example_use_model.after_flavor_permuted" title="example_use_model.after_flavor_permuted"><code class="xref py py-obj docutils literal notranslate"><span class="pre">after_flavor_permuted</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading"></a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.model_filename">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">model_filename</span></span><a class="headerlink" href="#example_use_model.model_filename" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.model">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">model</span></span><a class="headerlink" href="#example_use_model.model" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.device">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">device</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cuda'</span></span><a class="headerlink" href="#example_use_model.device" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.NF">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">NF</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></span><a class="headerlink" href="#example_use_model.NF" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.F4_test">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">F4_test</span></span><a class="headerlink" href="#example_use_model.F4_test" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.before">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">before</span></span><a class="headerlink" href="#example_use_model.before" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">before</span></span><a class="headerlink" href="#id0" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.before_rotated">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">before_rotated</span></span><a class="headerlink" href="#example_use_model.before_rotated" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.after_rotated">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">after_rotated</span></span><a class="headerlink" href="#example_use_model.after_rotated" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.before_permuted">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">before_permuted</span></span><a class="headerlink" href="#example_use_model.before_permuted" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.after_permuted">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">after_permuted</span></span><a class="headerlink" href="#example_use_model.after_permuted" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.before_flavor_permuted">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">before_flavor_permuted</span></span><a class="headerlink" href="#example_use_model.before_flavor_permuted" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="example_use_model.after_flavor_permuted">
+<span class="sig-prename descclassname"><span class="pre">example_use_model.</span></span><span class="sig-name descname"><span class="pre">after_flavor_permuted</span></span><a class="headerlink" href="#example_use_model.after_flavor_permuted" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../create_database/index.html" class="btn btn-neutral float-left" title="create_database" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../convert_model_to_cpu/index.html" class="btn btn-neutral float-right" title="convert_model_to_cpu" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Sherwood Richers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

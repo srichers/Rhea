@@ -1,0 +1,148 @@
+ml_neuralnet
+============
+
+.. py:module:: ml_neuralnet
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file contains the structure of the neural network, including the means of transforming between angular moments and the actual inputs/outputs of the ML model
+
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ml_neuralnet.PermutationEquivariantLinear
+   ml_neuralnet.PermutationEquivariantScalarTensorProduct
+   ml_neuralnet.PermutationEquivariantGatedBlock
+   ml_neuralnet.NeuralNetwork
+
+
+Module Contents
+---------------
+
+.. py:class:: PermutationEquivariantLinear(irreps_in, irreps_out, do_batchnorm)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: irreps_in
+
+
+   .. py:attribute:: irreps_out
+
+
+   .. py:attribute:: batchnorm
+
+
+   .. py:attribute:: lin_self
+
+
+   .. py:attribute:: lin_flavor
+
+
+   .. py:attribute:: lin_nunubar
+
+
+   .. py:attribute:: lin_all
+
+
+   .. py:method:: forward(x)
+
+
+.. py:class:: PermutationEquivariantScalarTensorProduct(irreps_in, irreps_out, do_batchnorm)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: irreps_in
+
+
+   .. py:attribute:: irreps_out
+
+
+   .. py:attribute:: batchnorm
+
+
+   .. py:attribute:: norm
+
+
+   .. py:attribute:: tp_self
+
+
+   .. py:attribute:: tp_flavor
+
+
+   .. py:attribute:: tp_nunubar
+
+
+   .. py:attribute:: tp_all
+
+
+   .. py:method:: forward(x)
+
+
+.. py:class:: PermutationEquivariantGatedBlock(irreps_in, irreps_out, act_scalars, act_gates, do_batchnorm)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: irreps_in
+
+
+   .. py:attribute:: irreps_out
+
+
+   .. py:attribute:: lin
+
+
+   .. py:attribute:: gate
+
+
+   .. py:method:: forward(x)
+
+
+.. py:class:: NeuralNetwork(parms)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: NF
+
+
+   .. py:attribute:: irreps_in
+
+
+   .. py:attribute:: average_heavies_in_final_state
+
+
+   .. py:attribute:: conserve_lepton_number
+
+
+   .. py:attribute:: linear_activation_stack_shared
+
+
+   .. py:attribute:: linear_activation_stack_stability
+
+
+   .. py:attribute:: linear_activation_stack_growthrate
+
+
+   .. py:attribute:: linear_activation_stack_F4
+
+
+   .. py:method:: convert_y_to_2flavor(y)
+
+
+   .. py:method:: forward(x)
+
+
+   .. py:method:: predict_all(F4_in)
+
+

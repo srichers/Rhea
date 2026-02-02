@@ -1,0 +1,350 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ml_neuralnet &mdash; Rhea  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="ml_trainmodel" href="../ml_trainmodel/index.html" />
+    <link rel="prev" title="ml_constants" href="../ml_constants/index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Rhea
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../conf/index.html">conf</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_loss/index.html">ml_loss</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_tools/index.html">ml_tools</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../generate/index.html">generate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_pytorch/index.html">ml_pytorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../maxentropy/index.html">maxentropy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_read_data/index.html">ml_read_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_constants/index.html">ml_constants</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">ml_neuralnet</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#classes">Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-contents">Module Contents</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#ml_neuralnet.PermutationEquivariantLinear"><code class="docutils literal notranslate"><span class="pre">PermutationEquivariantLinear</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct"><code class="docutils literal notranslate"><span class="pre">PermutationEquivariantScalarTensorProduct</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_neuralnet.PermutationEquivariantGatedBlock"><code class="docutils literal notranslate"><span class="pre">PermutationEquivariantGatedBlock</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ml_neuralnet.NeuralNetwork"><code class="docutils literal notranslate"><span class="pre">NeuralNetwork</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../ml_trainmodel/index.html">ml_trainmodel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../create_database/index.html">create_database</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../example_use_model/index.html">example_use_model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../convert_model_to_cpu/index.html">convert_model_to_cpu</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Rhea</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">API Reference</a></li>
+      <li class="breadcrumb-item active">ml_neuralnet</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/autoapi/ml_neuralnet/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-ml_neuralnet">
+<span id="ml-neuralnet"></span><h1>ml_neuralnet<a class="headerlink" href="#module-ml_neuralnet" title="Link to this heading"></a></h1>
+<p>Author: Sherwood Richers</p>
+<p>Copyright: GPLv3 (see LICENSE file)</p>
+<p>This file contains the structure of the neural network, including the means of transforming between angular moments and the actual inputs/outputs of the ML model</p>
+<section id="classes">
+<h2>Classes<a class="headerlink" href="#classes" title="Link to this heading"></a></h2>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_neuralnet.PermutationEquivariantLinear" title="ml_neuralnet.PermutationEquivariantLinear"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PermutationEquivariantLinear</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct" title="ml_neuralnet.PermutationEquivariantScalarTensorProduct"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PermutationEquivariantScalarTensorProduct</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ml_neuralnet.PermutationEquivariantGatedBlock" title="ml_neuralnet.PermutationEquivariantGatedBlock"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PermutationEquivariantGatedBlock</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ml_neuralnet.NeuralNetwork" title="ml_neuralnet.NeuralNetwork"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NeuralNetwork</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="module-contents">
+<h2>Module Contents<a class="headerlink" href="#module-contents" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ml_neuralnet.</span></span><span class="sig-name descname"><span class="pre">PermutationEquivariantLinear</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">irreps_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">irreps_out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_batchnorm</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">torch.nn.Module</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.irreps_in">
+<span class="sig-name descname"><span class="pre">irreps_in</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.irreps_in" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.irreps_out">
+<span class="sig-name descname"><span class="pre">irreps_out</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.irreps_out" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.batchnorm">
+<span class="sig-name descname"><span class="pre">batchnorm</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.batchnorm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.lin_self">
+<span class="sig-name descname"><span class="pre">lin_self</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.lin_self" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.lin_flavor">
+<span class="sig-name descname"><span class="pre">lin_flavor</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.lin_flavor" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.lin_nunubar">
+<span class="sig-name descname"><span class="pre">lin_nunubar</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.lin_nunubar" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.lin_all">
+<span class="sig-name descname"><span class="pre">lin_all</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.lin_all" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantLinear.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantLinear.forward" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ml_neuralnet.</span></span><span class="sig-name descname"><span class="pre">PermutationEquivariantScalarTensorProduct</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">irreps_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">irreps_out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_batchnorm</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">torch.nn.Module</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.irreps_in">
+<span class="sig-name descname"><span class="pre">irreps_in</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.irreps_in" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.irreps_out">
+<span class="sig-name descname"><span class="pre">irreps_out</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.irreps_out" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.batchnorm">
+<span class="sig-name descname"><span class="pre">batchnorm</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.batchnorm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.norm">
+<span class="sig-name descname"><span class="pre">norm</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.norm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_self">
+<span class="sig-name descname"><span class="pre">tp_self</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_self" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_flavor">
+<span class="sig-name descname"><span class="pre">tp_flavor</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_flavor" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_nunubar">
+<span class="sig-name descname"><span class="pre">tp_nunubar</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_nunubar" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_all">
+<span class="sig-name descname"><span class="pre">tp_all</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.tp_all" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantScalarTensorProduct.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantScalarTensorProduct.forward" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantGatedBlock">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ml_neuralnet.</span></span><span class="sig-name descname"><span class="pre">PermutationEquivariantGatedBlock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">irreps_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">irreps_out</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_scalars</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">act_gates</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_batchnorm</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantGatedBlock" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">torch.nn.Module</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantGatedBlock.irreps_in">
+<span class="sig-name descname"><span class="pre">irreps_in</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantGatedBlock.irreps_in" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantGatedBlock.irreps_out">
+<span class="sig-name descname"><span class="pre">irreps_out</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantGatedBlock.irreps_out" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantGatedBlock.lin">
+<span class="sig-name descname"><span class="pre">lin</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantGatedBlock.lin" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantGatedBlock.gate">
+<span class="sig-name descname"><span class="pre">gate</span></span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantGatedBlock.gate" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ml_neuralnet.PermutationEquivariantGatedBlock.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.PermutationEquivariantGatedBlock.forward" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">ml_neuralnet.</span></span><span class="sig-name descname"><span class="pre">NeuralNetwork</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parms</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-obj docutils literal notranslate"><span class="pre">torch.nn.Module</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.NF">
+<span class="sig-name descname"><span class="pre">NF</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.NF" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.irreps_in">
+<span class="sig-name descname"><span class="pre">irreps_in</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.irreps_in" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.average_heavies_in_final_state">
+<span class="sig-name descname"><span class="pre">average_heavies_in_final_state</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.average_heavies_in_final_state" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.conserve_lepton_number">
+<span class="sig-name descname"><span class="pre">conserve_lepton_number</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.conserve_lepton_number" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.linear_activation_stack_shared">
+<span class="sig-name descname"><span class="pre">linear_activation_stack_shared</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.linear_activation_stack_shared" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.linear_activation_stack_stability">
+<span class="sig-name descname"><span class="pre">linear_activation_stack_stability</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.linear_activation_stack_stability" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.linear_activation_stack_growthrate">
+<span class="sig-name descname"><span class="pre">linear_activation_stack_growthrate</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.linear_activation_stack_growthrate" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.linear_activation_stack_F4">
+<span class="sig-name descname"><span class="pre">linear_activation_stack_F4</span></span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.linear_activation_stack_F4" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.convert_y_to_2flavor">
+<span class="sig-name descname"><span class="pre">convert_y_to_2flavor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.convert_y_to_2flavor" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.forward" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ml_neuralnet.NeuralNetwork.predict_all">
+<span class="sig-name descname"><span class="pre">predict_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">F4_in</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ml_neuralnet.NeuralNetwork.predict_all" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../ml_constants/index.html" class="btn btn-neutral float-left" title="ml_constants" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../ml_trainmodel/index.html" class="btn btn-neutral float-right" title="ml_trainmodel" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Sherwood Richers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
