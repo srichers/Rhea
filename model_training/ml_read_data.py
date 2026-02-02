@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 import torch
 import ml_tools as ml
 import sys
-from torch.utils.data import TensorDataset
+from custom_dataset import CustomDataset
 sys.path.append("data")
 
 def read_asymptotic_data(parms):
@@ -80,9 +80,9 @@ def read_asymptotic_data(parms):
 
         # add dataset to the lists
         if dind==0:
-            dataset_test_list.append( TensorDataset(F4_initial, F4_final, growthrate) )
+            dataset_test_list.append( CustomDataset(F4_initial, F4_final, growthrate) )
         else:
-            dataset_train_list.append(TensorDataset(F4_initial, F4_final, growthrate) )
+            dataset_train_list.append(CustomDataset(F4_initial, F4_final, growthrate) )
 
     print()
     print("# Asymptotic Train:",[len(d) for d in dataset_train_list])
@@ -128,9 +128,9 @@ def read_stable_data(parms):
         assert(torch.all(torch.isfinite(ntot)))
 
         if i==0:
-            dataset_test_list.append(TensorDataset(F4, stable))
+            dataset_test_list.append(CustomDataset(F4, stable))
         else:
-            dataset_train_list.append(TensorDataset(F4, stable))
+            dataset_train_list.append(CustomDataset(F4, stable))
 
     print("# Stability Train:",[len(d) for d in dataset_train_list])
     print("# Stability Test:",[len(d) for d in dataset_test_list])

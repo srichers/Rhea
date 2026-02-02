@@ -15,6 +15,24 @@ import torch.autograd.profiler as profiler
 import pickle
 import os
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler
+from custom_dataset import _FullSliceSampler, _SubsetSampler
+
+def configure_eval_loader(parms, dataset):
+    eval_frac = parms.get("eval_frac", 1.0)
+    if eval_frac >= 1.0:
+        sampler = _FullSliceSampler()
+    else:
+        eval_count = max(1, int(len(dataset) * eval_frac))
+        generator = torch.Generator().manual_seed(parms["random_seed"])
+        sampler = _SubsetSampler(len(dataset), eval_count, generator)
+    return DataLoader(dataset,
+                      batch_size=1,
+                      sampler=sampler,
+                      num_workers=parms["loader.num_workers"],
+                      pin_memory=True,
+                      persistent_workers=True,
+                      prefetch_factor=parms["loader.prefetch_factor"],
+                      collate_fn=lambda batch: batch[0])
 
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
@@ -214,9 +232,11 @@ def train_asymptotic_model(parms,
         def accumulate_asymptotic_loss(dataset_list, traintest):
             total_loss = torch.tensor(0.0, requires_grad=False)
             for dataset in dataset_list:
-                F4i = dataset.tensors[0].to(parms["device"])
-                F4f_true = dataset.tensors[1].to(parms["device"])
-                growthrate_true = dataset.tensors[2].to(parms["device"])
+                loader_eval = configure_eval_loader(parms, dataset)
+                F4i, F4f_true, growthrate_true = next(iter(loader_eval))
+                F4i = F4i.to(parms["device"])
+                F4f_true = F4f_true.to(parms["device"])
+                growthrate_true = growthrate_true.to(parms["device"])
 
                 # get predicted values from the model
                 F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
@@ -254,8 +274,10 @@ def train_asymptotic_model(parms,
         def accumulate_stable_loss(dataset_list, traintest):
             total_loss = torch.tensor(0.0, requires_grad=False)
             for dataset in dataset_list:
-                F4i = dataset.tensors[0].to(parms["device"])
-                stable_true = dataset.tensors[1].to(parms["device"])
+                loader_eval = configure_eval_loader(parms, dataset)
+                F4i, stable_true = next(iter(loader_eval))
+                F4i = F4i.to(parms["device"])
+                stable_true = stable_true.to(parms["device"])
 
                 _, _, y_stable_pred = model.predict_all(F4i)
 
@@ -317,7 +339,7 @@ def train_asymptotic_model(parms,
         print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
         if(epoch%parms["output_every"]==0 or stop_early):
             outfilename = os.getcwd()+"/model"+str(epoch)
-            F4i = dataset_asymptotic_test_list[0].tensors[0]
+            F4i = dataset_asymptotic_test_list[0][0][0]
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
 
