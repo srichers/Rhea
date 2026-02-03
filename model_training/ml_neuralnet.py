@@ -139,8 +139,8 @@ class PermutationEquivariantGatedBlock(nn.Module):
         y = self.gate(y)
 
         # residual connection if shapes are the same
-        if self.irreps_in == self.irreps_out:
-            y = x + y
+        #if self.irreps_in == self.irreps_out:
+        #    y = x + y
         return y
     
 # define the NN model
