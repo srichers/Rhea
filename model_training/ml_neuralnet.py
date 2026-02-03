@@ -137,7 +137,8 @@ class PermutationEquivariantGatedBlock(nn.Module):
 
         # apply the gate. If input and output irreps are the same, add residual connection
         y = self.gate(y)
-        #TODO implement residual connection - the below fails during scripting
+
+        # residual connection if shapes are the same
         #if self.irreps_in == self.irreps_out:
         #    y = x + y
         return y

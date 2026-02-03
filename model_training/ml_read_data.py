@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 import torch
 import ml_tools as ml
 import sys
+import ml_constants as constants
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
@@ -33,7 +34,7 @@ def read_asymptotic_data(parms):
             # We want [simulationIndex, nu/nubar, flavor, xyzt]
             F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1) 
             F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
-            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
+            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...]) / constants.ndens_to_invsec
             assert(parms["NF"] == int(np.array(f_in["nf"])) )
             assert(torch.all(torch.isfinite(F4_initial)))
             assert(torch.all(torch.isfinite(F4_final)))
