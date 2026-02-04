@@ -10,19 +10,16 @@ import torch
 import numpy as np
 from torch import nn
 from ml_tools import restrict_F4_to_physical, ntotal
-from ml_tools import dot4, restrict_F4_to_physical, ntotal
-import ml_constants as const
 import e3nn.o3
 import e3nn.nn
 
 # define a permutation-equivariant message passing layer
 # 0 means flavor edge, 1 means neutrino/antineutrino edge
 class PermutationEquivariantLinear(nn.Module):
-    def __init__(self, irreps_in, irreps_out, do_batchnorm):
+    def __init__(self, irreps_in, irreps_out):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
-        self.batchnorm = e3nn.nn.BatchNorm(irreps_in) if do_batchnorm else None
         self.lin_self    = e3nn.o3.Linear(irreps_in, irreps_out)
         self.lin_flavor  = e3nn.o3.Linear(irreps_in, irreps_out)
         self.lin_nunubar = e3nn.o3.Linear(irreps_in, irreps_out)
@@ -43,13 +40,6 @@ class PermutationEquivariantLinear(nn.Module):
         x_nunubar = x_nunubar / (x.shape[1] - 1)
         x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
 
-        # optional per-irrep normalization before the linear maps
-        if self.batchnorm is not None:
-            x_self = self.batchnorm(x_self)
-            x_flavor = self.batchnorm(x_flavor)
-            x_nunubar = self.batchnorm(x_nunubar)
-            x_all = self.batchnorm(x_all)
-
         # compute the outputs from each part
         y_self = self.lin_self(x_self)
         y_flavor = self.lin_flavor(x_flavor)
@@ -61,11 +51,10 @@ class PermutationEquivariantLinear(nn.Module):
         return y
 
 class PermutationEquivariantScalarTensorProduct(nn.Module):
-    def __init__(self, irreps_in, irreps_out, do_batchnorm):
+    def __init__(self, irreps_in, irreps_out):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
-        self.batchnorm = e3nn.nn.BatchNorm(irreps_in) if do_batchnorm else None
         self.norm = e3nn.o3.Norm(irreps_in)
         self.tp_self    = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
         self.tp_flavor  = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
@@ -86,13 +75,6 @@ class PermutationEquivariantScalarTensorProduct(nn.Module):
         x_nunubar = x_nunubar / (x.shape[1] - 1)
         x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
 
-        # optional per-irrep normalization before the tensor product
-        if self.batchnorm is not None:
-            x_self = self.batchnorm(x_self)
-            x_flavor = self.batchnorm(x_flavor)
-            x_nunubar = self.batchnorm(x_nunubar)
-            x_all = self.batchnorm(x_all)
-
         # compute invariant scalars and apply scalar-gated tensor products
         s_self = self.norm(x_self)
         s_flavor = self.norm(x_flavor)
@@ -108,7 +90,7 @@ class PermutationEquivariantScalarTensorProduct(nn.Module):
         return y
 
 class PermutationEquivariantGatedBlock(nn.Module):
-    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, do_batchnorm):
+    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates):
         super().__init__()
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
@@ -119,8 +101,7 @@ class PermutationEquivariantGatedBlock(nn.Module):
 
         self.lin = PermutationEquivariantScalarTensorProduct(
             irreps_in,
-            irreps_with_gates,
-            do_batchnorm,
+            irreps_with_gates
         )
 
         self.gate = e3nn.nn.Gate(
@@ -183,8 +164,7 @@ class NeuralNetwork(nn.Module):
                 in_irreps,
                 out_irreps,
                 parms["scalar_activation"   ],
-                parms["nonscalar_activation"],
-                do_batchnorm,
+                parms["nonscalar_activation"]
             ))
 
             if parms["dropout_probability"] > 0:
@@ -206,13 +186,13 @@ class NeuralNetwork(nn.Module):
 
             # if no hidden layers, just do linear from start to final
             if nhidden_task == 0:
-                modules_task.append(PermutationEquivariantLinear(irreps_start, irreps_final, do_batchnorm))
+                modules_task.append(PermutationEquivariantLinear(irreps_start, irreps_final))
             # otherwise, build the full set of hidden layers
             else:
                 append_full_layer(modules_task, irreps_start, parms["irreps_hidden"])
                 for _ in range(nhidden_task-1):
                     append_full_layer(modules_task, parms["irreps_hidden"], parms["irreps_hidden"])
-                modules_task.append(PermutationEquivariantLinear(parms["irreps_hidden"], irreps_final, do_batchnorm))
+                modules_task.append(PermutationEquivariantLinear(parms["irreps_hidden"], irreps_final))
 
         # put together the layers of the neural network
         modules_shared = []
