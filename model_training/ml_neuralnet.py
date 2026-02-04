@@ -89,6 +89,40 @@ class PermutationEquivariantScalarTensorProduct(nn.Module):
         y = y_self + y_flavor + y_nunubar + y_all
         return y
 
+class PermutationEquivariantQuadraticTensorProduct(nn.Module):
+    def __init__(self, irreps_in, irreps_out):
+        super().__init__()
+        self.irreps_in = irreps_in
+        self.irreps_out = irreps_out
+        self.tp_self    = e3nn.o3.FullyConnectedTensorProduct(irreps_in, irreps_in, irreps_out)
+        self.tp_flavor  = e3nn.o3.FullyConnectedTensorProduct(irreps_in, irreps_in, irreps_out)
+        self.tp_nunubar = e3nn.o3.FullyConnectedTensorProduct(irreps_in, irreps_in, irreps_out)
+        self.tp_all     = e3nn.o3.FullyConnectedTensorProduct(irreps_in, irreps_in, irreps_out)
+
+    # x has shape [nsamples, nunubar, flavor, features]
+    def forward(self, x):
+        # compute the inputs to each node
+        # subtract self to get the messages from neighbors orthogonal to the self node
+        x_self = x
+        x_flavor  = x.sum(dim=2, keepdim=True) - x_self
+        x_nunubar = x.sum(dim=1, keepdim=True) - x_self
+        x_all = x.sum(dim=(1,2), keepdim=True) - x_self - x_flavor - x_nunubar
+
+        # normalize by the number of nodes contributing. Supposedly helps keep the scale of the activations reasonable.
+        x_flavor  = x_flavor / (x.shape[2] - 1)
+        x_nunubar = x_nunubar / (x.shape[1] - 1)
+        x_all     = x_all / ((x.shape[1] - 1) * (x.shape[2] - 1))
+
+        # compute tensor products
+        y_self = self.tp_self(x_self, x_self)
+        y_flavor = self.tp_flavor(x_flavor, x_flavor)
+        y_nunubar = self.tp_nunubar(x_nunubar, x_nunubar)
+        y_all = self.tp_all(x_all, x_all)
+
+        # sum the contributions, using the residual connection when possible
+        y = y_self + y_flavor + y_nunubar + y_all
+        return y
+    
 class PermutationEquivariantGatedBlock(nn.Module):
     def __init__(self, irreps_in, irreps_out, act_scalars, act_gates):
         super().__init__()
@@ -99,7 +133,7 @@ class PermutationEquivariantGatedBlock(nn.Module):
         irreps_gates = e3nn.o3.Irreps(f"{irreps_nonscalars.num_irreps}x0e")
         irreps_with_gates = irreps_scalars + irreps_gates + irreps_nonscalars
 
-        self.lin = PermutationEquivariantScalarTensorProduct(
+        self.lin = PermutationEquivariantLinear(
             irreps_in,
             irreps_with_gates
         )
@@ -160,13 +194,27 @@ class NeuralNetwork(nn.Module):
         def append_full_layer(modules, in_irreps, out_irreps):
 
             # for gated layers, add separate gate scalars to the main output
-            modules.append(PermutationEquivariantGatedBlock(
-                in_irreps,
-                out_irreps,
-                parms["scalar_activation"   ],
-                parms["nonscalar_activation"]
-            ))
-
+            if parms["layer_type"] == "gated":
+                modules.append(PermutationEquivariantGatedBlock(
+                    in_irreps,
+                    out_irreps,
+                    parms["scalar_activation"   ],
+                    parms["nonscalar_activation"]
+                ))
+            elif parms["layer_type"] == "scalar_tensor_product":
+                modules.append(PermutationEquivariantScalarTensorProduct(
+                        in_irreps,
+                        out_irreps
+                ))
+            elif parms["layer_type"] == "quadratic_tensor_product":
+                modules.append(PermutationEquivariantQuadraticTensorProduct(
+                        in_irreps,
+                        out_irreps
+                ))
+            else: # throw an error if unknown layer type
+                assert False, f"Unknown layer type {parms['layer_type']}"
+                
+            # add dropout layer
             if parms["dropout_probability"] > 0:
                 modules.append(e3nn.nn.Dropout(out_irreps, p=parms["dropout_probability"]))
         
