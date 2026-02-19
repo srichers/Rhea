@@ -9,9 +9,8 @@ This file contains the structure of the neural network, including the means of t
 import torch
 import numpy as np
 from torch import nn
-from ml_tools import restrict_F4_to_physical, ntotal
-from ml_tools import dot4, restrict_F4_to_physical, ntotal
-import ml_constants as const
+from ml_tools import ntotal
+from box3d_heuristic import Box3DHeuristic
 import e3nn.o3
 import e3nn.nn
 
@@ -154,17 +153,14 @@ class NeuralNetwork(nn.Module):
         self.NF = parms["NF"]
         do_batchnorm = parms.get("do_batchnorm")
 
-        # store loss weight parameters for tasks
-        if parms["do_learn_task_weights"]:
-            self.log_task_weights = nn.ParameterDict({
-                name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
-                for name in ["stability", "growthrate", "F4", "unphysical"]
-            })
-        else:
-            self.log_task_weights = {
-                name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
-                for name in ["stability", "growthrate", "F4", "unphysical"]
-            }
+        # Keep task weights in a ParameterDict in all cases so .to(device) works uniformly.
+        self.log_task_weights = nn.ParameterDict({
+            name: nn.Parameter(
+                torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32),
+                requires_grad=parms["do_learn_task_weights"],
+            )
+            for name in ["stability", "growthrate", "F4", "unphysical"]
+        })
 
         # The input irreps for each node are just the 4 components of F4
         self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e")
@@ -173,6 +169,16 @@ class NeuralNetwork(nn.Module):
         # add one extra to predict growth rate
         self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
         self.conserve_lepton_number = parms["conserve_lepton_number"]
+        self.use_box3d_residual = bool(parms.get("use_box3d_residual", False))
+        self.use_box3d_growth_baseline = bool(parms.get("use_box3d_growth_baseline", True))
+        self.report_box3d_control_metrics = bool(
+            parms.get("report_box3d_control_metrics", self.use_box3d_residual)
+        )
+        self.box3d = Box3DHeuristic(
+            self.NF,
+            int(parms.get("box3d_resolution_theta", 21)),
+            int(parms.get("box3d_resolution_phi", 41)),
+        )
 
         # append a full layer including linear, activation, and batchnorm/dropout if desired
         def append_full_layer(modules, in_irreps, out_irreps):
@@ -266,42 +272,90 @@ class NeuralNetwork(nn.Module):
 
         return y_F4, y_growthrate, y_stability
 
+    def _apply_physical_constraints(self, F4_in, F4_out):
+        # enforce symmetry in the heavies
+        if self.average_heavies_in_final_state:
+            heavy_mean = F4_out[:, :, 1:, :].mean(dim=2, keepdim=True)
+            F4_out[:, :, 1:, :] = heavy_mean
+
+        # ensure the flavor-traced number is conserved
+        F4_in_flavortrace = torch.sum(F4_in, dim=2, keepdim=True)
+        F4_out_flavortrace = torch.sum(F4_out, dim=2, keepdim=True)
+        F4_out_excess = F4_out_flavortrace - F4_in_flavortrace
+        F4_out[:, :, :, :] -= F4_out_excess / self.NF
+
+        # ensure that ELN is conserved
+        if self.conserve_lepton_number:
+            # ELN is defined on number density (t-component, index 3), not a spatial component.
+            ELN_in = F4_in[:, 0, :, 3] - F4_in[:, 1, :, 3]
+            ELN_out = F4_out[:, 0, :, 3] - F4_out[:, 1, :, 3]
+            ELN_excess = ELN_out - ELN_in
+            F4_out[:, 0, :, 3] -= ELN_excess / 2.0
+            F4_out[:, 1, :, 3] += ELN_excess / 2.0
+
+        return F4_out
+
+    @torch.jit.export
+    def predict_box3d(self, F4_in):
+        # Returns the Box3D baseline in the same physical units as input/output.
+        nsims = F4_in.shape[0]
+        F4_in = F4_in.reshape((nsims, 2, self.NF, 4))
+        ntot = ntotal(F4_in)
+        F4_in_norm = F4_in / ntot[:, None, None, None]
+        F4_box_norm, growth_box_norm = self.box3d(F4_in_norm)
+        F4_box_norm = self._apply_physical_constraints(F4_in_norm, F4_box_norm)
+        F4_box = F4_box_norm * ntot[:, None, None, None]
+        growth_box = growth_box_norm.reshape(nsims) * ntot
+        return F4_box, growth_box
+
+    @torch.jit.export
+    def predict_control(self, F4_in):
+        # "Control" prediction = model residuals set to zero.
+        nsims = F4_in.shape[0]
+        F4_in = F4_in.reshape((nsims, 2, self.NF, 4))
+        ntot = ntotal(F4_in)
+        F4_in_norm = F4_in / ntot[:, None, None, None]
+
+        if self.use_box3d_residual:
+            F4_out, growthrate = self.box3d(F4_in_norm)
+            if not self.use_box3d_growth_baseline:
+                growthrate = torch.zeros((nsims,), device=F4_in.device, dtype=F4_in.dtype)
+        else:
+            F4_out = F4_in_norm
+            growthrate = torch.zeros((nsims,), device=F4_in.device, dtype=F4_in.dtype)
+
+        F4_out = self._apply_physical_constraints(F4_in_norm, F4_out)
+        stability = torch.zeros((nsims,), device=F4_in.device, dtype=F4_in.dtype)
+
+        F4_out = F4_out * ntot[:, None, None, None]
+        growthrate = growthrate.reshape(nsims) * ntot
+        return F4_out, growthrate, stability
+
     # X is just F4_initial [nsamples, 2, NF, xyzt]
     @torch.jit.export
     def predict_all(self, F4_in):
 
         # get the total density
         nsims = F4_in.shape[0]
-        F4_in = F4_in.view((nsims,2,self.NF,4))
+        F4_in = F4_in.reshape((nsims,2,self.NF,4))
         ntot = ntotal(F4_in) # [nsims]
 
         # normalize the inputs by the total density
-        F4_in = F4_in / ntot[:,None,None,None]
+        F4_in = F4_in / ntot[:, None, None, None]
+
+        # baseline prediction for residual learning
+        if self.use_box3d_residual:
+            F4_base, growth_base = self.box3d(F4_in)
+        else:
+            F4_base = F4_in
+            growth_base = torch.zeros((nsims,), device=F4_in.device, dtype=F4_in.dtype)
 
         # propagate through the network
         y_F4, y_growthrate, y_stability = self.forward(F4_in)
 
-        # reshape into a matrix
-        F4_out = F4_in + y_F4.reshape((nsims,2,self.NF,4))
-
-        # enforce symmetry in the heavies
-        if self.average_heavies_in_final_state:
-            F4_out[:,:,1:,:] = F4_out.clone().detach()[:,:,1:,:].mean(dim=3, keepdim=True)
-
-        # ensure the flavor-traced number is conserved
-        F4_in = F4_in.view((nsims,2,self.NF,4))
-        F4_in_flavortrace = torch.sum(F4_in, dim=2, keepdim=True)
-        F4_out_flavortrace = torch.sum(F4_out, dim=2, keepdim=True)
-        F4_out_excess = F4_out_flavortrace - F4_in_flavortrace
-        F4_out[:,:,:,:] -= F4_out_excess / self.NF
-
-        # ensure that ELN is conserved
-        if self.conserve_lepton_number:
-            ELN_in  = F4_in[:,0,:,0]  - F4_in[:,1,:,0]
-            ELN_out = F4_out[:,0,:,0] - F4_out[:,1,:,0]
-            ELN_excess = ELN_out - ELN_in
-            F4_out[:,0,:,0] -= ELN_excess / 2.0
-            F4_out[:,1,:,0] += ELN_excess / 2.0
+        # residual correction on top of chosen baseline
+        F4_out = F4_base + y_F4.reshape((nsims, 2, self.NF, 4))
+        F4_out = self._apply_physical_constraints(F4_in, F4_out)
 
         # pool over features to get permutation-invariant output
         # Averaging over nodes in the graph
@@ -309,13 +363,15 @@ class NeuralNetwork(nn.Module):
         y_growthrate = torch.mean(y_growthrate, dim=(1,2))
 
         # squeeze stability logit (NOT passed through sigmoid yet)
-        stability = torch.squeeze(y_stability)
+        stability = y_stability.reshape(nsims)
 
         # apply total density scaling to log growth rate
-        growthrate = torch.squeeze(y_growthrate)
+        growthrate = y_growthrate.reshape(nsims)
+        if self.use_box3d_residual and self.use_box3d_growth_baseline:
+            growthrate = growthrate + growth_base.reshape(nsims)
 
         # rescale F4_out to the original total density
-        F4_out = F4_out * ntot[:,None,None,None]
+        F4_out = F4_out * ntot[:, None, None, None]
 
         # return growthrate in the same units (number density)
         # Multiplying by sqrt(2) G_F not done here because it causes issues with single-precision floats
