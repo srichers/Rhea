@@ -1,5 +1,5 @@
 '''
-Author: Sherwood Richers / contributors
+Author: Sherwood Richers / John McGuigan
 
 Copyright: GPLv3 (see LICENSE file)
 
