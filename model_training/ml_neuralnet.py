@@ -12,6 +12,7 @@ from torch import nn
 from ml_tools import restrict_F4_to_physical, ntotal
 import e3nn.o3
 import e3nn.nn
+import box3d
 
 # generate the set of permutation equivariant inputs for each node
 def PE_inputs(x):
@@ -139,22 +140,21 @@ class NeuralNetwork(nn.Module):
 
         # store input arguments
         self.NF = parms["NF"]
-        do_batchnorm = parms.get("do_batchnorm")
 
         # store loss weight parameters for tasks
         if parms["do_learn_task_weights"]:
             self.log_task_weights = nn.ParameterDict({
                 name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
-                for name in ["stability", "growthrate", "F4", "unphysical"]
+                for name in ["growthrate", "F4", "unphysical"]
             })
         else:
             self.log_task_weights = {
                 name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
-                for name in ["stability", "growthrate", "F4", "unphysical"]
+                for name in ["growthrate", "F4", "unphysical"]
             }
 
-        # The input irreps for each node are just the 4 components of F4
-        self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e")
+        # The input irreps for each node are just the 4 components of F4_in followed by 4 components of F4_box3d
+        self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e + 1x1o + 1x0e")
         
         # one y matrix for ndens, one for flux
         # add one extra to predict growth rate
@@ -206,19 +206,20 @@ class NeuralNetwork(nn.Module):
 
         # put together the layers of the neural network
         modules_shared = []
-        modules_stability = []
         modules_growthrate = []
         modules_F4 = []
         build_shared(modules_shared)
-        build_task(modules_stability,  parms["nhidden_stability"],  e3nn.o3.Irreps("1x0e"       ))
         build_task(modules_growthrate, parms["nhidden_growthrate"], e3nn.o3.Irreps("1x0e"       ))
         build_task(modules_F4,         parms["nhidden_F4"],         e3nn.o3.Irreps("1x1o + 1x0e"))
 
         # turn the list of modules into a sequential model
         self.TP_activation_stack_shared     = nn.Sequential(*modules_shared)
-        self.TP_activation_stack_stability  = nn.Sequential(*modules_stability)
         self.TP_activation_stack_growthrate = nn.Sequential(*modules_growthrate)
         self.TP_activation_stack_F4         = nn.Sequential(*modules_F4)
+
+        # register lebedev quadrature tensors as buffers so they are scriptable and move with the model
+        self.register_buffer('lebedev_pts', box3d.pts)
+        self.register_buffer('lebedev_weights', box3d.weights)
 
         # initialize the weights
         torch.manual_seed(parms["random_seed"])
@@ -247,7 +248,6 @@ class NeuralNetwork(nn.Module):
         y_shared = self.TP_activation_stack_shared(x)
 
         # evaluate each task
-        y_stability  = self.TP_activation_stack_stability(y_shared)
         y_growthrate = self.TP_activation_stack_growthrate(y_shared)
         y_F4         = self.TP_activation_stack_F4(y_shared)
 
@@ -255,7 +255,7 @@ class NeuralNetwork(nn.Module):
         #assert torch.all(torch.isfinite(y_growthrate))
         #assert torch.all(torch.isfinite(y_F4))
 
-        return y_F4, y_growthrate, y_stability
+        return y_F4, y_growthrate
 
     # X is just F4_initial [nsamples, 2, NF, xyzt]
     @torch.jit.export
@@ -269,11 +269,17 @@ class NeuralNetwork(nn.Module):
         # normalize the inputs by the total density
         F4_in = F4_in / ntot[:,None,None,None]
 
+        # get Box3D prediction (pass lebedev pts/weights registered as buffers)
+        F4_box3d, growthrate_box3d = box3d.mixBox3D_lebedev(F4_in, self.lebedev_pts, self.lebedev_weights)
+
+        # Combine F4_in and F4_box3D into a joint input of shape [nsamples, nu/nubar, flavor, xyzt(in)/xyzt(box3d)]
+        F4_joint = torch.cat([F4_in, F4_box3d], dim=-1)
+
         # propagate through the network
-        y_F4, y_growthrate, y_stability = self.forward(F4_in)
+        y_F4, y_growthrate = self.forward(F4_joint)
 
         # reshape into a matrix
-        F4_out = F4_in + y_F4.reshape((nsims,2,self.NF,4))
+        F4_out = F4_box3d + y_F4.reshape((nsims,2,self.NF,4))
 
         # enforce symmetry in the heavies
         if self.average_heavies_in_final_state:
@@ -296,14 +302,10 @@ class NeuralNetwork(nn.Module):
 
         # pool over features to get permutation-invariant output
         # Averaging over nodes in the graph
-        y_stability = torch.mean(y_stability, dim=(1,2))
         y_growthrate = torch.mean(y_growthrate, dim=(1,2))
 
-        # squeeze stability logit (NOT passed through sigmoid yet)
-        stability = torch.squeeze(y_stability)
-
         # apply total density scaling to log growth rate
-        growthrate = torch.squeeze(y_growthrate)
+        growthrate = growthrate_box3d + torch.squeeze(y_growthrate)
 
         # rescale F4_out to the original total density
         F4_out = F4_out * ntot[:,None,None,None]
@@ -315,5 +317,8 @@ class NeuralNetwork(nn.Module):
         #assert torch.all(torch.isfinite(F4_out))
         #assert torch.all(torch.isfinite(growthrate))
         #assert torch.all(torch.isfinite(stability))
+
+        # stability is determined only by box3d, output as float
+        stability = (growthrate_box3d <= 0).float()
 
         return F4_out, growthrate, stability

@@ -79,6 +79,13 @@ def read_asymptotic_data(parms):
             assert(torch.allclose( torch.mean(F4_initial[:,:,1:,:], dim=2), F4_initial[:,:,1,:] ))
             F4_final[:,:,1:,:] = torch.mean(F4_final[:,:,1:,:], dim=2, keepdim=True)
 
+        # remove any points where the flux factor is larger than 0.9 in any of the nunubar/flavor species, but separately for each data point
+        fluxfac = ml.flux_factor(F4_initial)
+        goodlocs = torch.where(torch.all(fluxfac < 0.9, dim=(1,2)))[0]
+        F4_initial = F4_initial[goodlocs,...]
+        F4_final   = F4_final  [goodlocs,...]
+        growthrate = growthrate[goodlocs]
+
         # add dataset to the lists
         if dind==0:
             dataset_test_list.append( TensorDataset(F4_initial, F4_final, growthrate) )
