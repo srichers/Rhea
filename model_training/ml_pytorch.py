@@ -51,6 +51,7 @@ if __name__ == "__main__":
     parms["weightedrandomsampler.epoch_num_samples"] = 10 #parms["samples_per_database"]
     parms["scalar_activation"] = nn.functional.silu
     parms["nonscalar_activation"] = torch.sigmoid
+    parms["tensor_product_class"] = "norm"
     
     parms["do_learn_task_weights"] = False
     parms["task_weight_stability"] = 1.0
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     parms["do_unphysical_check"]= True # True - seems to help prevent crazy results
 
     # neural network options
-    parms["nhidden_shared"]        = 0
+    parms["nhidden_shared"]        = 1
     parms["nhidden_stability"]     = 3
     parms["nhidden_growthrate"] = 3
     parms["nhidden_F4"]       = 3
@@ -99,6 +100,4 @@ if __name__ == "__main__":
     #with profiler.profile(with_stack=True, profile_memory=True, record_shapes=True) as prof:
     train_asymptotic_model(parms,
             dataset_asymptotic_train_list,
-            dataset_asymptotic_test_list,
-            dataset_stable_train_list,
-            dataset_stable_test_list)
+            dataset_asymptotic_test_list)
