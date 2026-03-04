@@ -1,9 +1,9 @@
 FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y python3 python3-pip gfortran build-essential libhdf5-openmpi-dev openmpi-bin pkg-config libopenmpi-dev openmpi-bin libblas-dev liblapack-dev libpnetcdf-dev git python-is-python3 gnuplot cmake wget unzip graphviz
-RUN pip3 install numpy matplotlib h5py "scipy>=1.15" sympy yt torch scikit-learn
-RUN pip3 install torchview
+RUN pip3 install --upgrade pip
+RUN pip3 install --index-url https://download.pytorch.org/whl/cu118 torch==2.6.0
+RUN pip3 install numpy matplotlib h5py "scipy>=1.15" sympy yt scikit-learn torchview e3nn
 RUN wget https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.0.1%2Bcu118.zip && unzip libtorch-cxx11-abi-shared-with-deps-2.0.1+cu118.zip && mv libtorch /usr/local/libtorch
-RUN pip3 install e3nn
 ENV USER=jenkins
 ENV LOGNAME=jenkins
