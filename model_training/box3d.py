@@ -49,7 +49,7 @@ def mixBox3D_lebedev(F4, pts, weights):
     n = F4[:,:,:2,3:]
     F = F4[:,:,:2,0:3]
     normF = torch.sqrt(torch.sum(F*F, dim=3, keepdim=True))
-    Fhat = torch.nan_to_num(F/normF, nan=0)
+    Fhat = torch.nan_to_num(F/normF, nan=0.0)
     Z = get_Z(normF/n)
 
     # evaluate the distribution function at each quadrature point
