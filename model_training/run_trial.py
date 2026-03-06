@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 '''
-Author: OpenAI Codex
+Author: John McGuigan
 
 Copyright: GPLv3 (see LICENSE file)
 
