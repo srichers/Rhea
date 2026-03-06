@@ -296,8 +296,7 @@ class NeuralNetwork(nn.Module):
 
         return F4_out * ntot[:, None, None, None], growthrate * ntot, stability
 
-    @torch.jit.export
-    def predict_box3d(self, F4_in):
+    def _predict_baseline_variant(self, F4_in, apply_constraints):
         _, F4_in_norm, ntot = self._prepare_input(F4_in)
         F4_box3d, growthrate_box3d = self._predict_box3d_normalized(F4_in_norm)
         zero_F4 = torch.zeros_like(F4_box3d)
@@ -309,24 +308,16 @@ class NeuralNetwork(nn.Module):
             zero_F4,
             zero_growth,
             ntot,
-            False,
+            apply_constraints,
         )
 
     @torch.jit.export
+    def predict_box3d(self, F4_in):
+        return self._predict_baseline_variant(F4_in, False)
+
+    @torch.jit.export
     def predict_control(self, F4_in):
-        _, F4_in_norm, ntot = self._prepare_input(F4_in)
-        F4_box3d, growthrate_box3d = self._predict_box3d_normalized(F4_in_norm)
-        zero_F4 = torch.zeros_like(F4_box3d)
-        zero_growth = torch.zeros_like(growthrate_box3d)
-        return self._finalize_prediction(
-            F4_in_norm,
-            F4_box3d,
-            growthrate_box3d,
-            zero_F4,
-            zero_growth,
-            ntot,
-            True,
-        )
+        return self._predict_baseline_variant(F4_in, True)
 
     # X is just F4_initial [nsamples, 2, NF, xyzt]
     @torch.jit.export
