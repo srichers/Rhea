@@ -142,16 +142,13 @@ class NeuralNetwork(nn.Module):
         self.NF = parms["NF"]
 
         # store loss weight parameters for tasks
-        if parms["do_learn_task_weights"]:
-            self.log_task_weights = nn.ParameterDict({
-                name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
-                for name in ["growthrate", "F4", "unphysical"]
-            })
-        else:
-            self.log_task_weights = {
-                name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
-                for name in ["growthrate", "F4", "unphysical"]
-            }
+        self.log_task_weights = nn.ParameterDict({
+            name: nn.Parameter(
+                torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32),
+                requires_grad=parms["do_learn_task_weights"],
+            )
+            for name in ["growthrate", "F4", "unphysical"]
+        })
 
         # The input irreps for each node are just the 4 components of F4_in followed by 4 components of F4_box3d
         self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e + 1x1o + 1x0e")
@@ -257,68 +254,93 @@ class NeuralNetwork(nn.Module):
 
         return y_F4, y_growthrate
 
+    def _prepare_input(self, F4_in):
+        nsims = F4_in.shape[0]
+        F4_in = F4_in.view((nsims, 2, self.NF, 4))
+        ntot = ntotal(F4_in)
+        F4_in_norm = F4_in / ntot[:, None, None, None]
+        return nsims, F4_in_norm, ntot
+
+    def _predict_box3d_normalized(self, F4_in_norm):
+        return box3d.mixBox3D_lebedev(F4_in_norm, self.lebedev_pts, self.lebedev_weights)
+
+    def _apply_physical_constraints(self, F4_in_norm, F4_out_norm):
+        F4_out = F4_out_norm.clone()
+
+        if self.average_heavies_in_final_state:
+            F4_out[:, :, 1:, :] = F4_out[:, :, 1:, :].mean(dim=2, keepdim=True)
+
+        F4_in_flavortrace = torch.sum(F4_in_norm, dim=2, keepdim=True)
+        F4_out_flavortrace = torch.sum(F4_out, dim=2, keepdim=True)
+        F4_out_excess = F4_out_flavortrace - F4_in_flavortrace
+        F4_out = F4_out - F4_out_excess / self.NF
+
+        if self.conserve_lepton_number:
+            ELN_in = F4_in_norm[:, 0, :, 3] - F4_in_norm[:, 1, :, 3]
+            ELN_out = F4_out[:, 0, :, 3] - F4_out[:, 1, :, 3]
+            ELN_excess = ELN_out - ELN_in
+            F4_out[:, 0, :, 3] -= ELN_excess / 2.0
+            F4_out[:, 1, :, 3] += ELN_excess / 2.0
+
+        return F4_out
+
+    def _finalize_prediction(self, F4_in_norm, F4_box3d, growthrate_box3d, F4_residual, growthrate_residual, ntot, apply_constraints: bool):
+        nsims = F4_in_norm.shape[0]
+
+        F4_out = F4_box3d + F4_residual.reshape((nsims, 2, self.NF, 4))
+        if apply_constraints:
+            F4_out = self._apply_physical_constraints(F4_in_norm, F4_out)
+
+        growthrate = growthrate_box3d + growthrate_residual.reshape((nsims,))
+        stability = (growthrate_box3d <= 0).float()
+
+        return F4_out * ntot[:, None, None, None], growthrate * ntot, stability
+
+    def _predict_baseline_variant(self, F4_in, apply_constraints: bool):
+        _, F4_in_norm, ntot = self._prepare_input(F4_in)
+        F4_box3d, growthrate_box3d = self._predict_box3d_normalized(F4_in_norm)
+        zero_F4 = torch.zeros_like(F4_box3d)
+        zero_growth = torch.zeros_like(growthrate_box3d)
+        return self._finalize_prediction(
+            F4_in_norm,
+            F4_box3d,
+            growthrate_box3d,
+            zero_F4,
+            zero_growth,
+            ntot,
+            apply_constraints,
+        )
+
+    @torch.jit.export
+    def predict_box3d(self, F4_in):
+        return self._predict_baseline_variant(F4_in, False)
+
+    @torch.jit.export
+    def predict_control(self, F4_in):
+        return self._predict_baseline_variant(F4_in, True)
+
     # X is just F4_initial [nsamples, 2, NF, xyzt]
     @torch.jit.export
     def predict_all(self, F4_in):
-
-        # get the total density
-        nsims = F4_in.shape[0]
-        F4_in = F4_in.view((nsims,2,self.NF,4))
-        ntot = ntotal(F4_in) # [nsims]
-
-        # normalize the inputs by the total density
-        F4_in = F4_in / ntot[:,None,None,None]
-
-        # get Box3D prediction (pass lebedev pts/weights registered as buffers)
-        F4_box3d, growthrate_box3d = box3d.mixBox3D_lebedev(F4_in, self.lebedev_pts, self.lebedev_weights)
+        nsims, F4_in_norm, ntot = self._prepare_input(F4_in)
+        F4_box3d, growthrate_box3d = self._predict_box3d_normalized(F4_in_norm)
 
         # Combine F4_in and F4_box3D into a joint input of shape [nsamples, nu/nubar, flavor, xyzt(in)/xyzt(box3d)]
-        F4_joint = torch.cat([F4_in, F4_box3d], dim=-1)
+        F4_joint = torch.cat([F4_in_norm, F4_box3d], dim=-1)
 
         # propagate through the network
         y_F4, y_growthrate = self.forward(F4_joint)
 
-        # reshape into a matrix
-        F4_out = F4_box3d + y_F4.reshape((nsims,2,self.NF,4))
-
-        # enforce symmetry in the heavies
-        if self.average_heavies_in_final_state:
-            F4_out[:,:,1:,:] = F4_out.clone().detach()[:,:,1:,:].mean(dim=3, keepdim=True)
-
-        # ensure the flavor-traced number is conserved
-        F4_in = F4_in.view((nsims,2,self.NF,4))
-        F4_in_flavortrace = torch.sum(F4_in, dim=2, keepdim=True)
-        F4_out_flavortrace = torch.sum(F4_out, dim=2, keepdim=True)
-        F4_out_excess = F4_out_flavortrace - F4_in_flavortrace
-        F4_out[:,:,:,:] -= F4_out_excess / self.NF
-
-        # ensure that ELN is conserved
-        if self.conserve_lepton_number:
-            ELN_in  = F4_in[:,0,:,0]  - F4_in[:,1,:,0]
-            ELN_out = F4_out[:,0,:,0] - F4_out[:,1,:,0]
-            ELN_excess = ELN_out - ELN_in
-            F4_out[:,0,:,0] -= ELN_excess / 2.0
-            F4_out[:,1,:,0] += ELN_excess / 2.0
-
         # pool over features to get permutation-invariant output
         # Averaging over nodes in the graph
-        y_growthrate = torch.mean(y_growthrate, dim=(1,2))
+        y_growthrate = torch.mean(y_growthrate, dim=(1,2)).reshape((nsims,))
 
-        # apply total density scaling to log growth rate
-        growthrate = growthrate_box3d + torch.squeeze(y_growthrate)
-
-        # rescale F4_out to the original total density
-        F4_out = F4_out * ntot[:,None,None,None]
-
-        # return growthrate in the same units (number density)
-        # Multiplying by sqrt(2) G_F not done here because it causes issues with single-precision floats
-        growthrate = growthrate * ntot
-
-        #assert torch.all(torch.isfinite(F4_out))
-        #assert torch.all(torch.isfinite(growthrate))
-        #assert torch.all(torch.isfinite(stability))
-
-        # stability is determined only by box3d, output as float
-        stability = (growthrate_box3d <= 0).float()
-
-        return F4_out, growthrate, stability
+        return self._finalize_prediction(
+            F4_in_norm,
+            F4_box3d,
+            growthrate_box3d,
+            y_F4,
+            y_growthrate,
+            ntot,
+            True,
+        )

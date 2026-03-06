@@ -55,10 +55,178 @@ def configure_loader(parms, dataset_train_list):
 
     return loader
 
+def samplewise_mse(pred, true):
+    return torch.mean((pred - true).reshape(pred.shape[0], -1) ** 2, dim=1)
+
+def samplewise_constraint_penalty(F4f_pred):
+    negative_density_error = torch.minimum(F4f_pred[:, :, :, 3], torch.zeros_like(F4f_pred[:, :, :, 3]))
+    negative_density_loss = torch.mean(negative_density_error ** 2, dim=(1, 2))
+
+    flux_mag2 = torch.sum(F4f_pred[:, :, :, 0:3] ** 2, dim=3)
+    ndens2 = F4f_pred[:, :, :, 3] ** 2
+    fluxfac_error = torch.maximum(flux_mag2 - ndens2, torch.zeros_like(ndens2))
+    fluxfac_loss = torch.mean(fluxfac_error, dim=(1, 2))
+
+    return negative_density_loss + fluxfac_loss
+
+def evaluate_asymptotic_datasets(parms, model, dataset_list, traintest):
+    eval_batch_size = parms.get("eval.batch_size", parms["loader.batch_size"])
+    loss_weights = {
+        "F4": torch.exp(-model.log_task_weights["F4"]).item(),
+        "growthrate": torch.exp(-model.log_task_weights["growthrate"]).item(),
+        "unphysical": torch.exp(-model.log_task_weights["unphysical"]).item(),
+    }
+
+    aggregates = {
+        "F4_loss_sum": 0.0,
+        "growthrate_loss_sum": 0.0,
+        "unphysical_loss_sum": 0.0,
+        "stability_error_sum": 0.0,
+        "control_F4_loss_sum": 0.0,
+        "control_growthrate_loss_sum": 0.0,
+        "control_unphysical_loss_sum": 0.0,
+        "control_stability_error_sum": 0.0,
+        "F4_max": 0.0,
+        "growthrate_max": 0.0,
+        "unphysical_max": 0.0,
+        "total_samples": 0,
+    }
+    combined_errors = []
+    control_errors = []
+    constraint_errors = []
+    F4_errors = []
+    growthrate_errors = []
+    control_F4_errors = []
+    control_growthrate_errors = []
+    residual_F4_errors = []
+    residual_growthrate_errors = []
+    with torch.no_grad():
+        for dataset in dataset_list:
+            loader = DataLoader(dataset, batch_size=eval_batch_size, shuffle=False)
+            for F4i, F4f_true, growthrate_true in loader:
+                F4i = F4i.to(parms["device"])
+                F4f_true = F4f_true.to(parms["device"])
+                growthrate_true = growthrate_true.to(parms["device"])
+
+                F4f_pred, growthrate_pred, stability_pred = model.predict_all(F4i)
+                F4f_control, growthrate_control, stability_control = model.predict_control(F4i)
+
+                ntot_t = ntotal(F4f_true)
+                assert torch.all(ntot_t > 0)
+
+                F4f_true_norm = F4f_true / ntot_t[:, None, None, None]
+                F4f_pred_norm = F4f_pred / ntot_t[:, None, None, None]
+                F4f_control_norm = F4f_control / ntot_t[:, None, None, None]
+                growthrate_true_norm = growthrate_true / ntot_t
+                growthrate_pred_norm = growthrate_pred / ntot_t
+                growthrate_control_norm = growthrate_control / ntot_t
+                stability_true = (growthrate_true <= 0).float()
+
+                F4_error = samplewise_mse(F4f_pred_norm, F4f_true_norm)
+                growthrate_error = samplewise_mse(growthrate_pred_norm.unsqueeze(1), growthrate_true_norm.unsqueeze(1))
+                unphysical_error = samplewise_constraint_penalty(F4f_pred_norm)
+                stability_error = torch.abs(stability_pred - stability_true)
+
+                control_F4_error = samplewise_mse(F4f_control_norm, F4f_true_norm)
+                control_growthrate_error = samplewise_mse(growthrate_control_norm.unsqueeze(1), growthrate_true_norm.unsqueeze(1))
+                control_unphysical_error = samplewise_constraint_penalty(F4f_control_norm)
+                control_stability_error = torch.abs(stability_control - stability_true)
+
+                combined_error = F4_error + growthrate_error + unphysical_error + stability_error
+                control_error = control_F4_error + control_growthrate_error + control_unphysical_error + control_stability_error
+
+                aggregates["F4_loss_sum"] += F4_error.sum().item()
+                aggregates["growthrate_loss_sum"] += growthrate_error.sum().item()
+                aggregates["unphysical_loss_sum"] += unphysical_error.sum().item()
+                aggregates["stability_error_sum"] += stability_error.sum().item()
+                aggregates["control_F4_loss_sum"] += control_F4_error.sum().item()
+                aggregates["control_growthrate_loss_sum"] += control_growthrate_error.sum().item()
+                aggregates["control_unphysical_loss_sum"] += control_unphysical_error.sum().item()
+                aggregates["control_stability_error_sum"] += control_stability_error.sum().item()
+                aggregates["F4_max"] = max(aggregates["F4_max"], torch.max(torch.abs(F4f_pred_norm - F4f_true_norm)).item())
+                aggregates["growthrate_max"] = max(aggregates["growthrate_max"], torch.max(torch.abs(growthrate_pred_norm - growthrate_true_norm)).item())
+                aggregates["unphysical_max"] = max(aggregates["unphysical_max"], unphysical_error.max().item())
+                aggregates["total_samples"] += F4i.shape[0]
+
+                combined_errors.append(combined_error.cpu())
+                control_errors.append(control_error.cpu())
+                constraint_errors.append(unphysical_error.cpu())
+                F4_errors.append(F4_error.cpu())
+                growthrate_errors.append(growthrate_error.cpu())
+                control_F4_errors.append(control_F4_error.cpu())
+                control_growthrate_errors.append(control_growthrate_error.cpu())
+                residual_F4_errors.append(samplewise_mse(F4f_pred_norm, F4f_control_norm).cpu())
+                residual_growthrate_errors.append(samplewise_mse(growthrate_pred_norm.unsqueeze(1), growthrate_control_norm.unsqueeze(1)).cpu())
+
+    total_samples = aggregates["total_samples"]
+    if total_samples == 0:
+        return {}
+
+    combined_errors = torch.cat(combined_errors)
+    control_errors = torch.cat(control_errors)
+    constraint_errors = torch.cat(constraint_errors)
+    F4_errors = torch.cat(F4_errors)
+    growthrate_errors = torch.cat(growthrate_errors)
+    control_F4_errors = torch.cat(control_F4_errors)
+    control_growthrate_errors = torch.cat(control_growthrate_errors)
+    residual_F4_errors = torch.cat(residual_F4_errors)
+    residual_growthrate_errors = torch.cat(residual_growthrate_errors)
+
+    results = {
+        f"F4_{traintest}_loss": aggregates["F4_loss_sum"] / total_samples,
+        f"F4_{traintest}_max": aggregates["F4_max"],
+        f"growthrate_{traintest}_loss": aggregates["growthrate_loss_sum"] / total_samples,
+        f"growthrate_{traintest}_max": aggregates["growthrate_max"],
+        f"unphysical_{traintest}_loss": aggregates["unphysical_loss_sum"] / total_samples,
+        f"unphysical_{traintest}_max": aggregates["unphysical_max"],
+        f"stability_{traintest}_error": aggregates["stability_error_sum"] / total_samples,
+        f"control_F4_{traintest}_loss": aggregates["control_F4_loss_sum"] / total_samples,
+        f"control_growthrate_{traintest}_loss": aggregates["control_growthrate_loss_sum"] / total_samples,
+        f"control_unphysical_{traintest}_loss": aggregates["control_unphysical_loss_sum"] / total_samples,
+        f"control_stability_{traintest}_error": aggregates["control_stability_error_sum"] / total_samples,
+        f"control_total_{traintest}_loss": control_errors.mean().item(),
+        f"F4_{traintest}_improvement_frac": torch.mean((F4_errors <= control_F4_errors).float()).item(),
+        f"growthrate_{traintest}_improvement_frac": torch.mean((growthrate_errors <= control_growthrate_errors).float()).item(),
+        f"total_{traintest}_improvement_frac": torch.mean((combined_errors <= control_errors).float()).item(),
+        f"F4_{traintest}_residual_rms": torch.sqrt(torch.mean(residual_F4_errors)).item(),
+        f"growthrate_{traintest}_residual_rms": torch.sqrt(torch.mean(residual_growthrate_errors)).item(),
+        f"{traintest}_p95_error": torch.quantile(combined_errors, 0.95).item(),
+        f"{traintest}_p99_error": torch.quantile(combined_errors, 0.99).item(),
+        f"{traintest}_control_gap": torch.mean(torch.relu(combined_errors - control_errors)).item(),
+        f"{traintest}_exceedance_rate": torch.mean((combined_errors > control_errors).float()).item(),
+        f"{traintest}_constraint_exceedance_rate": torch.mean((constraint_errors > 0).float()).item(),
+    }
+
+    weighted_loss = (
+        loss_weights["F4"] * results[f"F4_{traintest}_loss"]
+        + loss_weights["growthrate"] * results[f"growthrate_{traintest}_loss"]
+    )
+    if parms["do_unphysical_check"]:
+        weighted_loss += loss_weights["unphysical"] * results[f"unphysical_{traintest}_loss"]
+    if any(parameter.requires_grad for parameter in model.log_task_weights.values()):
+        for name, parameter in model.log_task_weights.items():
+            if (not parms["do_unphysical_check"]) and name == "unphysical":
+                continue
+            weighted_loss += parameter.item()
+
+    results[f"{traintest}_loss"] = weighted_loss
+    results[f"{traintest}_mean_error"] = combined_errors.mean().item()
+    results[f"{traintest}_robust_score"] = (
+        results[f"{traintest}_mean_error"]
+        + results[f"{traintest}_control_gap"]
+        + 0.1 * results[f"{traintest}_p95_error"]
+        + 0.2 * results[f"{traintest}_p99_error"]
+        + 0.5 * results[f"{traintest}_exceedance_rate"]
+        + 0.5 * results[f"{traintest}_constraint_exceedance_rate"]
+        + 0.25 * results[f"stability_{traintest}_error"]
+    )
+
+    return results
 
 def train_asymptotic_model(parms,
                            dataset_asymptotic_train_list,
-                           dataset_asymptotic_test_list):
+                           dataset_asymptotic_test_list,
+                           report_fn = None):
 
     # print out all parameters for the record
     parmfile = open(os.getcwd()+"/parameters.txt","w")
@@ -111,12 +279,6 @@ def train_asymptotic_model(parms,
     loader_asymptotic = configure_loader(parms, dataset_asymptotic_train_list)
 
 
-    def contribute_loss(pred, true, traintest, key, loss_fn):
-        loss = loss_fn(pred, true)
-        loss_dict[key+"_"+traintest+"_loss"] += loss.item()
-        loss_dict[key+"_"+traintest+"_max"]  = max(max_error(pred, true), loss_dict[key+"_"+traintest+"_max"])
-        return loss
-
     # set up file for writing performance metrics
     loss_file = open(os.getcwd()+"/loss.dat","w")
     
@@ -125,6 +287,7 @@ def train_asymptotic_model(parms,
     #===============#
     print("#STARTING TRAINING LOOP")
     torch.backends.cudnn.benchmark = True # may help with performance
+    final_metrics = {}
     for epoch in range(1,parms["epochs"]+1):
         # set up the loss dictionary for IO
         loss_dict = {}
@@ -185,70 +348,11 @@ def train_asymptotic_model(parms,
         #============================#
         model.eval()
 
-        loss_dict["F4_train_loss"] = 0
-        loss_dict["F4_train_max"] = 0
-        loss_dict["F4_test_loss"] = 0
-        loss_dict["F4_test_max"] = 0
-        loss_dict["growthrate_train_loss"] = 0
-        loss_dict["growthrate_train_max"] = 0
-        loss_dict["growthrate_test_loss"] = 0
-        loss_dict["growthrate_test_max"] = 0
-        loss_dict["unphysical_train_loss"] = 0
-        loss_dict["unphysical_train_max"] = 0
-        loss_dict["unphysical_test_loss"] = 0
-        loss_dict["unphysical_test_max"] = 0
-
-        # Asymptotic losses
-        def accumulate_asymptotic_loss(dataset_list, traintest):
-            total_loss = torch.tensor(0.0, requires_grad=False)
-            for dataset in dataset_list:
-                F4i = dataset.tensors[0].to(parms["device"])
-                F4f_true = dataset.tensors[1].to(parms["device"])
-                growthrate_true = dataset.tensors[2].to(parms["device"])
-
-                # get predicted values from the model
-                F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
-
-                # normalize quantities by ntotal before computing losses to avoid floating point issues
-                ntot_t = ntotal(F4f_true)
-                ntot_p = ntotal(F4f_pred)
-                assert torch.all(ntot_t > 0)
-                assert torch.all(ntot_p > 0)
-                F4f_true = F4f_true / ntot_t[:,None,None,None]
-                F4f_pred = F4f_pred / ntot_p[:,None,None,None]
-                growthrate_true = growthrate_true / ntot_t
-                growthrate_pred = growthrate_pred / ntot_p
-
-                # accumulate losses
-                total_loss = total_loss + torch.exp(-model.log_task_weights["F4"]     ) * contribute_loss(F4f_pred,
-                                                                                                          F4f_true,
-                                                                                                          traintest, "F4", comparison_loss_fn)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss(growthrate_pred, #torch.log
-                                                                                                             growthrate_true, #torch.log
-                                                                                                             traintest, "growthrate", comparison_loss_fn)
-                unphysical_loss = torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred,
-                                                                                                     None,
-                                                                                                     traintest, "unphysical", unphysical_loss_fn)
-                if parms["do_unphysical_check"]:
-                    total_loss = total_loss + unphysical_loss
-
-                # add loss weights to loss
-                if parms["do_learn_task_weights"]:
-                    for name in model.log_task_weights.keys():
-                        if (not parms["do_unphysical_check"]) and name=="unphysical":
-                            continue
-                        else:
-                            total_loss = total_loss + torch.sum(model.log_task_weights[name])
-
-            return total_loss
-
-        with torch.no_grad():
-            train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
-            test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
-
-        # track the total loss
-        loss_dict["train_loss"] = train_loss.item()
-        loss_dict["test_loss"]  =  test_loss.item()
+        train_metrics = evaluate_asymptotic_datasets(parms, model, dataset_asymptotic_train_list, "train")
+        test_metrics = evaluate_asymptotic_datasets(parms, model, dataset_asymptotic_test_list, "test")
+        loss_dict.update(train_metrics)
+        loss_dict.update(test_metrics)
+        loss_dict["validation_score"] = loss_dict["test_robust_score"]
 
         # track the task weights
         for name in model.log_task_weights.keys():
@@ -264,7 +368,7 @@ def train_asymptotic_model(parms,
         else:
             scheduler = schedulers[1]
             loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
-            scheduler.step(train_loss.item())
+            scheduler.step(loss_dict["validation_score"])
 
         #==========================================#
         # OUTPUT LOSS METRICS AND MODEL PARAMETERS #
@@ -289,12 +393,20 @@ def train_asymptotic_model(parms,
         stop_early = (scheduler.get_last_lr()[0]<=parms["min_lr"]) and (epoch>parms["warmup_iters"])
 
         # output
-        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
+        print(
+            f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  "
+            f"{loss_dict['test_loss']:12.5e}  {loss_dict['validation_score']:12.5e}",
+            flush=True,
+        )
         if(epoch%parms["output_every"]==0 or stop_early):
             outfilename = os.getcwd()+"/model"+str(epoch)
             F4i = dataset_asymptotic_test_list[0].tensors[0]
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
+
+        final_metrics = dict(loss_dict)
+        if report_fn is not None:
+            report_fn(dict(loss_dict))
 
         # exit the loop if the learning rate is too low
         if stop_early:
@@ -302,4 +414,4 @@ def train_asymptotic_model(parms,
             break
         
 
-    return
+    return final_metrics
