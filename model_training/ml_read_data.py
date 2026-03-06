@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 import torch
 import ml_tools as ml
 import sys
+import ml_constants as constants
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
@@ -33,7 +34,7 @@ def read_asymptotic_data(parms):
             # We want [simulationIndex, nu/nubar, flavor, xyzt]
             F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1) 
             F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
-            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...])
+            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...]) / constants.ndens_to_invsec
             assert(parms["NF"] == int(np.array(f_in["nf"])) )
             assert(torch.all(torch.isfinite(F4_initial)))
             assert(torch.all(torch.isfinite(F4_final)))
@@ -77,6 +78,13 @@ def read_asymptotic_data(parms):
         if parms["average_heavies_in_final_state"]:
             assert(torch.allclose( torch.mean(F4_initial[:,:,1:,:], dim=2), F4_initial[:,:,1,:] ))
             F4_final[:,:,1:,:] = torch.mean(F4_final[:,:,1:,:], dim=2, keepdim=True)
+
+        # remove any points where the flux factor is larger than 0.9 in any of the nunubar/flavor species, but separately for each data point
+        fluxfac = ml.flux_factor(F4_initial)
+        goodlocs = torch.where(torch.all(fluxfac < 0.9, dim=(1,2)))[0]
+        F4_initial = F4_initial[goodlocs,...]
+        F4_final   = F4_final  [goodlocs,...]
+        growthrate = growthrate[goodlocs]
 
         # add dataset to the lists
         if dind==0:

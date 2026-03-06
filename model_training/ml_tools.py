@@ -29,7 +29,7 @@ def ntotal(F4):
 # input dimensions: [sim, nu/nubar, flavor, xyzt]
 # output dimensions: [sim, nunubar, flavor]
 def flux_factor(F4):
-    return torch.sqrt(torch.sum(F4[:,:,:,:3]**2, dim=1)) / F4[:,:,:,3]
+    return torch.sqrt(torch.sum( (F4[:,:,:,:3]/F4[:,:,:,3:])**2, dim=3))
 
 def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     ntot = ntotal(F4_initial_list)
@@ -43,7 +43,7 @@ def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
     N_Nbar_difference = (N_Nbar_initial - N_Nbar_final) # [sim, flavor]
     N_Nbar_error = torch.max(torch.abs(N_Nbar_difference)/ntot[:,None]) # [sim, flavor]
     print("#    N_Nbar_error = ", N_Nbar_error.item())
-    #assert(N_Nbar_error < tolerance)
+    assert(N_Nbar_error < tolerance)
 
     # check for number conservation
     F4_flavorsum_initial = torch.sum(F4_initial_list, dim=(2)) # [sim, nu/nubar, xyzt]
@@ -84,6 +84,10 @@ def restrict_F4_to_physical(F4_final):
 
 def save_model(model, outfilename, device, F4i_test):
     with torch.no_grad():
-        scripted_model = e3nn.util.jit.script(model)
+        # create a copy of the model so scripting doesn't modify the original
+        modelcopy = copy.deepcopy(model)
+        
+        # script the model and save it
+        scripted_model = e3nn.util.jit.script(modelcopy.to(device))
         torch.jit.save(scripted_model, outfilename+"_"+device+".pt")
         print("Saving to",outfilename+"_"+device+".pt")

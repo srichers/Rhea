@@ -58,9 +58,7 @@ def configure_loader(parms, dataset_train_list):
 
 def train_asymptotic_model(parms,
                            dataset_asymptotic_train_list,
-                           dataset_asymptotic_test_list,
-                           dataset_stable_train_list,
-                           dataset_stable_test_list):
+                           dataset_asymptotic_test_list):
 
     # print out all parameters for the record
     parmfile = open(os.getcwd()+"/parameters.txt","w")
@@ -111,7 +109,6 @@ def train_asymptotic_model(parms,
     #=========================#
     print("#SETTING UP DATA LOADERS")
     loader_asymptotic = configure_loader(parms, dataset_asymptotic_train_list)
-    loader_stable     = configure_loader(parms, dataset_stable_train_list    )
 
 
     def contribute_loss(pred, true, traintest, key, loss_fn):
@@ -136,20 +133,16 @@ def train_asymptotic_model(parms,
         #============================#
         # TRAINING LOOP OVER BATCHES #
         #============================#
-        assert(len(loader_asymptotic)==len(loader_stable))
         model.train()
-        for (F4i_asymptotic_train, F4f_true_train, growthrate_true_train),(F4i_stable_train, stable_true_train) in zip(loader_asymptotic, loader_stable):
+        for (F4i_asymptotic_train, F4f_true_train, growthrate_true_train) in loader_asymptotic:
 
             # move the minibatch to the device
             F4i_asymptotic_train = F4i_asymptotic_train.to(parms["device"])
             F4f_true_train = F4f_true_train.to(parms["device"])
             growthrate_true_train = growthrate_true_train.to(parms["device"])
-            F4i_stable_train = F4i_stable_train.to(parms["device"])
-            stable_true_train = stable_true_train.to(parms["device"])
 
             # get predicted values from the model
-            F4f_pred_train, growthrate_pred_train, _                 = model.predict_all(F4i_asymptotic_train)
-            _           , _                      , stable_pred_train = model.predict_all(F4i_stable_train    )
+            F4f_pred_train, growthrate_pred_train, stable = model.predict_all(F4i_asymptotic_train)
 
             # convert F4 to densities and fluxes to feed to loss functions
             # note the outputs are all normalized to the total number density
@@ -171,7 +164,6 @@ def train_asymptotic_model(parms,
 
             # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
             batch_loss = 0.0
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["stability"] ) * stability_loss_fn(stable_pred_train, stable_true_train)
             batch_loss = batch_loss + torch.exp(-model.log_task_weights["F4"]     ) * comparison_loss_fn(F4f_pred_train, F4f_true_train)
             batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn(growthrate_pred_train, growthrate_true_train)
             if parms["do_unphysical_check"]:
@@ -205,10 +197,6 @@ def train_asymptotic_model(parms,
         loss_dict["unphysical_train_max"] = 0
         loss_dict["unphysical_test_loss"] = 0
         loss_dict["unphysical_test_max"] = 0
-        loss_dict["stability_train_loss"] = 0
-        loss_dict["stability_train_max"] = 0
-        loss_dict["stability_test_loss"] = 0
-        loss_dict["stability_test_max"] = 0
 
         # Asymptotic losses
         def accumulate_asymptotic_loss(dataset_list, traintest):
@@ -244,32 +232,19 @@ def train_asymptotic_model(parms,
                 if parms["do_unphysical_check"]:
                     total_loss = total_loss + unphysical_loss
 
+                # add loss weights to loss
+                if parms["do_learn_task_weights"]:
+                    for name in model.log_task_weights.keys():
+                        if (not parms["do_unphysical_check"]) and name=="unphysical":
+                            continue
+                        else:
+                            total_loss = total_loss + torch.sum(model.log_task_weights[name])
+
             return total_loss
 
         with torch.no_grad():
             train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
             test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
-
-        # Stability losses
-        def accumulate_stable_loss(dataset_list, traintest):
-            total_loss = torch.tensor(0.0, requires_grad=False)
-            for dataset in dataset_list:
-                F4i = dataset.tensors[0].to(parms["device"])
-                stable_true = dataset.tensors[1].to(parms["device"])
-
-                _, _, y_stable_pred = model.predict_all(F4i)
-
-                #print(torch.sum(torch.abs(torch.sigmoid(y_stable_pred)-stable_true)).item()/y_stable_pred.shape[0],"fractional difference in stable points")
-
-                this_loss = torch.exp(-model.log_task_weights["stability"] ) * \
-                    contribute_loss(y_stable_pred, stable_true, traintest, "stability", stability_loss_fn)
-                #print("  stability loss contribution:", this_loss.item())
-                total_loss = total_loss + this_loss
-            return total_loss
-        
-        with torch.no_grad():
-            train_loss = train_loss + accumulate_stable_loss(dataset_stable_train_list, "train")
-            test_loss  = test_loss  + accumulate_stable_loss(dataset_stable_test_list , "test" )
 
         # track the total loss
         loss_dict["train_loss"] = train_loss.item()
