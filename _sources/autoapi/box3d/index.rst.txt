@@ -1,0 +1,41 @@
+box3d
+=====
+
+.. py:module:: box3d
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   box3d.pts
+   box3d.weights
+   box3d.F4
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   box3d.get_Z
+   box3d.distrib
+   box3d.mixBox3D_lebedev
+
+
+Module Contents
+---------------
+
+.. py:data:: pts
+
+.. py:data:: weights
+
+.. py:function:: get_Z(fluxfac)
+
+.. py:function:: distrib(n, Z, mu)
+
+.. py:function:: mixBox3D_lebedev(F4, pts, weights)
+
+.. py:data:: F4
+

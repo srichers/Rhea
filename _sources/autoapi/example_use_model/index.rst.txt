@@ -1,0 +1,68 @@
+example_use_model
+=================
+
+.. py:module:: example_use_model
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This reads a trained model and passes a sample data point through it.
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   example_use_model.model_filename
+   example_use_model.model
+   example_use_model.device
+   example_use_model.NF
+   example_use_model.F4_test
+   example_use_model.before
+   example_use_model.before
+   example_use_model.before_rotated
+   example_use_model.after_rotated
+   example_use_model.before_permuted
+   example_use_model.after_permuted
+   example_use_model.before_flavor_permuted
+   example_use_model.after_flavor_permuted
+
+
+Module Contents
+---------------
+
+.. py:data:: model_filename
+
+.. py:data:: model
+
+.. py:data:: device
+   :value: 'cuda'
+
+
+.. py:data:: NF
+   :value: 3
+
+
+.. py:data:: F4_test
+
+.. py:data:: before
+
+.. py:data:: before
+
+.. py:data:: before_rotated
+
+.. py:data:: after_rotated
+
+.. py:data:: before_permuted
+
+.. py:data:: after_permuted
+
+.. py:data:: before_flavor_permuted
+
+.. py:data:: after_flavor_permuted
+

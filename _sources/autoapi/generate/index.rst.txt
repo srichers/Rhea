@@ -1,0 +1,49 @@
+generate
+========
+
+.. py:module:: generate
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file contains a variety of functions that generate randomized distributions
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   generate.NF
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   generate.generate_stable_F4_zerofluxfac
+   generate.generate_stable_F4_oneflavor
+   generate.generate_random_F4
+   generate.write_stable_dataset
+
+
+Module Contents
+---------------
+
+.. py:function:: generate_stable_F4_zerofluxfac(NF, n_generate, average_heavies_in_final_state)
+
+.. py:function:: generate_stable_F4_oneflavor(NF, n_generate, average_heavies_in_final_state)
+
+.. py:function:: generate_random_F4(NF, n_generate, average_heavies_in_final_state, zero_weight, max_fluxfac)
+
+.. py:function:: write_stable_dataset(outfilename, F4i, stable)
+
+.. py:data:: NF
+   :value: 3
+
+
