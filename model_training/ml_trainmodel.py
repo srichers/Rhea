@@ -225,7 +225,8 @@ def evaluate_asymptotic_datasets(parms, model, dataset_list, traintest):
 
 def train_asymptotic_model(parms,
                            dataset_asymptotic_train_list,
-                           dataset_asymptotic_test_list):
+                           dataset_asymptotic_test_list,
+                           report_fn = None):
 
     # print out all parameters for the record
     parmfile = open(os.getcwd()+"/parameters.txt","w")
@@ -286,6 +287,7 @@ def train_asymptotic_model(parms,
     #===============#
     print("#STARTING TRAINING LOOP")
     torch.backends.cudnn.benchmark = True # may help with performance
+    final_metrics = {}
     for epoch in range(1,parms["epochs"]+1):
         # set up the loss dictionary for IO
         loss_dict = {}
@@ -402,10 +404,14 @@ def train_asymptotic_model(parms,
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
 
+        final_metrics = dict(loss_dict)
+        if report_fn is not None:
+            report_fn(dict(loss_dict))
+
         # exit the loop if the learning rate is too low
         if stop_early:
             print("Learning rate below minimum threshold - stopping training")
             break
         
 
-    return
+    return final_metrics
