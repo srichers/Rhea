@@ -4,7 +4,7 @@ Author: John McGuigan
 
 Copyright: GPLv3 (see LICENSE file)
 
-Minimal trial runner for config-driven training and Syne Tune integration.
+Minimal trial runner for parms-driven training and Syne Tune integration.
 '''
 
 import argparse
@@ -14,52 +14,6 @@ from pathlib import Path
 import e3nn.o3
 
 from ml_pytorch import build_default_parms, run_default_training
-
-
-def parse_key_value(raw):
-    if "=" not in raw:
-        raise argparse.ArgumentTypeError("Overrides must be formatted as key=value")
-    key, value = raw.split("=", 1)
-    if not key:
-        raise argparse.ArgumentTypeError("Override key cannot be empty")
-    return key, value
-
-
-def parse_bool(raw_value):
-    lowered = raw_value.strip().lower()
-    if lowered in {"1", "true", "yes", "on"}:
-        return True
-    if lowered in {"0", "false", "no", "off"}:
-        return False
-    raise ValueError(f"Could not parse boolean value '{raw_value}'")
-
-
-def parse_unknown_args(unknown_args):
-    parsed = {}
-    i = 0
-    while i < len(unknown_args):
-        token = unknown_args[i]
-        if not token.startswith("--"):
-            raise ValueError(f"Unexpected argument '{token}'")
-        if i + 1 >= len(unknown_args):
-            raise ValueError(f"Missing value for argument '{token}'")
-        key = token[2:]
-        parsed[key] = unknown_args[i + 1]
-        i += 2
-    return parsed
-
-
-def pop_json_config_arg(override_map):
-    return override_map.pop("st_config_json_filename", None)
-
-
-def pop_bool_override(override_map, key):
-    if key not in override_map:
-        return False
-    raw_value = override_map.pop(key)
-    if isinstance(raw_value, bool):
-        return raw_value
-    return parse_bool(raw_value)
 
 
 def load_json_dict(filename):
@@ -81,7 +35,12 @@ def coerce_override(key, raw_value, current_value):
             return raw_value
 
     if isinstance(current_value, bool):
-        return parse_bool(raw_value)
+        lowered = raw_value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+        raise ValueError(f"Could not parse boolean value '{raw_value}'")
     if isinstance(current_value, int) and not isinstance(current_value, bool):
         return int(raw_value)
     if isinstance(current_value, float):
@@ -102,6 +61,10 @@ def apply_overrides(parms, overrides):
     return resolved
 
 
+def is_irreps(value):
+    return value.__class__.__name__ == "Irreps"
+
+
 def serialize_config_value(value):
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
@@ -109,7 +72,7 @@ def serialize_config_value(value):
         return [serialize_config_value(item) for item in value]
     if isinstance(value, dict):
         return {str(key): serialize_config_value(item) for key, item in value.items()}
-    if current_is_irreps(value):
+    if is_irreps(value):
         return str(value)
     if hasattr(value, "__module__") and hasattr(value, "__name__"):
         return f"{value.__module__}.{value.__name__}"
@@ -118,14 +81,11 @@ def serialize_config_value(value):
     return str(value)
 
 
-def current_is_irreps(value):
-    return value.__class__.__name__ == "Irreps"
-
-
-def build_report_callback(enable_syne_tune):
+def build_report_callback(parms):
     history = []
     reporter = None
-    if enable_syne_tune:
+    syne_tune_cfg = parms.get("syne_tune", {})
+    if syne_tune_cfg.get("report", False):
         try:
             from syne_tune import Reporter
         except ImportError as exc:
@@ -147,73 +107,76 @@ def build_report_callback(enable_syne_tune):
     return report_fn, history
 
 
-def summarize_history(history, final_metrics):
+def summarize_history(history, final_metrics, parms):
+    syne_tune_cfg = parms.get("syne_tune", {})
+    metric_name = syne_tune_cfg.get("metric", "validation_score")
+    mode = syne_tune_cfg.get("mode", "min")
+
     if not history:
         return {
             "status": "completed",
+            "metric": metric_name,
+            "mode": mode,
             "epochs_reported": 0,
             "final_metrics": final_metrics,
         }
 
-    best_metrics = min(history, key=lambda metrics: metrics["validation_score"])
+    if mode == "max":
+        best_metrics = max(history, key=lambda metrics: metrics[metric_name])
+    else:
+        best_metrics = min(history, key=lambda metrics: metrics[metric_name])
+
     return {
         "status": "completed",
+        "metric": metric_name,
+        "mode": mode,
         "epochs_reported": len(history),
         "best_epoch": int(best_metrics["epoch"]),
-        "best_validation_score": float(best_metrics["validation_score"]),
+        "best_metric_value": float(best_metrics[metric_name]),
         "final_epoch": int(final_metrics["epoch"]),
-        "final_validation_score": float(final_metrics["validation_score"]),
+        "final_metric_value": float(final_metrics[metric_name]),
         "best_metrics": best_metrics,
         "final_metrics": final_metrics,
     }
 
 
+def load_trial_parms():
+    parser = argparse.ArgumentParser(description="Run one training trial using the parms dictionary")
+    parser.add_argument(
+        "--st_config_json_filename",
+        type=Path,
+        help="Syne Tune JSON config handoff. No manual CLI overrides are supported.",
+    )
+    args = parser.parse_args()
+
+    parms = build_default_parms()
+    if args.st_config_json_filename is not None:
+        parms = apply_overrides(parms, load_json_dict(args.st_config_json_filename))
+    return parms
+
+
+def write_json(path, payload):
+    with open(path, "w", encoding="utf-8") as outfile:
+        json.dump(payload, outfile, indent=2, sort_keys=True)
+        outfile.write("\n")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Run one training trial with optional Syne Tune reporting")
-    parser.add_argument("--config", type=Path, help="Path to a JSON file containing flat parameter overrides")
-    parser.add_argument("--set", dest="set_overrides", action="append", type=parse_key_value, default=[],
-                        help="Flat key=value override. May be passed multiple times.")
-    parser.add_argument("--output-dir", type=Path, default=Path("."),
-                        help="Directory for resolved config and trial summary artifacts")
-    parser.add_argument("--report-to-syne-tune", action="store_true",
-                        help="Emit per-epoch metrics through syne_tune.Reporter")
-    args, unknown_args = parser.parse_known_args()
-
-    cli_overrides = parse_unknown_args(unknown_args)
-    syne_tune_json_path = pop_json_config_arg(cli_overrides)
-    report_from_cli_config = pop_bool_override(cli_overrides, "report_to_syne_tune")
-
-    overrides = {}
-    if args.config is not None:
-        overrides.update(load_json_dict(args.config))
-    if syne_tune_json_path is not None:
-        overrides.update(load_json_dict(syne_tune_json_path))
-    overrides.update(cli_overrides)
-    overrides.update(dict(args.set_overrides))
-    report_from_overrides = pop_bool_override(overrides, "report_to_syne_tune")
-
-    parms = apply_overrides(build_default_parms(), overrides)
-
-    output_dir = args.output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    parms = load_trial_parms()
+    output_dir = Path.cwd()
     resolved_config_path = output_dir / "trial_config_resolved.json"
     summary_path = output_dir / "trial_summary.json"
 
-    with open(resolved_config_path, "w", encoding="utf-8") as outfile:
-        json.dump({key: serialize_config_value(value) for key, value in parms.items()}, outfile, indent=2, sort_keys=True)
-        outfile.write("\n")
-
-    enable_syne_tune_reporting = (
-        args.report_to_syne_tune
-        or report_from_cli_config
-        or report_from_overrides
-        or syne_tune_json_path is not None
+    write_json(
+        resolved_config_path,
+        {key: serialize_config_value(value) for key, value in parms.items()},
     )
-    report_fn, history = build_report_callback(enable_syne_tune_reporting)
+
+    report_fn, history = build_report_callback(parms)
 
     try:
         final_metrics = run_default_training(parms=parms, report_fn=report_fn)
-        summary = summarize_history(history, final_metrics)
+        summary = summarize_history(history, final_metrics, parms)
     except Exception as exc:
         summary = {
             "status": "failed",
@@ -222,14 +185,10 @@ def main():
             "epochs_reported": len(history),
             "partial_history": history,
         }
-        with open(summary_path, "w", encoding="utf-8") as outfile:
-            json.dump(summary, outfile, indent=2, sort_keys=True)
-            outfile.write("\n")
+        write_json(summary_path, summary)
         raise
 
-    with open(summary_path, "w", encoding="utf-8") as outfile:
-        json.dump(summary, outfile, indent=2, sort_keys=True)
-        outfile.write("\n")
+    write_json(summary_path, summary)
 
 
 if __name__ == "__main__":

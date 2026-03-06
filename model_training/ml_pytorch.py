@@ -90,6 +90,31 @@ def build_default_parms():
     #========================#
     parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
 
+    parms["syne_tune"] = {
+        "report": True,
+        "metric": "validation_score",
+        "mode": "min",
+        "resource_attr": "epoch",
+        "max_resource_attr": "epochs",
+        "backend": {
+            "pass_args_as_json": True,
+            "rotate_gpus": True,
+            "num_gpus_per_trial": 1,
+        },
+        "scheduler": {
+            "searcher": "random",
+            "type": "stopping",
+            "grace_period": 1,
+            "reduction_factor": 3,
+        },
+        "tuner": {
+            "n_workers": 1,
+        },
+        "stop": {
+            "max_wallclock_time": 3600,
+        },
+    }
+
     return parms
 
 
