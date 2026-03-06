@@ -96,12 +96,31 @@ def build_default_parms():
         "mode": "min",
         "resource_attr": "epoch",
         "max_resource_attr": "epochs",
+        "config_space": {
+            "epochs": 10,
+            "learning_rate": {
+                "type": "loguniform",
+                "lower": 1e-5,
+                "upper": 1e-3,
+            },
+            "loader.batch_size": {
+                "type": "randint",
+                "lower": 8,
+                "upper": 64,
+            },
+            "adamw.weight_decay": {
+                "type": "loguniform",
+                "lower": 1e-8,
+                "upper": 1e-2,
+            },
+        },
         "backend": {
             "pass_args_as_json": True,
             "rotate_gpus": True,
             "num_gpus_per_trial": 1,
         },
         "scheduler": {
+            "name": "hyperband",
             "searcher": "random",
             "type": "stopping",
             "grace_period": 1,
