@@ -53,6 +53,15 @@ def pop_json_config_arg(override_map):
     return override_map.pop("st_config_json_filename", None)
 
 
+def pop_bool_override(override_map, key):
+    if key not in override_map:
+        return False
+    raw_value = override_map.pop(key)
+    if isinstance(raw_value, bool):
+        return raw_value
+    return parse_bool(raw_value)
+
+
 def load_json_dict(filename):
     with open(filename, "r", encoding="utf-8") as infile:
         data = json.load(infile)
@@ -172,6 +181,7 @@ def main():
 
     cli_overrides = parse_unknown_args(unknown_args)
     syne_tune_json_path = pop_json_config_arg(cli_overrides)
+    report_from_cli_config = pop_bool_override(cli_overrides, "report_to_syne_tune")
 
     overrides = {}
     if args.config is not None:
@@ -180,6 +190,7 @@ def main():
         overrides.update(load_json_dict(syne_tune_json_path))
     overrides.update(cli_overrides)
     overrides.update(dict(args.set_overrides))
+    report_from_overrides = pop_bool_override(overrides, "report_to_syne_tune")
 
     parms = apply_overrides(build_default_parms(), overrides)
 
@@ -192,7 +203,13 @@ def main():
         json.dump({key: serialize_config_value(value) for key, value in parms.items()}, outfile, indent=2, sort_keys=True)
         outfile.write("\n")
 
-    report_fn, history = build_report_callback(args.report_to_syne_tune)
+    enable_syne_tune_reporting = (
+        args.report_to_syne_tune
+        or report_from_cli_config
+        or report_from_overrides
+        or syne_tune_json_path is not None
+    )
+    report_fn, history = build_report_callback(enable_syne_tune_reporting)
 
     try:
         final_metrics = run_default_training(parms=parms, report_fn=report_fn)
