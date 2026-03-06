@@ -284,7 +284,7 @@ class NeuralNetwork(nn.Module):
 
         return F4_out
 
-    def _finalize_prediction(self, F4_in_norm, F4_box3d, growthrate_box3d, F4_residual, growthrate_residual, ntot, apply_constraints):
+    def _finalize_prediction(self, F4_in_norm, F4_box3d, growthrate_box3d, F4_residual, growthrate_residual, ntot, apply_constraints: bool):
         nsims = F4_in_norm.shape[0]
 
         F4_out = F4_box3d + F4_residual.reshape((nsims, 2, self.NF, 4))
@@ -296,7 +296,7 @@ class NeuralNetwork(nn.Module):
 
         return F4_out * ntot[:, None, None, None], growthrate * ntot, stability
 
-    def _predict_baseline_variant(self, F4_in, apply_constraints):
+    def _predict_baseline_variant(self, F4_in, apply_constraints: bool):
         _, F4_in_norm, ntot = self._prepare_input(F4_in)
         F4_box3d, growthrate_box3d = self._predict_box3d_normalized(F4_in_norm)
         zero_F4 = torch.zeros_like(F4_box3d)
