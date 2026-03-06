@@ -69,41 +69,6 @@ def samplewise_constraint_penalty(F4f_pred):
 
     return negative_density_loss + fluxfac_loss
 
-def evaluate_symmetry_metrics(model, F4i):
-    if F4i.shape[0] == 0:
-        return {}
-
-    F4i = F4i[: min(8, F4i.shape[0])]
-    F4_out, growthrate, stability = model.predict_all(F4i)
-
-    xy_swap = torch.tensor([1, 0, 2, 3], device=F4i.device)
-    nunubar_swap = torch.tensor([1, 0], device=F4i.device)
-    flavor_swap = torch.tensor([1, 0, 2], device=F4i.device)
-
-    before_rotated = F4i.index_select(3, xy_swap)
-    after_rotated_expected = F4_out.index_select(3, xy_swap)
-    after_rotated, growthrate_rotated, stability_rotated = model.predict_all(before_rotated)
-
-    before_nunubar = F4i.index_select(1, nunubar_swap)
-    after_nunubar_expected = F4_out.index_select(1, nunubar_swap)
-    after_nunubar, growthrate_nunubar, stability_nunubar = model.predict_all(before_nunubar)
-
-    before_flavor = F4i.index_select(2, flavor_swap)
-    after_flavor_expected = F4_out.index_select(2, flavor_swap)
-    after_flavor, growthrate_flavor, stability_flavor = model.predict_all(before_flavor)
-
-    return {
-        "rotation_xy_F4_max": torch.max(torch.abs(after_rotated_expected - after_rotated)).item(),
-        "rotation_xy_growthrate_max": torch.max(torch.abs(growthrate - growthrate_rotated)).item(),
-        "rotation_xy_stability_max": torch.max(torch.abs(stability - stability_rotated)).item(),
-        "nunubar_swap_F4_max": torch.max(torch.abs(after_nunubar_expected - after_nunubar)).item(),
-        "nunubar_swap_growthrate_max": torch.max(torch.abs(growthrate - growthrate_nunubar)).item(),
-        "nunubar_swap_stability_max": torch.max(torch.abs(stability - stability_nunubar)).item(),
-        "flavor_swap_F4_max": torch.max(torch.abs(after_flavor_expected - after_flavor)).item(),
-        "flavor_swap_growthrate_max": torch.max(torch.abs(growthrate - growthrate_flavor)).item(),
-        "flavor_swap_stability_max": torch.max(torch.abs(stability - stability_flavor)).item(),
-    }
-
 def evaluate_asymptotic_datasets(parms, model, dataset_list, traintest):
     eval_batch_size = parms.get("eval.batch_size", parms["loader.batch_size"])
     loss_weights = {
@@ -135,12 +100,10 @@ def evaluate_asymptotic_datasets(parms, model, dataset_list, traintest):
     control_growthrate_errors = []
     residual_F4_errors = []
     residual_growthrate_errors = []
-    symmetry_metrics = {}
-
     with torch.no_grad():
         for dataset in dataset_list:
             loader = DataLoader(dataset, batch_size=eval_batch_size, shuffle=False)
-            for batch_index, (F4i, F4f_true, growthrate_true) in enumerate(loader):
+            for F4i, F4f_true, growthrate_true in loader:
                 F4i = F4i.to(parms["device"])
                 F4f_true = F4f_true.to(parms["device"])
                 growthrate_true = growthrate_true.to(parms["device"])
@@ -194,9 +157,6 @@ def evaluate_asymptotic_datasets(parms, model, dataset_list, traintest):
                 control_growthrate_errors.append(control_growthrate_error.cpu())
                 residual_F4_errors.append(samplewise_mse(F4f_pred_norm, F4f_control_norm).cpu())
                 residual_growthrate_errors.append(samplewise_mse(growthrate_pred_norm.unsqueeze(1), growthrate_control_norm.unsqueeze(1)).cpu())
-
-                if traintest == "test" and not symmetry_metrics and batch_index == 0:
-                    symmetry_metrics = evaluate_symmetry_metrics(model, F4i)
 
     total_samples = aggregates["total_samples"]
     if total_samples == 0:
@@ -260,9 +220,6 @@ def evaluate_asymptotic_datasets(parms, model, dataset_list, traintest):
         + 0.5 * results[f"{traintest}_constraint_exceedance_rate"]
         + 0.25 * results[f"stability_{traintest}_error"]
     )
-
-    for key, value in symmetry_metrics.items():
-        results[f"{traintest}_{key}"] = value
 
     return results
 
