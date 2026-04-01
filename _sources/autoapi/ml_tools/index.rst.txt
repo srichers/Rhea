@@ -1,0 +1,43 @@
+ml_tools
+========
+
+.. py:module:: ml_tools
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file contains a variety of utilities used in the model training process.
+
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_tools.dot4
+   ml_tools.ntotal
+   ml_tools.flux_factor
+   ml_tools.check_conservation
+   ml_tools.restrict_F4_to_physical
+   ml_tools.save_model
+
+
+Module Contents
+---------------
+
+.. py:function:: dot4(v1, v2)
+
+.. py:function:: ntotal(F4)
+
+.. py:function:: flux_factor(F4)
+
+.. py:function:: check_conservation(F4_initial_list, F4_final_list, tolerance=0.001)
+
+.. py:function:: restrict_F4_to_physical(F4_final)
+
+.. py:function:: save_model(model, outfilename, device, F4i_test)
+

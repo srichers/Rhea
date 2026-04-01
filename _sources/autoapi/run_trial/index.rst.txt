@@ -1,0 +1,58 @@
+run_trial
+=========
+
+.. py:module:: run_trial
+
+.. autoapi-nested-parse::
+
+   Author: John McGuigan
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   Minimal trial runner for parms-driven training and Syne Tune integration.
+
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   run_trial.load_json_dict
+   run_trial.coerce_override
+   run_trial.apply_overrides
+   run_trial.is_irreps
+   run_trial.serialize_config_value
+   run_trial.build_report_callback
+   run_trial.summarize_history
+   run_trial.load_trial_parms
+   run_trial.should_report_to_syne_tune
+   run_trial.write_json
+   run_trial.main
+
+
+Module Contents
+---------------
+
+.. py:function:: load_json_dict(filename)
+
+.. py:function:: coerce_override(key, raw_value, current_value)
+
+.. py:function:: apply_overrides(parms, overrides)
+
+.. py:function:: is_irreps(value)
+
+.. py:function:: serialize_config_value(value)
+
+.. py:function:: build_report_callback(enable_reporting)
+
+.. py:function:: summarize_history(history, final_metrics, parms)
+
+.. py:function:: load_trial_parms()
+
+.. py:function:: should_report_to_syne_tune(parms, st_config_json_filename)
+
+.. py:function:: write_json(path, payload)
+
+.. py:function:: main()
+

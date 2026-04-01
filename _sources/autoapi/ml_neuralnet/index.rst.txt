@@ -1,0 +1,143 @@
+ml_neuralnet
+============
+
+.. py:module:: ml_neuralnet
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file contains the structure of the neural network, including the means of transforming between angular moments and the actual inputs/outputs of the ML model
+
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ml_neuralnet.PETP_Norm
+   ml_neuralnet.PETP_Quadratic
+   ml_neuralnet.PE_GatedBlock
+   ml_neuralnet.PE_ResidualGatedBlock
+   ml_neuralnet.NeuralNetwork
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_neuralnet.PE_inputs
+
+
+Module Contents
+---------------
+
+.. py:function:: PE_inputs(x)
+
+.. py:class:: PETP_Norm(irreps_in, irreps_out)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: norm
+
+
+   .. py:attribute:: tp_self
+
+
+   .. py:attribute:: tp_flavor
+
+
+   .. py:attribute:: tp_nunubar
+
+
+   .. py:attribute:: tp_all
+
+
+   .. py:method:: forward(x)
+
+
+.. py:class:: PETP_Quadratic(irreps_in, irreps_out)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: tp_self
+
+
+   .. py:attribute:: tp_flavor
+
+
+   .. py:attribute:: tp_nunubar
+
+
+   .. py:attribute:: tp_all
+
+
+   .. py:method:: forward(x)
+
+
+.. py:class:: PE_GatedBlock(irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: irreps_out
+
+
+   .. py:attribute:: tp
+
+
+   .. py:attribute:: gate
+
+
+   .. py:method:: forward(x)
+
+
+.. py:class:: PE_ResidualGatedBlock(irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class)
+
+   Bases: :py:obj:`PE_GatedBlock`
+
+
+   .. py:method:: forward(x)
+
+
+.. py:class:: NeuralNetwork(parms)
+
+   Bases: :py:obj:`torch.nn.Module`
+
+
+   .. py:attribute:: NF
+
+
+   .. py:attribute:: irreps_in
+
+
+   .. py:attribute:: average_heavies_in_final_state
+
+
+   .. py:attribute:: conserve_lepton_number
+
+
+   .. py:attribute:: TP_activation_stack_shared
+
+
+   .. py:attribute:: TP_activation_stack_growthrate
+
+
+   .. py:attribute:: TP_activation_stack_F4
+
+
+   .. py:method:: convert_y_to_2flavor(y)
+
+
+   .. py:method:: forward(x)
+
+
+   .. py:method:: predict_all(F4_in)
+
+

@@ -1,0 +1,37 @@
+launch_syne_tune
+================
+
+.. py:module:: launch_syne_tune
+
+.. autoapi-nested-parse::
+
+   Author: John McGuigan
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   Launch Syne Tune using the configuration embedded in the parms dictionary.
+
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   launch_syne_tune.make_domain
+   launch_syne_tune.build_config_space
+   launch_syne_tune.build_scheduler
+   launch_syne_tune.main
+
+
+Module Contents
+---------------
+
+.. py:function:: make_domain(spec)
+
+.. py:function:: build_config_space(parms)
+
+.. py:function:: build_scheduler(parms, config_space)
+
+.. py:function:: main()
+
