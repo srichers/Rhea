@@ -16,87 +16,108 @@ import ml_constants as constants
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
+def read_asymptotic_dataset(parms, filename, rng):
+    print()
+    print(filename)
+    # read from file
+    with h5py.File(filename,"r") as f_in:
+        # File contains [simulationIndex, xyzt, nu/nubar, flavor]
+        # We want [simulationIndex, nu/nubar, flavor, xyzt]
+        F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1)
+        F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
+        growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...]) / constants.ndens_to_invsec
+        assert(parms["NF"] == int(np.array(f_in["nf"])) )
+        assert(torch.all(torch.isfinite(F4_initial)))
+        assert(torch.all(torch.isfinite(F4_final)))
+        assert(torch.all(torch.isfinite(growthrate)))
+    print("#   ",len(F4_initial),"points in",filename)
+
+    # downsample to less data
+    if parms["samples_per_database"]>0:
+        print("#    Downsampling to",parms["samples_per_database"],"samples")
+        random_indices = torch.randperm(len(growthrate), generator=rng)[:parms["samples_per_database"]]
+        F4_initial = F4_initial[random_indices,...]
+        F4_final   = F4_final  [random_indices,...]
+        growthrate = growthrate[random_indices,...]
+
+    print("#   ",len(F4_initial),"points in resampled dataset")
+
+    # compute stats (all physical units)
+    ntot_initial = ml.ntotal(F4_initial)
+    ntot_final = ml.ntotal(F4_final)
+    print("#    ntot_initial min/max:", ntot_initial.min().item(), ntot_initial.max().item())
+    print("#    ntot_final   min/max:", ntot_final.min().item(), ntot_final.max().item())
+    print("#    growthrate   min/max:", growthrate.min().item(), growthrate.max().item())
+
+    assert torch.all(ntot_initial > 0)
+    assert torch.all(ntot_final > 0)
+    assert torch.all(torch.isfinite(growthrate))
+    assert torch.all(growthrate > 0)
+
+    # fix slightly negative energy densities
+    ndens = F4_initial[:,:,:,3]
+    badlocs = torch.where(ndens < 0)
+    assert(torch.all(ndens > -1e10))
+    for i in range(4):
+        F4_initial[:,:,:,i][badlocs] = 0
+
+    # make sure the data are good
+    ml.check_conservation(F4_initial, F4_final)
+    assert(torch.all(growthrate > 0))
+
+    # average heavies if necessary
+    if parms["average_heavies_in_final_state"]:
+        assert(torch.allclose( torch.mean(F4_initial[:,:,1:,:], dim=2), F4_initial[:,:,1,:] ))
+        F4_final[:,:,1:,:] = torch.mean(F4_final[:,:,1:,:], dim=2, keepdim=True)
+
+    # remove any points where the flux factor is larger than 0.9 in any of the nunubar/flavor species, but separately for each data point
+    fluxfac = ml.flux_factor(F4_initial)
+    goodlocs = torch.where(torch.all(fluxfac < 0.9, dim=(1,2)))[0]
+    F4_initial = F4_initial[goodlocs,...]
+    F4_final   = F4_final  [goodlocs,...]
+    growthrate = growthrate[goodlocs]
+
+    return TensorDataset(F4_initial, F4_final, growthrate)
+
+
 def read_asymptotic_data(parms):
     #===============================================#
     # read in the database from the previous script #
     #===============================================#
     print("# PREPARING TEST/TRAIN DATA #")
 
-    dataset_train_list = []
-    dataset_test_list = []
     rng = torch.Generator().manual_seed(parms["random_seed"])
-    for dind,d in enumerate(parms["database_list"]):
-        print()
-        print(dind,d)
-        # read from file
-        with h5py.File(d,"r") as f_in:
-            # File contains [simulationIndex, xyzt, nu/nubar, flavor]
-            # We want [simulationIndex, nu/nubar, flavor, xyzt]
-            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1) 
-            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
-            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...]) / constants.ndens_to_invsec
-            assert(parms["NF"] == int(np.array(f_in["nf"])) )
-            assert(torch.all(torch.isfinite(F4_initial)))
-            assert(torch.all(torch.isfinite(F4_final)))
-            assert(torch.all(torch.isfinite(growthrate)))
-        print("#   ",len(F4_initial),"points in",d)
-
-        # downsample to less data
-        if parms["samples_per_database"]>0:
-            print("#    Downsampling to",parms["samples_per_database"],"samples")
-            random_indices = torch.randperm(len(growthrate), generator=rng)[:parms["samples_per_database"]]
-            F4_initial = F4_initial[random_indices,...]
-            F4_final   = F4_final  [random_indices,...]
-            growthrate = growthrate[random_indices,...]
-
-        print("#   ",len(F4_initial),"points in resampled dataset")
-
-        # compute stats (all physical units)
-        ntot_initial = ml.ntotal(F4_initial)
-        ntot_final = ml.ntotal(F4_final)
-        print("#    ntot_initial min/max:", ntot_initial.min().item(), ntot_initial.max().item())
-        print("#    ntot_final   min/max:", ntot_final.min().item(), ntot_final.max().item())
-        print("#    growthrate   min/max:", growthrate.min().item(), growthrate.max().item())
-
-        assert torch.all(ntot_initial > 0)
-        assert torch.all(ntot_final > 0)
-        assert torch.all(torch.isfinite(growthrate))
-        assert torch.all(growthrate > 0)
-
-        # fix slightly negative energy densities
-        ndens = F4_initial[:,:,:,3]
-        badlocs = torch.where(ndens < 0)
-        assert(torch.all(ndens > -1e10))
-        for i in range(4):
-            F4_initial[:,:,:,i][badlocs] = 0
-
-        # make sure the data are good
-        ml.check_conservation(F4_initial, F4_final)
-        assert(torch.all(growthrate > 0))
-
-        # average heavies if necessary
-        if parms["average_heavies_in_final_state"]:
-            assert(torch.allclose( torch.mean(F4_initial[:,:,1:,:], dim=2), F4_initial[:,:,1,:] ))
-            F4_final[:,:,1:,:] = torch.mean(F4_final[:,:,1:,:], dim=2, keepdim=True)
-
-        # remove any points where the flux factor is larger than 0.9 in any of the nunubar/flavor species, but separately for each data point
-        fluxfac = ml.flux_factor(F4_initial)
-        goodlocs = torch.where(torch.all(fluxfac < 0.9, dim=(1,2)))[0]
-        F4_initial = F4_initial[goodlocs,...]
-        F4_final   = F4_final  [goodlocs,...]
-        growthrate = growthrate[goodlocs]
-
-        # add dataset to the lists
-        if dind==0:
-            dataset_test_list.append( TensorDataset(F4_initial, F4_final, growthrate) )
-        else:
-            dataset_train_list.append(TensorDataset(F4_initial, F4_final, growthrate) )
+    if "database_train_list" in parms:
+        dataset_train_list = [
+            read_asymptotic_dataset(parms, filename, rng)
+            for filename in parms["database_train_list"]
+        ]
+        dataset_validation_list = [
+            read_asymptotic_dataset(parms, filename, rng)
+            for filename in parms.get("database_validation_list", [])
+        ]
+        dataset_test_list = [
+            read_asymptotic_dataset(parms, filename, rng)
+            for filename in parms.get("database_test_list", [])
+        ]
+    else:
+        dataset_train_list = []
+        dataset_validation_list = []
+        dataset_test_list = []
+        for dind,d in enumerate(parms["database_list"]):
+            dataset = read_asymptotic_dataset(parms, d, rng)
+            # Preserve legacy behavior: first dataset is test, rest train.
+            if dind==0:
+                dataset_test_list.append(dataset)
+            else:
+                dataset_train_list.append(dataset)
 
     print()
     print("# Asymptotic Train:",[len(d) for d in dataset_train_list])
+    print("# Asymptotic Validation:",[len(d) for d in dataset_validation_list])
     print("# Asymptotic Test:",[len(d) for d in dataset_test_list])
     
-    return dataset_train_list, dataset_test_list
+    return dataset_train_list, dataset_validation_list, dataset_test_list
 
 #=================================================#
 # read in the stable points from the NSM snapshot #

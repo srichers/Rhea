@@ -14,6 +14,7 @@ from ml_read_data import *
 import torch.autograd.profiler as profiler
 import pickle
 import os
+from pathlib import Path
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler
 
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
@@ -58,11 +59,17 @@ def configure_loader(parms, dataset_train_list):
 
 def train_asymptotic_model(parms,
                            dataset_asymptotic_train_list,
+                           dataset_asymptotic_validation_list,
                            dataset_asymptotic_test_list,
                            report_fn=None):
+    output_dir = Path(parms.get("output_dir", os.getcwd()))
+    if not output_dir.is_absolute():
+        output_dir = Path(os.getcwd()) / output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    validation_eval_list = dataset_asymptotic_validation_list or dataset_asymptotic_test_list
 
     # print out all parameters for the record
-    parmfile = open(os.getcwd()+"/parameters.txt","w")
+    parmfile = open(output_dir / "parameters.txt","w")
     for key in parms.keys():
         parmfile.write(key+" = "+str(parms[key])+"\n")
     parmfile.close()
@@ -119,7 +126,7 @@ def train_asymptotic_model(parms,
         return loss
 
     # set up file for writing performance metrics
-    loss_file = open(os.getcwd()+"/loss.dat","w")
+    loss_file = open(output_dir / "loss.dat","w")
     
     #===============#
     # training loop #
@@ -189,14 +196,20 @@ def train_asymptotic_model(parms,
 
         loss_dict["F4_train_loss"] = 0
         loss_dict["F4_train_max"] = 0
+        loss_dict["F4_validation_loss"] = 0
+        loss_dict["F4_validation_max"] = 0
         loss_dict["F4_test_loss"] = 0
         loss_dict["F4_test_max"] = 0
         loss_dict["growthrate_train_loss"] = 0
         loss_dict["growthrate_train_max"] = 0
+        loss_dict["growthrate_validation_loss"] = 0
+        loss_dict["growthrate_validation_max"] = 0
         loss_dict["growthrate_test_loss"] = 0
         loss_dict["growthrate_test_max"] = 0
         loss_dict["unphysical_train_loss"] = 0
         loss_dict["unphysical_train_max"] = 0
+        loss_dict["unphysical_validation_loss"] = 0
+        loss_dict["unphysical_validation_max"] = 0
         loss_dict["unphysical_test_loss"] = 0
         loss_dict["unphysical_test_max"] = 0
 
@@ -246,14 +259,14 @@ def train_asymptotic_model(parms,
 
         with torch.no_grad():
             train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
+            validation_loss = accumulate_asymptotic_loss(validation_eval_list, "validation")
             test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
 
         # track the total loss
         loss_dict["train_loss"] = train_loss.item()
+        loss_dict["validation_loss"] = validation_loss.item()
         loss_dict["test_loss"]  =  test_loss.item()
-        # Keep the existing training behavior, but expose a stable validation
-        # metric name for Syne Tune and other external runners.
-        loss_dict["validation_score"] = loss_dict["test_loss"]
+        loss_dict["validation_score"] = loss_dict["validation_loss"]
 
         # track the task weights
         for name in model.log_task_weights.keys():
@@ -294,10 +307,11 @@ def train_asymptotic_model(parms,
         stop_early = (scheduler.get_last_lr()[0]<=parms["min_lr"]) and (epoch>parms["warmup_iters"])
 
         # output
-        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
+        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['validation_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
         if(epoch%parms["output_every"]==0 or stop_early):
-            outfilename = os.getcwd()+"/model"+str(epoch)
-            F4i = dataset_asymptotic_test_list[0].tensors[0]
+            outfilename = str(output_dir / ("model"+str(epoch)))
+            checkpoint_dataset_list = dataset_asymptotic_test_list or validation_eval_list
+            F4i = checkpoint_dataset_list[0].tensors[0]
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
 

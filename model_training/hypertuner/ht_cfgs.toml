@@ -1,0 +1,137 @@
+# Example hyperparameter tuning configuration for Rhea.
+#
+# This file documents a complete Syne Tune setup: runtime defaults, searchable
+# hyperparameters, model tier definitions, scheduler settings, resource/budget
+# normalization, cost-balanced sampling, plotting output, and BOHB-specific
+# options. The Python builders in `cfgs.py` and `space.py` convert these tables
+# into the typed registry objects and Syne Tune search-space objects used by the
+# tuner.
+
+[runtime]
+seed = 42
+device = "cpu"
+
+[space.lr]
+kind = "loguniform"
+lower = 3e-5
+upper = 3e-3
+
+[space.weight_decay]
+kind = "loguniform"
+lower = 1e-6
+upper = 1e-2
+
+[space.batch_size]
+kind = "choice"
+values = [32, 64, 128]
+
+[space.model_tier]
+kind = "choice"
+values = ["tiny", "small", "medium", "large"]
+
+[model_tiers.tiny]
+[model_tiers.tiny.parms]
+irreps_hidden = "2x0e + 2x1o"
+nhidden_shared = 1
+nhidden_stability = 2
+nhidden_growthrate = 2
+nhidden_F4 = 2
+dropout_probability = 0.15
+
+[model_tiers.small]
+[model_tiers.small.parms]
+irreps_hidden = "4x0e + 4x1o"
+nhidden_shared = 1
+nhidden_stability = 3
+nhidden_growthrate = 3
+nhidden_F4 = 3
+dropout_probability = 0.20
+
+[model_tiers.medium]
+[model_tiers.medium.parms]
+irreps_hidden = "8x0e + 8x1o"
+nhidden_shared = 2
+nhidden_stability = 4
+nhidden_growthrate = 4
+nhidden_F4 = 4
+dropout_probability = 0.25
+
+[model_tiers.large]
+[model_tiers.large.parms]
+irreps_hidden = "16x0e + 16x1o"
+nhidden_shared = 2
+nhidden_stability = 6
+nhidden_growthrate = 6
+nhidden_F4 = 6
+dropout_probability = 0.30
+
+[base_model_cfg]
+input_irreps = "1x1o + 1x0e + 1x1o + 1x0e"
+growthrate_irreps = "1x0e"
+F4_irreps = "1x1o + 1x0e"
+tensor_product_class = "norm"
+
+[space.max_budget]
+kind = "constant"
+value = 600
+
+[space.device]
+kind = "constant"
+value = "cpu"
+
+[space.seed]
+kind = "constant"
+value = 42
+
+[tune]
+scheduler = "ASHA"
+metric = "val_loss"
+mode = "MIN"
+tuner_name = "asha-rhea-e3nn"
+max_wallclock_time = 300
+max_num_trials_started = 100
+n_workers = 2
+save_tuner = true
+sleep_time = 5.0
+results_update_interval = 10.0
+print_update_interval = 30.0
+
+[resource]
+resource_attr = "budget"
+max_resource_attr = "max_budget"
+grace_period = 60
+reduction_factor = 3
+brackets = 1
+
+[budget]
+kind = "normalized_split"
+ref_params = 100000
+ref_batch_size = 64
+ref_lr = 1e-3
+param_exponent = 0.25
+batch_exponent = 0.5
+lr_exponent = 0.25
+raw_steps_per_budget = 5.0
+
+[sampling]
+kind = "cost_balanced"
+cost_exponent = 0.5
+candidate_pool_size = 256
+
+[plots]
+enabled = true
+metric = "val_loss"
+best_over_time = true
+trials_over_time = true
+output_dir = "plots"
+best_filename = "best_val_loss.png"
+trials_filename = "trials_val_loss.png"
+show = false
+
+[bohb]
+num_min_data_points = 0
+top_n_percent = 15
+min_bandwidth = 1e-3
+num_candidates = 64
+bandwidth_factor = 3
+random_fraction = 0.33

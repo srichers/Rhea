@@ -16,19 +16,26 @@ def build_default_parms():
     # create a list of options
     parms = {}
 
+    parms["output_dir"] = "output/train_one"
+
     # list of asymptotic data
-    # First dataset is deemed test data
-    parms["database_list"] = [
-        "data/dummy_asymptotic.h5",
-        "data/dummy_asymptotic.h5",
+    parms["database_train_list"] = [
+        "datasets/asymptotic_M1-NuLib-7ms.h5",
+        "datasets/asymptotic_random.h5",
+    ]
+    parms["database_validation_list"] = [
+        "datasets/asymptotic_M1-NuLib-old.h5",
+    ]
+    parms["database_test_list"] = [
+        "datasets/asymptotic_M1-NuLib.h5",
     ]
 
     # list of stability data
     # First dataset is deemed test data
     parms["stable_database_list"] = [
-        "data/stable_oneflavor_database.h5",
-        "data/stable_random_database.h5",
-        "data/stable_zerofluxfac_database.h5",
+        "datasets/stable_oneflavor.h5",
+        "datasets/stable_random.h5",
+        "datasets/stable_zerofluxfac.h5",
     ]
     parms["samples_per_database"] = 1000000
 
@@ -91,45 +98,151 @@ def build_default_parms():
     parms["syne_tune"] = {
         "report": False,
         "metric": "validation_score",
-        "mode": "min",
-        "resource_attr": "epoch",
-        "max_resource_attr": "epochs",
-        "config_space": {
-            "epochs": 10,
-            "learning_rate": {
-                "type": "loguniform",
-                "lower": 1e-5,
-                "upper": 1e-3,
+        "mode": "MIN",
+        "scheduler": "ASHA",
+        "space": {
+            "lr": {
+                "kind": "loguniform",
+                "lower": 3e-5,
+                "upper": 3e-3,
             },
-            "loader.batch_size": {
-                "type": "randint",
-                "lower": 8,
-                "upper": 64,
-            },
-            "adamw.weight_decay": {
-                "type": "loguniform",
-                "lower": 1e-8,
+            "weight_decay": {
+                "kind": "loguniform",
+                "lower": 1e-6,
                 "upper": 1e-2,
             },
+            "batch_size": {
+                "kind": "choice",
+                "values": [32, 64, 128],
+            },
+            "model_tier": {
+                "kind": "choice",
+                "values": ["tiny", "small", "medium", "large"],
+            },
+            "epochs": {
+                "kind": "constant",
+                "value": parms["epochs"],
+            },
+            "max_budget": {
+                "kind": "constant",
+                "value": 600,
+            },
+            "device": {
+                "kind": "constant",
+                "value": parms["device"],
+            },
+            "seed": {
+                "kind": "constant",
+                "value": parms["random_seed"],
+            },
         },
-        "backend": {
-            "pass_args_as_json": True,
-            "rotate_gpus": True,
-            "num_gpus_per_trial": 1,
+        "model_tiers": {
+            "tiny": {
+                "parms": {
+                    "irreps_hidden": "2x0e + 2x1o",
+                    "nhidden_shared": 1,
+                    "nhidden_stability": 2,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 2,
+                    "dropout_probability": 0.15,
+                },
+            },
+            "small": {
+                "parms": {
+                    "irreps_hidden": "4x0e + 4x1o",
+                    "nhidden_shared": 1,
+                    "nhidden_stability": 3,
+                    "nhidden_growthrate": 3,
+                    "nhidden_F4": 3,
+                    "dropout_probability": 0.20,
+                },
+            },
+            "medium": {
+                "parms": {
+                    "irreps_hidden": "8x0e + 8x1o",
+                    "nhidden_shared": 2,
+                    "nhidden_stability": 4,
+                    "nhidden_growthrate": 4,
+                    "nhidden_F4": 4,
+                    "dropout_probability": 0.25,
+                },
+            },
+            "large": {
+                "parms": {
+                    "irreps_hidden": "16x0e + 16x1o",
+                    "nhidden_shared": 2,
+                    "nhidden_stability": 6,
+                    "nhidden_growthrate": 6,
+                    "nhidden_F4": 6,
+                    "dropout_probability": 0.30,
+                },
+            },
         },
-        "scheduler": {
-            "name": "hyperband",
-            "searcher": "random",
-            "type": "stopping",
+        "base_model_cfg": {
+            "input_irreps": "1x1o + 1x0e + 1x1o + 1x0e",
+            "growthrate_irreps": "1x0e",
+            "F4_irreps": "1x1o + 1x0e",
+            "tensor_product_class": parms["tensor_product_class"],
+        },
+        "resource": {
+            "resource_attr": "epoch",
+            "max_resource_attr": "epochs",
             "grace_period": 1,
             "reduction_factor": 3,
+            "brackets": 1,
         },
-        "tuner": {
-            "n_workers": 1,
+        # current Rhea trainer reports epoch as its scheduler resource.
+        "budget_resource": {
+            "resource_attr": "budget",
+            "max_resource_attr": "max_budget",
+            "grace_period": 60,
+            "reduction_factor": 3,
+            "brackets": 1,
         },
-        "stop": {
-            "max_wallclock_time": 3600,
+        "budget": {
+            "kind": "normalized_split",
+            "ref_params": 100000,
+            "ref_batch_size": 64,
+            "ref_lr": 1e-3,
+            "param_exponent": 0.25,
+            "batch_exponent": 0.5,
+            "lr_exponent": 0.25,
+            "raw_steps_per_budget": 5.0,
         },
+        "sampling": {
+            "kind": "cost_balanced",
+            "cost_exponent": 0.5,
+            "candidate_pool_size": 256,
+        },
+        "plots": {
+            "enabled": True,
+            "metric": "validation_score",
+            "best_over_time": True,
+            "trials_over_time": True,
+            "output_dir": "plots",
+            "best_filename": "best_validation_score.png",
+            "trials_filename": "trials_validation_score.png",
+            "show": False,
+        },
+        "bohb_num_min_data_points": 0,
+        "bohb_top_n_percent": 15,
+        "bohb_min_bandwidth": 1e-3,
+        "bohb_num_candidates": 64,
+        "bohb_bandwidth_factor": 3,
+        "bohb_random_fraction": 0.33,
+        "max_wallclock_time": 300,
+        "max_num_trials_started": 100,
+        "max_num_trials_completed": None,
+        "n_workers": 2,
+        "random_seed": parms["random_seed"],
+        "tuner_name": "rhea-asha",
+        "results_root": "syne-tune",
+        "rotate_gpus": True,
+        "delete_checkpoints": False,
+        "save_tuner": True,
+        "sleep_time": 5.0,
+        "results_update_interval": 10.0,
+        "print_update_interval": 30.0,
     }
 
     return parms
@@ -142,7 +255,11 @@ def run_default_training(parms=None, report_fn=None):
     if parms is None:
         parms = build_default_parms()
 
-    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
+    (
+        dataset_asymptotic_train_list,
+        dataset_asymptotic_validation_list,
+        dataset_asymptotic_test_list,
+    ) = read_asymptotic_data(parms)
 
     # Preserve the current stable-dataset loading behavior even though the
     # training loop does not consume those datasets directly.
@@ -151,6 +268,7 @@ def run_default_training(parms=None, report_fn=None):
     return train_asymptotic_model(
         parms,
         dataset_asymptotic_train_list,
+        dataset_asymptotic_validation_list,
         dataset_asymptotic_test_list,
         report_fn=report_fn,
     )
