@@ -23,6 +23,9 @@ from syne_tune import StoppingCriterion, Tuner
 from syne_tune.backend import PythonBackend
 from syne_tune.optimizer.baselines import BOHB, RandomSearch
 from syne_tune.optimizer.schedulers.asha import AsynchronousSuccessiveHalving
+from syne_tune.optimizer.schedulers.searchers.last_value_multi_fidelity_searcher import (
+    LastValueMultiFidelitySearcher,
+)
 
 from .registry import SyneTuneCfg, TuneSchedulerKind
 
@@ -39,12 +42,14 @@ class HyperTuner:
 
     def configure_environment(self) -> Path:
         project_root = Path(self.cfg.project_root or ".").resolve()
+        model_training_root = project_root / "Rhea" / "model_training"
         os.environ["KAGGLE_NUMS_ROOT"] = str(project_root)
 
         pythonpath = os.environ.get("PYTHONPATH", "")
         paths = [p for p in pythonpath.split(os.pathsep) if p]
-        if str(project_root) not in paths:
-            os.environ["PYTHONPATH"] = os.pathsep.join([str(project_root)] + paths)
+        required_paths = [str(model_training_root), str(project_root)]
+        paths = required_paths + [p for p in paths if p not in required_paths]
+        os.environ["PYTHONPATH"] = os.pathsep.join(paths)
 
         if self.cfg.results_root is not None:
             results_root = Path(self.cfg.results_root)
@@ -81,15 +86,22 @@ class HyperTuner:
 
     def _build_asha(self):
         asha = self.cfg.asha
-        searcher_kwargs = {}
+        searcher = "random_search"
+        searcher_kwargs = None
         if self.cfg.points_to_evaluate is not None:
-            searcher_kwargs["points_to_evaluate"] = self.cfg.points_to_evaluate
+            searcher = LastValueMultiFidelitySearcher(
+                searcher="random_search",
+                config_space=self.config_space,
+                random_seed=self.cfg.random_seed,
+                points_to_evaluate=self.cfg.points_to_evaluate,
+                searcher_kwargs={},
+            )
 
         return AsynchronousSuccessiveHalving(
             config_space=self.config_space,
             metric=self.cfg.metric,
             do_minimize=self.cfg.do_minimize,
-            searcher="random_search",
+            searcher=searcher,
             time_attr=asha.resource_attr,
             max_t=self._max_resource(),
             grace_period=asha.grace_period,

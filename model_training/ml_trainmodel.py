@@ -16,6 +16,8 @@ import pickle
 import os
 from pathlib import Path
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler
+from hypertuner.budget import build_epoch_budget_tracker
+from ml_training_status import validate_finite_metrics, validate_positive_predicted_ntotal
 
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
@@ -96,6 +98,17 @@ def train_asymptotic_model(parms,
         raise ValueError("Unknown optimizer "+str(parms["op"]))
 
     print("#  number of parameters:", sum(p.numel() for p in model.parameters()))
+    budget_tracker = build_epoch_budget_tracker(parms, model)
+    if budget_tracker is not None:
+        print(
+            "#USING NORMALIZED BUDGET RESOURCE",
+            "resource=", budget_tracker.resource_attr,
+            "max_budget=", budget_tracker.max_budget,
+            "max_epoch=", budget_tracker.max_epoch(),
+            "uncapped_max_epoch=", budget_tracker.uncapped_max_epoch(),
+            "compute_cost_scale=", f"{budget_tracker.compute_cost_scale:.5e}",
+            "lr_need_scale=", f"{budget_tracker.lr_need_scale:.5e}",
+        )
 
     #=======================#
     # set up the schedulers #
@@ -122,7 +135,10 @@ def train_asymptotic_model(parms,
     def contribute_loss(pred, true, traintest, key, loss_fn):
         loss = loss_fn(pred, true)
         loss_dict[key+"_"+traintest+"_loss"] += loss.item()
-        loss_dict[key+"_"+traintest+"_max"]  = max(max_error(pred, true), loss_dict[key+"_"+traintest+"_max"])
+        loss_dict[key+"_"+traintest+"_max"] = max(
+            float(max_error(pred, true)),
+            loss_dict[key+"_"+traintest+"_max"],
+        )
         return loss
 
     # set up file for writing performance metrics
@@ -134,7 +150,12 @@ def train_asymptotic_model(parms,
     print("#STARTING TRAINING LOOP")
     torch.backends.cudnn.benchmark = True # may help with performance
     final_metrics = {}
-    for epoch in range(1,parms["epochs"]+1):
+    max_training_epochs = (
+        budget_tracker.max_epoch()
+        if budget_tracker is not None
+        else parms["epochs"]
+    )
+    for epoch in range(1,max_training_epochs+1):
         # set up the loss dictionary for IO
         loss_dict = {}
         loss_dict["epoch"] = epoch
@@ -160,7 +181,7 @@ def train_asymptotic_model(parms,
             ntot_p = ntotal(F4f_pred_train)
             #print("ntot_pred min/max:", ntot_p.min().item(), ntot_p.max().item())
             assert torch.all(ntot_t > 0)
-            assert torch.all(ntot_p > 0)
+            validate_positive_predicted_ntotal(ntot_p, "train", epoch)
 
             # normalize quantities before computing losses
             F4f_true_train = F4f_true_train / ntot_t[:,None,None,None]
@@ -228,7 +249,7 @@ def train_asymptotic_model(parms,
                 ntot_t = ntotal(F4f_true)
                 ntot_p = ntotal(F4f_pred)
                 assert torch.all(ntot_t > 0)
-                assert torch.all(ntot_p > 0)
+                validate_positive_predicted_ntotal(ntot_p, traintest, epoch)
                 F4f_true = F4f_true / ntot_t[:,None,None,None]
                 F4f_pred = F4f_pred / ntot_p[:,None,None,None]
                 growthrate_true = growthrate_true / ntot_t
@@ -271,6 +292,9 @@ def train_asymptotic_model(parms,
         # track the task weights
         for name in model.log_task_weights.keys():
             loss_dict["weight_"+name] = torch.exp(-model.log_task_weights[name]).item()
+        if budget_tracker is not None:
+            loss_dict.update(budget_tracker.metrics_for_epoch(epoch))
+        validate_finite_metrics(loss_dict)
 
         #=====================================#
         # ADVANCE THE LEARNING RATE SCHEDULER #
@@ -301,14 +325,17 @@ def train_asymptotic_model(parms,
                 loss_file.write("{:<12.3e}\t".format(loss_dict[k]))
         loss_file.write('\n')
         loss_file.flush()
-        assert(loss_dict["train_loss"]==loss_dict["train_loss"])
 
         # determine if stopping early
         stop_early = (scheduler.get_last_lr()[0]<=parms["min_lr"]) and (epoch>parms["warmup_iters"])
+        hit_budget_limit = (
+            budget_tracker is not None
+            and loss_dict[budget_tracker.resource_attr] >= budget_tracker.max_budget
+        )
 
         # output
         print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['validation_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
-        if(epoch%parms["output_every"]==0 or stop_early):
+        if(epoch%parms["output_every"]==0 or stop_early or hit_budget_limit):
             outfilename = str(output_dir / ("model"+str(epoch)))
             checkpoint_dataset_list = dataset_asymptotic_test_list or validation_eval_list
             F4i = checkpoint_dataset_list[0].tensors[0]
@@ -322,6 +349,9 @@ def train_asymptotic_model(parms,
         # exit the loop if the learning rate is too low
         if stop_early:
             print("Learning rate below minimum threshold - stopping training")
+            break
+        if hit_budget_limit:
+            print("Normalized budget limit reached - stopping training")
             break
         
 

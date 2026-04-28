@@ -1,8 +1,17 @@
-from run_trial import run_training_trial
+#!/usr/bin/env python3
+"""Run one Rhea training trial without launching a Syne Tune experiment."""
 
-  run_training_trial({
-      "model_tier": "small",
-      "lr": 1e-3,
-      "batch_size": 64,
-      "seed": 42,
-  })
+from ml_run_hytune import run_single_trial
+
+
+def main():
+    run_single_trial({
+        "model_tier": "small",
+        "lr": 1e-3,
+        "batch_size": 64,
+        "seed": 42,
+    })
+
+
+if __name__ == "__main__":
+    main()

@@ -44,7 +44,7 @@ def build_default_parms():
     parms["output_every"] = 10
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = True
-    parms["random_seed"] = 42
+    parms["random_seed"] = 100
     parms["loader.batch_size"] = 10
     parms["loader.num_workers"] = 1
     parms["loader.prefetch_factor"] = 1
@@ -55,7 +55,6 @@ def build_default_parms():
     parms["tensor_product_class"] = "norm"
 
     parms["do_learn_task_weights"] = False
-    parms["task_weight_stability"] = 1.0
     parms["task_weight_F4"] = 1.0
     parms["task_weight_unphysical"] = 1
     parms["task_weight_growthrate"] = 1.0
@@ -66,7 +65,6 @@ def build_default_parms():
 
     # neural network options
     parms["nhidden_shared"] = 1
-    parms["nhidden_stability"] = 3
     parms["nhidden_growthrate"] = 3
     parms["nhidden_F4"] = 3
     parms["irreps_hidden"] = e3nn.o3.Irreps("4x0e + 4x1o")
@@ -95,6 +93,9 @@ def build_default_parms():
     #========================#
     parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
 
+    hpo_ref_epochs = 20
+    hpo_max_budget = 1000
+
     parms["syne_tune"] = {
         "report": False,
         "metric": "validation_score",
@@ -103,8 +104,8 @@ def build_default_parms():
         "space": {
             "lr": {
                 "kind": "loguniform",
-                "lower": 3e-5,
-                "upper": 3e-3,
+                "lower": 1e-5,
+                "upper": 1e-2,
             },
             "weight_decay": {
                 "kind": "loguniform",
@@ -113,19 +114,19 @@ def build_default_parms():
             },
             "batch_size": {
                 "kind": "choice",
-                "values": [32, 64, 128],
+                "values": [128, 256, 512, 1024],
             },
             "model_tier": {
                 "kind": "choice",
-                "values": ["tiny", "small", "medium", "large"],
+                "values": ["tiny", "small"],
             },
-            "epochs": {
+            "ref_epochs": {
                 "kind": "constant",
-                "value": parms["epochs"],
+                "value": hpo_ref_epochs,
             },
             "max_budget": {
                 "kind": "constant",
-                "value": 600,
+                "value": hpo_max_budget,
             },
             "device": {
                 "kind": "constant",
@@ -140,41 +141,37 @@ def build_default_parms():
             "tiny": {
                 "parms": {
                     "irreps_hidden": "2x0e + 2x1o",
-                    "nhidden_shared": 1,
-                    "nhidden_stability": 2,
+                    "nhidden_shared": 2,
                     "nhidden_growthrate": 2,
                     "nhidden_F4": 2,
-                    "dropout_probability": 0.15,
+                    "dropout_probability": 0.025,
                 },
             },
             "small": {
                 "parms": {
-                    "irreps_hidden": "4x0e + 4x1o",
-                    "nhidden_shared": 1,
-                    "nhidden_stability": 3,
-                    "nhidden_growthrate": 3,
-                    "nhidden_F4": 3,
-                    "dropout_probability": 0.20,
+                    "irreps_hidden": "3x0e + 3x1o",
+                    "nhidden_shared": 2,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 2,
+                    "dropout_probability": 0.05,
                 },
             },
             "medium": {
                 "parms": {
-                    "irreps_hidden": "8x0e + 8x1o",
+                    "irreps_hidden": "5x0e + 5x1o",
                     "nhidden_shared": 2,
-                    "nhidden_stability": 4,
-                    "nhidden_growthrate": 4,
-                    "nhidden_F4": 4,
-                    "dropout_probability": 0.25,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 3,
+                    "dropout_probability": 0.075,
                 },
             },
             "large": {
                 "parms": {
-                    "irreps_hidden": "16x0e + 16x1o",
-                    "nhidden_shared": 2,
-                    "nhidden_stability": 6,
-                    "nhidden_growthrate": 6,
-                    "nhidden_F4": 6,
-                    "dropout_probability": 0.30,
+                    "irreps_hidden": "6x0e + 6x1o",
+                    "nhidden_shared": 3,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 3,
+                    "dropout_probability": 0.1,
                 },
             },
         },
@@ -185,34 +182,30 @@ def build_default_parms():
             "tensor_product_class": parms["tensor_product_class"],
         },
         "resource": {
-            "resource_attr": "epoch",
-            "max_resource_attr": "epochs",
-            "grace_period": 1,
-            "reduction_factor": 3,
-            "brackets": 1,
-        },
-        # current Rhea trainer reports epoch as its scheduler resource.
-        "budget_resource": {
             "resource_attr": "budget",
             "max_resource_attr": "max_budget",
             "grace_period": 60,
             "reduction_factor": 3,
             "brackets": 1,
         },
+        # ASHA schedules on normalized budget. `ref_epochs` defines how many
+        # epochs a reference-cost model gets before consuming max_budget.
         "budget": {
             "kind": "normalized_split",
-            "ref_params": 100000,
-            "ref_batch_size": 64,
+            "ref_epochs": hpo_ref_epochs,
+            "ref_params": 300000,
+            "ref_batch_size": 256,
             "ref_lr": 1e-3,
             "param_exponent": 0.25,
             "batch_exponent": 0.5,
             "lr_exponent": 0.25,
-            "raw_steps_per_budget": 5.0,
+            "raw_steps_per_budget": hpo_ref_epochs / hpo_max_budget,
+            "max_epochs_cap": 100,
         },
         "sampling": {
             "kind": "cost_balanced",
             "cost_exponent": 0.5,
-            "candidate_pool_size": 256,
+            "candidate_pool_size": 512,
         },
         "plots": {
             "enabled": True,
@@ -230,7 +223,7 @@ def build_default_parms():
         "bohb_num_candidates": 64,
         "bohb_bandwidth_factor": 3,
         "bohb_random_fraction": 0.33,
-        "max_wallclock_time": 300,
+        "max_wallclock_time": 23 * 60 * 60,
         "max_num_trials_started": 100,
         "max_num_trials_completed": None,
         "n_workers": 2,

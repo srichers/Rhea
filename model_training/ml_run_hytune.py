@@ -8,6 +8,7 @@ The is the runner called to run the syne tune hpo experiment
 '''
 
 import json
+import hashlib
 from pathlib import Path
 from hypertuner.syne import HyperTuner
 from hypertuner.cfgs import build_tune_plot_cfg
@@ -124,9 +125,10 @@ class BuildnRun:
             {key: serialize_config_value(value) for key, value in self.parms.items()},
         )
 
-    def write_results(self, final_metrics):
+    def write_results(self, final_metrics, status="completed"):
         summary = summarize_history(self.history, final_metrics, self.parms)
-        write_json(self.history_path, build_history_lib(self.history, self.parms, "completed"))
+        summary["status"] = status
+        write_json(self.history_path, build_history_lib(self.history, self.parms, status))
         write_json(self.summary_path, summary)
 
     def run(self):
@@ -197,7 +199,7 @@ class HPOExperiment:
     def build_tuner(self):
         return HyperTuner(run_training_trial, self.syne_tune_cfg)
 
-    def maybe_plot_results(self):
+    def maybe_plot_results(self, tuner_name=None):
         plots = self.parms.get("syne_tune", {}).get("plots")
         if not plots or not plots.get("enabled", False):
             return []
@@ -206,11 +208,11 @@ class HPOExperiment:
             plots=plots,
             results_root=self.hyper_tuner.cfg.results_root,
         )
-        return HyperTunePlotter(plot_cfg).plot(self.hyper_tuner.cfg.tuner_name)
+        return HyperTunePlotter(plot_cfg).plot(tuner_name or self.hyper_tuner.cfg.tuner_name)
 
     def run(self):
         tuner = self.hyper_tuner.run()
-        self.maybe_plot_results()
+        self.maybe_plot_results(tuner.name)
         return tuner
 
 
@@ -222,6 +224,13 @@ def is_irreps(value):
 def serialize_config_value(value):
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
+    if hasattr(value, "detach") and hasattr(value, "cpu"):
+        value = value.detach().cpu()
+        if value.numel() == 1:
+            return value.item()
+        return value.tolist()
+    if hasattr(value, "item"):
+        return value.item()
     if isinstance(value, (list, tuple)):
         return [serialize_config_value(item) for item in value]
     if isinstance(value, dict):
@@ -303,6 +312,44 @@ def should_report_to_syne_tune(parms, config):
     return bool(syne_tune_cfg.get("report", False) or config is not None)
 
 
+def build_trial_output_dir(config):
+    serialized = serialize_config_value(config)
+    config_blob = json.dumps(serialized, sort_keys=True)
+    trial_hash = hashlib.sha1(config_blob.encode("utf-8")).hexdigest()[:12]
+    return f"output/train_tune/trial_{trial_hash}"
+
+
+def build_divergence_metrics(parms, divergence_metrics):
+    syne_tune_cfg = parms.get("syne_tune", {})
+    resource_cfg = syne_tune_cfg.get("resource", {})
+    resource_attr = resource_cfg.get("resource_attr")
+    max_resource_attr = resource_cfg.get("max_resource_attr")
+    metric_name = syne_tune_cfg.get("metric", "validation_score")
+    penalty = float(parms.get("hpo_failure_penalty", 1.0e30))
+    metrics = {
+        "epoch": int(divergence_metrics.get("epoch", 0)),
+        "train_loss": penalty,
+        "validation_loss": penalty,
+        "test_loss": penalty,
+        "validation_score": penalty,
+        metric_name: penalty,
+        "diverged": 1,
+    }
+    metrics.update(divergence_metrics)
+    metrics[metric_name] = penalty
+    if resource_attr and resource_attr not in metrics:
+        metrics[resource_attr] = int(resource_cfg.get("grace_period", 1))
+    if max_resource_attr and max_resource_attr not in metrics:
+        max_resource = parms.get(max_resource_attr)
+        if max_resource is None:
+            max_resource = resource_cfg.get("max_budget")
+        if max_resource is None:
+            max_resource = syne_tune_cfg.get("space", {}).get(max_resource_attr, {}).get("value")
+        if max_resource is not None:
+            metrics[max_resource_attr] = int(max_resource)
+    return metrics
+
+
 def build_history_lib(history, parms, status):
     syne_tune_cfg = parms.get("syne_tune", {})
     return {
@@ -316,13 +363,32 @@ def build_history_lib(history, parms, status):
 
 def write_json(path, payload):
     with open(path, "w", encoding="utf-8") as outfile:
-        json.dump(payload, outfile, indent=2, sort_keys=True)
+        json.dump(serialize_config_value(payload), outfile, indent=2, sort_keys=True)
         outfile.write("\n")
 
 
-def run_training_trial(config=None):
-    #single model train function, aka no synetune
+def run_single_trial(config=None):
     return BuildnRun(config).run()
+
+
+def run_training_trial(**config):
+    # Syne Tune's PythonBackend calls this function with one keyword per
+    # hyperparameter and serializes it without module globals.
+    from ml_run_hytune import BuildnRun, build_divergence_metrics, build_trial_output_dir
+    from ml_training_status import TrainingDivergedError
+
+    trial_config = dict(config) or None
+    if trial_config is not None and "output_dir" not in trial_config:
+        trial_config["output_dir"] = build_trial_output_dir(trial_config)
+
+    runner = BuildnRun(trial_config)
+    try:
+        return runner.run()
+    except TrainingDivergedError as exc:
+        final_metrics = build_divergence_metrics(runner.parms, exc.metrics)
+        runner.report_fn(final_metrics)
+        runner.write_results(final_metrics, status="diverged")
+        return final_metrics
 
 
 def build_syne_tune_cfg_from_parms(parms):
@@ -350,7 +416,7 @@ def run_syne_tune(parms=None):
 
 
 def main():
-    run_training_trial()
+    run_syne_tune()
 
 
 if __name__ == "__main__":

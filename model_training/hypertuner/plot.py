@@ -44,6 +44,13 @@ class HyperTunePlotter:
             return []
 
         experiment = self.load_experiment(tuner_name)
+        if experiment.metadata is None or experiment.results is None:
+            print(
+                f"Skipping tune plots for {tuner_name}: "
+                f"missing Syne Tune metadata or results at {experiment.path}",
+                flush=True,
+            )
+            return []
 
         if not self.cfg.show:
             mpl_cache = experiment.path / ".matplotlib"

@@ -36,6 +36,7 @@ class SamplingCfg:
 @dataclass(frozen=True)
 class BudgetCfg:
     kind: str = "normalized_split"
+    ref_epochs: int = 10
     ref_params: int = 100000
     ref_batch_size: int = 64
     ref_lr: float = 1e-3
@@ -43,6 +44,7 @@ class BudgetCfg:
     batch_exponent: float = 0.5
     lr_exponent: float = 0.25
     raw_steps_per_budget: float = 1.0
+    max_epochs_cap: int | None = None
 
 
 @dataclass(frozen=True)

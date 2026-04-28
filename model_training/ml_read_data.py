@@ -16,6 +16,17 @@ import ml_constants as constants
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
+
+# for handling keys in the hdf5 files
+def read_hdf5_dataset(file_handle, key_options):
+    for key in key_options:
+        if key in file_handle:
+            return file_handle[key][...]
+    raise KeyError(
+        "None of the expected HDF5 datasets exist: "
+        + ", ".join(key_options)
+    )
+
 def read_asymptotic_data(parms):
     #===============================================#
     # read in the database from the previous script #
@@ -46,9 +57,15 @@ def read_asymptotic_data(parms):
         with h5py.File(d,"r") as f_in:
             # File contains [simulationIndex, xyzt, nu/nubar, flavor]
             # We want [simulationIndex, nu/nubar, flavor, xyzt]
-            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1) 
-            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
-            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...]) / constants.ndens_to_invsec
+            F4_initial = torch.Tensor(
+                read_hdf5_dataset(f_in, ["F4_initial(1|ccm)"])
+            ).permute(0,2,3,1)
+            F4_final = torch.Tensor(
+                read_hdf5_dataset(f_in, ["F4_final(1|ccm)", "targets/F4_final(1|ccm)"])
+            ).permute(0,2,3,1)
+            growthrate = torch.Tensor(
+                read_hdf5_dataset(f_in, ["growthRate(1|s)", "targets/growthRate(1|s)"])
+            ) / constants.ndens_to_invsec
             assert(parms["NF"] == int(np.array(f_in["nf"])) )
             assert(torch.all(torch.isfinite(F4_initial)))
             assert(torch.all(torch.isfinite(F4_final)))

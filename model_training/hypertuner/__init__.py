@@ -10,7 +10,7 @@ configuration dataclasses, config builders, budget utilities, Syne Tune
 integration, plotting helpers, and cost-balanced sampling helpers used by
 `run_trial.py` and external tuning scripts.
 '''
-from .budget import StepBudgetPolicy
+from .budget import EpochBudgetTracker, StepBudgetPolicy, build_epoch_budget_tracker
 from .callbacks import SyneTuneReporter
 from .cfgs import (
     build_budget_policy_cfg,
@@ -35,10 +35,20 @@ from .registry import (
     TuneMode,
     TuneSchedulerKind,
 )
-from .plot import HyperTunePlotter
 from .sampling import CostBalancedSampler
-from .syne import HyperTuner
 from .space import build_config_space
+
+
+def __getattr__(name):
+    if name == "HyperTunePlotter":
+        from .plot import HyperTunePlotter
+
+        return HyperTunePlotter
+    if name == "HyperTuner":
+        from .syne import HyperTuner
+
+        return HyperTuner
+    raise AttributeError(f"module 'hypertuner' has no attribute '{name}'")
 
 __all__ = [
     "ASHACfg",
@@ -49,6 +59,7 @@ __all__ = [
     "BudgetRuntimeCfg",
     "CostBalancedSampler",
     "CostBalancedSamplerCfg",
+    "EpochBudgetTracker",
     "HyperTuner",
     "HyperTunePlotter",
     "ResourceCfg",
@@ -63,6 +74,7 @@ __all__ = [
     "build_budget_runtime_cfg",
     "build_cost_balanced_sampler_cfg",
     "build_config_space",
+    "build_epoch_budget_tracker",
     "build_resource_cfg",
     "build_syne_tune_cfg",
     "build_tune_plot_cfg",
