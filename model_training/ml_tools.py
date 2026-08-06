@@ -12,9 +12,6 @@ import e3nn
 from e3nn.util.jit import script, trace
 import copy
 
-# set e3nn to trace without scripting. Scripting e3nn seems to make it fail
-e3nn.set_optimization_defaults(jit_mode="eager")
-
 # input dimensions: [sim, ..., xyzt]
 # output dimensions: [sim, ...]
 def dot4(v1,v2):
