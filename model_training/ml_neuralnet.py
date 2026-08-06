@@ -283,7 +283,7 @@ class NeuralNetwork(nn.Module):
 
         # enforce symmetry in the heavies
         if self.average_heavies_in_final_state:
-            F4_out[:,:,1:,:] = F4_out.clone().detach()[:,:,1:,:].mean(dim=3, keepdim=True)
+            F4_out[:,:,1:,:] = F4_out.clone().detach()[:,:,1:,:].mean(dim=2, keepdim=True)
 
         # ensure the flavor-traced number is conserved
         F4_in = F4_in.view((nsims,2,self.NF,4))
@@ -293,12 +293,14 @@ class NeuralNetwork(nn.Module):
         F4_out[:,:,:,:] -= F4_out_excess / self.NF
 
         # ensure that ELN is conserved
+        # xyzt index 3 is the number density. Correcting a flux component
+        # instead would not be rotationally equivariant.
         if self.conserve_lepton_number:
-            ELN_in  = F4_in[:,0,:,0]  - F4_in[:,1,:,0]
-            ELN_out = F4_out[:,0,:,0] - F4_out[:,1,:,0]
+            ELN_in  = F4_in[:,0,:,3]  - F4_in[:,1,:,3]
+            ELN_out = F4_out[:,0,:,3] - F4_out[:,1,:,3]
             ELN_excess = ELN_out - ELN_in
-            F4_out[:,0,:,0] -= ELN_excess / 2.0
-            F4_out[:,1,:,0] += ELN_excess / 2.0
+            F4_out[:,0,:,3] -= ELN_excess / 2.0
+            F4_out[:,1,:,3] += ELN_excess / 2.0
 
         # pool over features to get permutation-invariant output
         # Averaging over nodes in the graph

@@ -54,7 +54,7 @@ def check_conservation(F4_initial_list, F4_final_list, tolerance = 1e-3):
 
 # F4 has dimensions [sim, nu/nubar, flavor, xyzt]
 def restrict_F4_to_physical(F4_final):
-    NF = F4_final.shape[-1]
+    NF = F4_final.shape[2]
     avgF4 = torch.sum(F4_final, dim=2, keepdim=True) / NF
 
     # enforce that all four-vectors are time-like
