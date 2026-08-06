@@ -16,11 +16,9 @@ def get_Z(fluxfac):
 # n,Z have shape [npoints, nunubar, flavor]
 # mu, g have shape [npoints, nunubar, flavor, quadrature]
 def distrib(n,Z,mu):
-    g = Z / torch.sinh(Z) * torch.exp(Z*mu)
-
-    # for large Z use form of expression that avoids large exponentials
-    # Z/sinh(Z) -> 2*Z*exp(-Z), and sinh(Z) overflows float32 at Z~89.4
-    g = torch.where(Z < 30, g, 2*Z*torch.exp(Z * (mu-1)) )
+    # Z/sinh(Z)*exp(Z*mu) rewritten so the exponent is never positive. The
+    # identity is exact for all Z>0, so there is no large-Z branch to overflow.
+    g = (2*Z/(-torch.expm1(-2*Z))) * torch.exp(Z*(mu-1))
 
     # for small Z use form of expression that avoids division by small numbers
     g = torch.where(Z > 1e-3, g, mu*Z + 1.0)
@@ -75,7 +73,7 @@ def mixBox3D_lebedev(F4, pts, weights):
     Z = get_Z(fluxfac)
 
     # evaluate the distribution function at each quadrature point
-    mu = torch.sum(pts[None,None,None,:,:] * Fhat[:,:,:,:,None], dim=3) # [point, nunubar, flavor, quadrature]
+    mu = torch.matmul(Fhat, pts) # [point, nunubar, flavor, quadrature]
     g = distrib(n,Z,mu) # [point, nunubar, flavor, quadrature]
 
     # get eln-xln distribution [point, quadrature]
@@ -83,18 +81,19 @@ def mixBox3D_lebedev(F4, pts, weights):
 
     # get the integrals of gELN over the quadrature points, weighted by the weights
     # [point]
-    zero = torch.tensor(0., device=gELN.device)
-    Iplus  =  torch.sum(gELN*weights * torch.heaviside( gELN,zero), dim=1)
-    Iminus = -torch.sum(gELN*weights * torch.heaviside(-gELN,zero), dim=1)
+    Iplus  = torch.sum(   gELN .clamp(min=0)*weights, dim=1)
+    Iminus = torch.sum((-gELN).clamp(min=0)*weights, dim=1)
 
     # set Psur depending on the relative size of Iplus and Iminus [point, quadrature]
-    Psur = torch.zeros_like(gELN)
-    locs1 = torch.where(Iplus <  Iminus)[0]
-    locs2 = torch.where(Iplus >= Iminus)[0]
-    IpIm = (Iplus[locs1]/Iminus[locs1]).unsqueeze(1)
-    ImIp = (Iminus[locs2]/Iplus[locs2]).unsqueeze(1)
-    Psur[locs1,:] = (1/3)*torch.heaviside( gELN[locs1],zero) + (1-2/3*IpIm)*torch.heaviside(-gELN[locs1],zero)
-    Psur[locs2,:] = (1/3)*torch.heaviside(-gELN[locs2],zero) + (1-2/3*ImIp)*torch.heaviside( gELN[locs2],zero)
+    # Written without index gathers, which would force a device sync.
+    swap = (Iplus < Iminus)
+    hi   = torch.where(swap, Iminus, Iplus)
+    lo   = torch.where(swap, Iplus,  Iminus)
+    ratio = (lo/torch.where(hi > 0, hi, torch.ones_like(hi))).unsqueeze(1)
+    Hplus  = (gELN > 0).to(gELN.dtype)
+    Hminus = (gELN < 0).to(gELN.dtype)
+    swapq = swap.unsqueeze(1)
+    Psur = (1/3)*torch.where(swapq, Hplus, Hminus) + (1-2/3*ratio)*torch.where(swapq, Hminus, Hplus)
 
     # gELN identically zero gives Iplus==Iminus==0 and hence 0/0 above. There
     # is no crossing, so the distribution is stable and nothing converts.
@@ -104,17 +103,19 @@ def mixBox3D_lebedev(F4, pts, weights):
     unphysical = torch.logical_or(unphysical, torch.logical_not((Psur >= 0) & (Psur <= 1)).any(dim=1))
 
     # compute the mixed distribution function at each quadrature point, using Psur to mix the contributions from the different flavors
-    g_t = torch.zeros_like(g)
-    g_t[:,0,0,:] =  Psur*g[:,0,0,:] + (1-Psur)*g[:,0,1,:]
-    g_t[:,1,0,:] =  Psur*g[:,1,0,:] + (1-Psur)*g[:,1,1,:]
-    g_t[:,0,1,:] = ((1+Psur)*g[:,0,1,:] + (1-Psur)*g[:,0,0,:])/2
-    g_t[:,1,1,:] = ((1+Psur)*g[:,1,1,:] + (1-Psur)*g[:,1,0,:])/2
+    g_e = g[:,:,0,:]
+    g_x = g[:,:,1,:]
+    Psurq = Psur[:,None,:]
+    g_t = torch.stack([ Psurq*g_e     + (1-Psurq)*g_x,
+                       ((1+Psurq)*g_x + (1-Psurq)*g_e)/2], dim=2)
 
     # integrate the mixed distribution function over the quadrature points, weighted by the weights, to get the mixed moments
+    # the basis columns are the three direction cosines followed by 1, so a
+    # single matmul produces all four components at once [quadrature, xyzt]
+    ptsT  = pts.transpose(0,1)
+    basis = torch.cat([ptsT, torch.ones_like(ptsT[:,0:1])], dim=1) * weights[:,None]
     F4mix = torch.zeros_like(F4)
-    F4mix[:,:,:2,3] = torch.sum(g_t * weights[None,None,None,:], dim=3)
-    for i in range(3):
-        F4mix[:,:,:2,i] = torch.sum(g_t * weights[None,None,None,:] * pts[None,None,None,i], dim=3)
+    F4mix[:,:,:2,:] = torch.matmul(g_t, basis)
 
     # Identical mu = tau = x flavors
     F4mix[:,:,2,:] = F4mix[:,:,1,:]
