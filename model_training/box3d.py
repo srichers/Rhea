@@ -19,7 +19,8 @@ def distrib(n,Z,mu):
     g = Z / torch.sinh(Z) * torch.exp(Z*mu)
 
     # for large Z use form of expression that avoids large exponentials
-    g = torch.where(Z < 100, g, torch.exp(Z * (mu-1)) )
+    # Z/sinh(Z) -> 2*Z*exp(-Z), and sinh(Z) overflows float32 at Z~89.4
+    g = torch.where(Z < 30, g, 2*Z*torch.exp(Z * (mu-1)) )
 
     # for small Z use form of expression that avoids division by small numbers
     g = torch.where(Z > 1e-3, g, mu*Z + 1.0)
@@ -35,11 +36,15 @@ def mixBox3D_lebedev(F4, pts, weights):
     # This module is not intended to contribute gradients.
     F4 = F4.detach().clone()
 
+    # points with non-finite input cannot be interpreted at all [point]
+    unphysical = torch.logical_not(torch.isfinite(F4).flatten(start_dim=1).all(dim=1))
+
     # get total number of neutrinos
     Ntot = torch.sum(F4[:,:,:,3:], dim=(1,2), keepdim=True)
 
-    # make sure Ntot is still close to 1
-    assert torch.allclose(Ntot, torch.ones_like(Ntot), atol=1e-5), "Total number of neutrinos is not close to 1"
+    # the caller is expected to have normalized so that Ntot is 1
+    Ntot_bad = torch.logical_not(torch.isclose(Ntot, torch.ones_like(Ntot), atol=1e-5))
+    unphysical = torch.logical_or(unphysical, Ntot_bad.flatten(start_dim=1).any(dim=1))
 
     # average the heavy flavors
     F4[:,:,1:,:] = torch.mean(F4[:,:,1:,:], dim=2, keepdim=True)
@@ -48,9 +53,26 @@ def mixBox3D_lebedev(F4, pts, weights):
     # only use one heavy flavor since they are averaged
     n = F4[:,:,:2,3:]
     F = F4[:,:,:2,0:3]
-    normF = torch.sqrt(torch.sum(F*F, dim=3, keepdim=True))
-    Fhat = torch.nan_to_num(F/normF, nan=0.0)
-    Z = get_Z(normF/n)
+
+    # scale by the largest component before squaring so small fluxes do not
+    # underflow float32, which would collapse normF to exactly zero
+    Fscale = torch.amax(torch.abs(F), dim=3, keepdim=True)
+    Fscale = torch.where(Fscale > 0, Fscale, torch.ones_like(Fscale))
+    normF  = Fscale * torch.sqrt(torch.sum((F/Fscale)**2, dim=3, keepdim=True))
+
+    # normF is zero only if F is, so the floor leaves Fhat exactly zero there
+    Fhat = F / torch.where(normF > 0, normF, torch.ones_like(normF))
+
+    # Nonpositive density, and flux the quadrature cannot represent, are
+    # unphysical. The limit is below the causal value of 1 because the beam
+    # width goes like 1/Z: the total density is off by 3% at a flux factor of
+    # 0.98, 54% at 0.995 and 666% at 0.999. It must stay inline rather than
+    # become a module constant, which torch.jit.script cannot close over. [point]
+    fluxfac = normF/n
+    bad     = torch.logical_or(n <= 0, fluxfac >= 0.98)
+    unphysical = torch.logical_or(unphysical, bad.flatten(start_dim=1).any(dim=1))
+
+    Z = get_Z(fluxfac)
 
     # evaluate the distribution function at each quadrature point
     mu = torch.sum(pts[None,None,None,:,:] * Fhat[:,:,:,:,None], dim=3) # [point, nunubar, flavor, quadrature]
@@ -74,7 +96,12 @@ def mixBox3D_lebedev(F4, pts, weights):
     Psur[locs1,:] = (1/3)*torch.heaviside( gELN[locs1],zero) + (1-2/3*IpIm)*torch.heaviside(-gELN[locs1],zero)
     Psur[locs2,:] = (1/3)*torch.heaviside(-gELN[locs2],zero) + (1-2/3*ImIp)*torch.heaviside( gELN[locs2],zero)
 
-    assert torch.all((Psur >= 0) & (Psur <= 1)), "Psur is not between 0 and 1"
+    # gELN identically zero gives Iplus==Iminus==0 and hence 0/0 above. There
+    # is no crossing, so the distribution is stable and nothing converts.
+    noELN = torch.logical_and(Iplus <= 0, Iminus <= 0)
+    Psur  = torch.where(noELN[:,None], torch.ones_like(Psur), Psur)
+
+    unphysical = torch.logical_or(unphysical, torch.logical_not((Psur >= 0) & (Psur <= 1)).any(dim=1))
 
     # compute the mixed distribution function at each quadrature point, using Psur to mix the contributions from the different flavors
     g_t = torch.zeros_like(g)
@@ -95,16 +122,26 @@ def mixBox3D_lebedev(F4, pts, weights):
     # check that ELN-xln is still conserved
     #check_conservation(F4, F4mix)
 
-    # check that all densities are positive
-    assert torch.all(F4mix[:,:,:,3] >= 0), "Negative densities in mixed distribution function"
+    # negative or non-finite densities are not a usable prediction [point]
+    unphysical = torch.logical_or(unphysical, (F4mix[:,:,:,3] < 0).flatten(start_dim=1).any(dim=1))
+    unphysical = torch.logical_or(unphysical, torch.logical_not(torch.isfinite(F4mix)).flatten(start_dim=1).any(dim=1))
 
-    
-    return F4mix, torch.sqrt(Iplus*Iminus)
+    # return nan rather than raising, so that a single bad point does not kill
+    # the whole batch. Callers running inside a simulation handle the nans.
+    growthrate = torch.sqrt(Iplus*Iminus)
+    F4mix      = torch.where(unphysical[:,None,None,None], torch.full_like(F4mix,      float("nan")), F4mix)
+    growthrate = torch.where(unphysical,                   torch.full_like(growthrate, float("nan")), growthrate)
+
+    return F4mix, growthrate
 
 
 
 if __name__ == "__main__":
+    # fluxes must be smaller than the density to stay subluminal, and the
+    # caller normalizes the total density to 1
     F4 = torch.rand(10,2,3,4)
+    F4[:,:,:,:3] = (F4[:,:,:,:3] - 0.5) * F4[:,:,:,3:]
+    F4 = F4 / torch.sum(F4[:,:,:,3], dim=(1,2))[:,None,None,None]
     F4mix, I = mixBox3D_lebedev(F4, pts, weights)
     print(F4mix)
     print(I)
