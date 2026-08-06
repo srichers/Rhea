@@ -258,8 +258,10 @@ class NeuralNetwork(nn.Module):
         return y_F4, y_growthrate
 
     # X is just F4_initial [nsamples, 2, NF, xyzt]
+    # use_network=False returns the analytic box3d result with no learned correction
+    # (the type hint is required by torch.jit.script, which otherwise assumes Tensor)
     @torch.jit.export
-    def predict_all(self, F4_in):
+    def predict_all(self, F4_in, use_network: bool = True):
 
         # get the total density
         nsims = F4_in.shape[0]
@@ -272,14 +274,24 @@ class NeuralNetwork(nn.Module):
         # get Box3D prediction (pass lebedev pts/weights registered as buffers)
         F4_box3d, growthrate_box3d = box3d.mixBox3D_lebedev(F4_in, self.lebedev_pts, self.lebedev_weights)
 
-        # Combine F4_in and F4_box3D into a joint input of shape [nsamples, nu/nubar, flavor, xyzt(in)/xyzt(box3d)]
-        F4_joint = torch.cat([F4_in, F4_box3d], dim=-1)
+        if use_network:
+            # Combine F4_in and F4_box3D into a joint input of shape [nsamples, nu/nubar, flavor, xyzt(in)/xyzt(box3d)]
+            F4_joint = torch.cat([F4_in, F4_box3d], dim=-1)
 
-        # propagate through the network
-        y_F4, y_growthrate = self.forward(F4_joint)
+            # propagate through the network
+            y_F4, y_growthrate = self.forward(F4_joint)
 
-        # reshape into a matrix
-        F4_out = F4_box3d + y_F4.reshape((nsims,2,self.NF,4))
+            # pool over features to get permutation-invariant output
+            # Averaging over nodes in the graph
+            y_growthrate = torch.mean(y_growthrate, dim=(1,2))
+
+            # reshape into a matrix
+            F4_out     = F4_box3d + y_F4.reshape((nsims,2,self.NF,4))
+            growthrate = growthrate_box3d + torch.squeeze(y_growthrate)
+        else:
+            # clone because the conservation enforcement below is in-place
+            F4_out     = F4_box3d.clone()
+            growthrate = growthrate_box3d
 
         # enforce symmetry in the heavies
         if self.average_heavies_in_final_state:
@@ -301,13 +313,6 @@ class NeuralNetwork(nn.Module):
             ELN_excess = ELN_out - ELN_in
             F4_out[:,0,:,3] -= ELN_excess / 2.0
             F4_out[:,1,:,3] += ELN_excess / 2.0
-
-        # pool over features to get permutation-invariant output
-        # Averaging over nodes in the graph
-        y_growthrate = torch.mean(y_growthrate, dim=(1,2))
-
-        # apply total density scaling to log growth rate
-        growthrate = growthrate_box3d + torch.squeeze(y_growthrate)
 
         # rescale F4_out to the original total density
         F4_out = F4_out * ntot[:,None,None,None]
