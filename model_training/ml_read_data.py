@@ -16,6 +16,17 @@ import ml_constants as constants
 from torch.utils.data import TensorDataset
 sys.path.append("data")
 
+
+# for handling keys in the hdf5 files
+def read_hdf5_dataset(file_handle, key_options):
+    for key in key_options:
+        if key in file_handle:
+            return file_handle[key][...]
+    raise KeyError(
+        "None of the expected HDF5 datasets exist: "
+        + ", ".join(key_options)
+    )
+
 def read_asymptotic_data(parms):
     #===============================================#
     # read in the database from the previous script #
@@ -23,18 +34,38 @@ def read_asymptotic_data(parms):
     print("# PREPARING TEST/TRAIN DATA #")
 
     dataset_train_list = []
+    dataset_validation_list = []
     dataset_test_list = []
     rng = torch.Generator().manual_seed(parms["random_seed"])
-    for dind,d in enumerate(parms["database_list"]):
+    if "database_train_list" in parms:
+        database_list = (
+            [("train", d) for d in parms["database_train_list"]]
+            + [("validation", d) for d in parms.get("database_validation_list", [])]
+            + [("test", d) for d in parms.get("database_test_list", [])]
+        )
+    else:
+        # Preserve legacy behavior: first dataset is test, rest train.
+        database_list = [
+            ("test" if dind==0 else "train", d)
+            for dind,d in enumerate(parms["database_list"])
+        ]
+
+    for dind,(split,d) in enumerate(database_list):
         print()
         print(dind,d)
         # read from file
         with h5py.File(d,"r") as f_in:
             # File contains [simulationIndex, xyzt, nu/nubar, flavor]
             # We want [simulationIndex, nu/nubar, flavor, xyzt]
-            F4_initial = torch.Tensor(f_in["F4_initial(1|ccm)"][...]).permute(0,2,3,1) 
-            F4_final   = torch.Tensor(f_in["F4_final(1|ccm)"  ][...]).permute(0,2,3,1)
-            growthrate = torch.Tensor(f_in["growthRate(1|s)"  ][...]) / constants.ndens_to_invsec
+            F4_initial = torch.Tensor(
+                read_hdf5_dataset(f_in, ["F4_initial(1|ccm)"])
+            ).permute(0,2,3,1)
+            F4_final = torch.Tensor(
+                read_hdf5_dataset(f_in, ["F4_final(1|ccm)", "targets/F4_final(1|ccm)"])
+            ).permute(0,2,3,1)
+            growthrate = torch.Tensor(
+                read_hdf5_dataset(f_in, ["growthRate(1|s)", "targets/growthRate(1|s)"])
+            ) / constants.ndens_to_invsec
             assert(parms["NF"] == int(np.array(f_in["nf"])) )
             assert(torch.all(torch.isfinite(F4_initial)))
             assert(torch.all(torch.isfinite(F4_final)))
@@ -87,16 +118,20 @@ def read_asymptotic_data(parms):
         growthrate = growthrate[goodlocs]
 
         # add dataset to the lists
-        if dind==0:
-            dataset_test_list.append( TensorDataset(F4_initial, F4_final, growthrate) )
+        dataset = TensorDataset(F4_initial, F4_final, growthrate)
+        if split=="test":
+            dataset_test_list.append(dataset)
+        elif split=="validation":
+            dataset_validation_list.append(dataset)
         else:
-            dataset_train_list.append(TensorDataset(F4_initial, F4_final, growthrate) )
+            dataset_train_list.append(dataset)
 
     print()
     print("# Asymptotic Train:",[len(d) for d in dataset_train_list])
+    print("# Asymptotic Validation:",[len(d) for d in dataset_validation_list])
     print("# Asymptotic Test:",[len(d) for d in dataset_test_list])
     
-    return dataset_train_list, dataset_test_list
+    return dataset_train_list, dataset_validation_list, dataset_test_list
 
 #=================================================#
 # read in the stable points from the NSM snapshot #

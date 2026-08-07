@@ -14,7 +14,10 @@ from ml_read_data import *
 import torch.autograd.profiler as profiler
 import pickle
 import os
+from pathlib import Path
 from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler
+from hypertuner.budget import build_epoch_budget_tracker
+from ml_training_status import validate_finite_metrics, validate_positive_predicted_ntotal
 
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
@@ -58,11 +61,17 @@ def configure_loader(parms, dataset_train_list):
 
 def train_asymptotic_model(parms,
                            dataset_asymptotic_train_list,
+                           dataset_asymptotic_validation_list,
                            dataset_asymptotic_test_list,
                            report_fn=None):
+    output_dir = Path(parms.get("output_dir", os.getcwd()))
+    if not output_dir.is_absolute():
+        output_dir = Path(os.getcwd()) / output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    validation_eval_list = dataset_asymptotic_validation_list or dataset_asymptotic_test_list
 
     # print out all parameters for the record
-    parmfile = open(os.getcwd()+"/parameters.txt","w")
+    parmfile = open(output_dir / "parameters.txt","w")
     for key in parms.keys():
         parmfile.write(key+" = "+str(parms[key])+"\n")
     parmfile.close()
@@ -89,6 +98,17 @@ def train_asymptotic_model(parms,
         raise ValueError("Unknown optimizer "+str(parms["op"]))
 
     print("#  number of parameters:", sum(p.numel() for p in model.parameters()))
+    budget_tracker = build_epoch_budget_tracker(parms, model)
+    if budget_tracker is not None:
+        print(
+            "#USING NORMALIZED BUDGET RESOURCE",
+            "resource=", budget_tracker.resource_attr,
+            "max_budget=", budget_tracker.max_budget,
+            "max_epoch=", budget_tracker.max_epoch(),
+            "uncapped_max_epoch=", budget_tracker.uncapped_max_epoch(),
+            "compute_cost_scale=", f"{budget_tracker.compute_cost_scale:.5e}",
+            "lr_need_scale=", f"{budget_tracker.lr_need_scale:.5e}",
+        )
 
     #=======================#
     # set up the schedulers #
@@ -115,11 +135,14 @@ def train_asymptotic_model(parms,
     def contribute_loss(pred, true, traintest, key, loss_fn):
         loss = loss_fn(pred, true)
         loss_dict[key+"_"+traintest+"_loss"] += loss.item()
-        loss_dict[key+"_"+traintest+"_max"]  = max(max_error(pred, true), loss_dict[key+"_"+traintest+"_max"])
+        loss_dict[key+"_"+traintest+"_max"] = max(
+            float(max_error(pred, true)),
+            loss_dict[key+"_"+traintest+"_max"],
+        )
         return loss
 
     # set up file for writing performance metrics
-    loss_file = open(os.getcwd()+"/loss.dat","w")
+    loss_file = open(output_dir / "loss.dat","w")
     
     #===============#
     # training loop #
@@ -127,7 +150,12 @@ def train_asymptotic_model(parms,
     print("#STARTING TRAINING LOOP")
     torch.backends.cudnn.benchmark = True # may help with performance
     final_metrics = {}
-    for epoch in range(1,parms["epochs"]+1):
+    max_training_epochs = (
+        budget_tracker.max_epoch()
+        if budget_tracker is not None
+        else parms["epochs"]
+    )
+    for epoch in range(1,max_training_epochs+1):
         # set up the loss dictionary for IO
         loss_dict = {}
         loss_dict["epoch"] = epoch
@@ -153,7 +181,7 @@ def train_asymptotic_model(parms,
             ntot_p = ntotal(F4f_pred_train)
             #print("ntot_pred min/max:", ntot_p.min().item(), ntot_p.max().item())
             assert torch.all(ntot_t > 0)
-            assert torch.all(ntot_p > 0)
+            validate_positive_predicted_ntotal(ntot_p, "train", epoch)
 
             # normalize quantities before computing losses
             F4f_true_train = F4f_true_train / ntot_t[:,None,None,None]
@@ -189,14 +217,20 @@ def train_asymptotic_model(parms,
 
         loss_dict["F4_train_loss"] = 0
         loss_dict["F4_train_max"] = 0
+        loss_dict["F4_validation_loss"] = 0
+        loss_dict["F4_validation_max"] = 0
         loss_dict["F4_test_loss"] = 0
         loss_dict["F4_test_max"] = 0
         loss_dict["growthrate_train_loss"] = 0
         loss_dict["growthrate_train_max"] = 0
+        loss_dict["growthrate_validation_loss"] = 0
+        loss_dict["growthrate_validation_max"] = 0
         loss_dict["growthrate_test_loss"] = 0
         loss_dict["growthrate_test_max"] = 0
         loss_dict["unphysical_train_loss"] = 0
         loss_dict["unphysical_train_max"] = 0
+        loss_dict["unphysical_validation_loss"] = 0
+        loss_dict["unphysical_validation_max"] = 0
         loss_dict["unphysical_test_loss"] = 0
         loss_dict["unphysical_test_max"] = 0
 
@@ -215,7 +249,7 @@ def train_asymptotic_model(parms,
                 ntot_t = ntotal(F4f_true)
                 ntot_p = ntotal(F4f_pred)
                 assert torch.all(ntot_t > 0)
-                assert torch.all(ntot_p > 0)
+                validate_positive_predicted_ntotal(ntot_p, traintest, epoch)
                 F4f_true = F4f_true / ntot_t[:,None,None,None]
                 F4f_pred = F4f_pred / ntot_p[:,None,None,None]
                 growthrate_true = growthrate_true / ntot_t
@@ -246,18 +280,21 @@ def train_asymptotic_model(parms,
 
         with torch.no_grad():
             train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
+            validation_loss = accumulate_asymptotic_loss(validation_eval_list, "validation")
             test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
 
         # track the total loss
         loss_dict["train_loss"] = train_loss.item()
+        loss_dict["validation_loss"] = validation_loss.item()
         loss_dict["test_loss"]  =  test_loss.item()
-        # Keep the existing training behavior, but expose a stable validation
-        # metric name for Syne Tune and other external runners.
-        loss_dict["validation_score"] = loss_dict["test_loss"]
+        loss_dict["validation_score"] = loss_dict["validation_loss"]
 
         # track the task weights
         for name in model.log_task_weights.keys():
             loss_dict["weight_"+name] = torch.exp(-model.log_task_weights[name]).item()
+        if budget_tracker is not None:
+            loss_dict.update(budget_tracker.metrics_for_epoch(epoch))
+        validate_finite_metrics(loss_dict)
 
         #=====================================#
         # ADVANCE THE LEARNING RATE SCHEDULER #
@@ -288,16 +325,20 @@ def train_asymptotic_model(parms,
                 loss_file.write("{:<12.3e}\t".format(loss_dict[k]))
         loss_file.write('\n')
         loss_file.flush()
-        assert(loss_dict["train_loss"]==loss_dict["train_loss"])
 
         # determine if stopping early
         stop_early = (scheduler.get_last_lr()[0]<=parms["min_lr"]) and (epoch>parms["warmup_iters"])
+        hit_budget_limit = (
+            budget_tracker is not None
+            and loss_dict[budget_tracker.resource_attr] >= budget_tracker.max_budget
+        )
 
         # output
-        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
-        if(epoch%parms["output_every"]==0 or stop_early):
-            outfilename = os.getcwd()+"/model"+str(epoch)
-            F4i = dataset_asymptotic_test_list[0].tensors[0]
+        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['validation_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
+        if(epoch%parms["output_every"]==0 or stop_early or hit_budget_limit):
+            outfilename = str(output_dir / ("model"+str(epoch)))
+            checkpoint_dataset_list = dataset_asymptotic_test_list or validation_eval_list
+            F4i = checkpoint_dataset_list[0].tensors[0]
             save_model(model, outfilename, parms["device"], F4i)
             print("Saved",outfilename, flush=True)
 
@@ -308,6 +349,9 @@ def train_asymptotic_model(parms,
         # exit the loop if the learning rate is too low
         if stop_early:
             print("Learning rate below minimum threshold - stopping training")
+            break
+        if hit_budget_limit:
+            print("Normalized budget limit reached - stopping training")
             break
         
 

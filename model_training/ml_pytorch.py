@@ -16,19 +16,26 @@ def build_default_parms():
     # create a list of options
     parms = {}
 
+    parms["output_dir"] = "output/train_one"
+
     # list of asymptotic data
-    # First dataset is deemed test data
-    parms["database_list"] = [
-        "data/dummy_asymptotic.h5",
-        "data/dummy_asymptotic.h5",
+    parms["database_train_list"] = [
+        "datasets/asymptotic_M1-NuLib-7ms.h5",
+        "datasets/asymptotic_random.h5",
+    ]
+    parms["database_validation_list"] = [
+        "datasets/asymptotic_M1-NuLib-old.h5",
+    ]
+    parms["database_test_list"] = [
+        "datasets/asymptotic_M1-NuLib.h5",
     ]
 
     # list of stability data
     # First dataset is deemed test data
     parms["stable_database_list"] = [
-        "data/stable_oneflavor_database.h5",
-        "data/stable_random_database.h5",
-        "data/stable_zerofluxfac_database.h5",
+        "datasets/stable_oneflavor.h5",
+        "datasets/stable_random.h5",
+        "datasets/stable_zerofluxfac.h5",
     ]
     parms["samples_per_database"] = 1000000
 
@@ -37,7 +44,7 @@ def build_default_parms():
     parms["output_every"] = 10
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = True
-    parms["random_seed"] = 42
+    parms["random_seed"] = 100
     parms["loader.batch_size"] = 10
     parms["loader.num_workers"] = 1
     parms["loader.prefetch_factor"] = 1
@@ -48,7 +55,6 @@ def build_default_parms():
     parms["tensor_product_class"] = "norm"
 
     parms["do_learn_task_weights"] = False
-    parms["task_weight_stability"] = 1.0
     parms["task_weight_F4"] = 1.0
     parms["task_weight_unphysical"] = 1
     parms["task_weight_growthrate"] = 1.0
@@ -59,7 +65,6 @@ def build_default_parms():
 
     # neural network options
     parms["nhidden_shared"] = 1
-    parms["nhidden_stability"] = 3
     parms["nhidden_growthrate"] = 3
     parms["nhidden_F4"] = 3
     parms["irreps_hidden"] = e3nn.o3.Irreps("4x0e + 4x1o")
@@ -88,48 +93,149 @@ def build_default_parms():
     #========================#
     parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
 
+    hpo_ref_epochs = 20
+    hpo_max_budget = 1000
+
     parms["syne_tune"] = {
         "report": False,
         "metric": "validation_score",
-        "mode": "min",
-        "resource_attr": "epoch",
-        "max_resource_attr": "epochs",
-        "config_space": {
-            "epochs": 10,
-            "learning_rate": {
-                "type": "loguniform",
+        "mode": "MIN",
+        "scheduler": "ASHA",
+        "space": {
+            "lr": {
+                "kind": "loguniform",
                 "lower": 1e-5,
-                "upper": 1e-3,
-            },
-            "loader.batch_size": {
-                "type": "randint",
-                "lower": 8,
-                "upper": 64,
-            },
-            "adamw.weight_decay": {
-                "type": "loguniform",
-                "lower": 1e-8,
                 "upper": 1e-2,
             },
+            "weight_decay": {
+                "kind": "loguniform",
+                "lower": 1e-6,
+                "upper": 1e-2,
+            },
+            "batch_size": {
+                "kind": "choice",
+                "values": [128, 256, 512, 1024],
+            },
+            "model_tier": {
+                "kind": "choice",
+                "values": ["tiny", "small"],
+            },
+            "ref_epochs": {
+                "kind": "constant",
+                "value": hpo_ref_epochs,
+            },
+            "max_budget": {
+                "kind": "constant",
+                "value": hpo_max_budget,
+            },
+            "device": {
+                "kind": "constant",
+                "value": parms["device"],
+            },
+            "seed": {
+                "kind": "constant",
+                "value": parms["random_seed"],
+            },
         },
-        "backend": {
-            "pass_args_as_json": True,
-            "rotate_gpus": True,
-            "num_gpus_per_trial": 1,
+        "model_tiers": {
+            "tiny": {
+                "parms": {
+                    "irreps_hidden": "2x0e + 2x1o",
+                    "nhidden_shared": 2,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 2,
+                    "dropout_probability": 0.025,
+                },
+            },
+            "small": {
+                "parms": {
+                    "irreps_hidden": "3x0e + 3x1o",
+                    "nhidden_shared": 2,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 2,
+                    "dropout_probability": 0.05,
+                },
+            },
+            "medium": {
+                "parms": {
+                    "irreps_hidden": "5x0e + 5x1o",
+                    "nhidden_shared": 2,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 3,
+                    "dropout_probability": 0.075,
+                },
+            },
+            "large": {
+                "parms": {
+                    "irreps_hidden": "6x0e + 6x1o",
+                    "nhidden_shared": 3,
+                    "nhidden_growthrate": 2,
+                    "nhidden_F4": 3,
+                    "dropout_probability": 0.1,
+                },
+            },
         },
-        "scheduler": {
-            "name": "hyperband",
-            "searcher": "random",
-            "type": "stopping",
-            "grace_period": 1,
+        "base_model_cfg": {
+            "input_irreps": "1x1o + 1x0e + 1x1o + 1x0e",
+            "growthrate_irreps": "1x0e",
+            "F4_irreps": "1x1o + 1x0e",
+            "tensor_product_class": parms["tensor_product_class"],
+        },
+        "resource": {
+            "resource_attr": "budget",
+            "max_resource_attr": "max_budget",
+            "grace_period": 60,
             "reduction_factor": 3,
+            "brackets": 1,
         },
-        "tuner": {
-            "n_workers": 1,
+        # ASHA schedules on normalized budget. `ref_epochs` defines how many
+        # epochs a reference-cost model gets before consuming max_budget.
+        "budget": {
+            "kind": "normalized_split",
+            "ref_epochs": hpo_ref_epochs,
+            "ref_params": 300000,
+            "ref_batch_size": 256,
+            "ref_lr": 1e-3,
+            "param_exponent": 0.25,
+            "batch_exponent": 0.5,
+            "lr_exponent": 0.25,
+            "raw_steps_per_budget": hpo_ref_epochs / hpo_max_budget,
+            "max_epochs_cap": 100,
         },
-        "stop": {
-            "max_wallclock_time": 3600,
+        "sampling": {
+            "kind": "cost_balanced",
+            "cost_exponent": 0.5,
+            "candidate_pool_size": 512,
         },
+        "plots": {
+            "enabled": True,
+            "metric": "validation_score",
+            "best_over_time": True,
+            "trials_over_time": True,
+            "output_dir": "plots",
+            "best_filename": "best_validation_score.png",
+            "trials_filename": "trials_validation_score.png",
+            "show": False,
+        },
+        "bohb_num_min_data_points": 0,
+        "bohb_top_n_percent": 15,
+        "bohb_min_bandwidth": 1e-3,
+        "bohb_num_candidates": 64,
+        "bohb_bandwidth_factor": 3,
+        "bohb_random_fraction": 0.33,
+        "max_wallclock_time": 23 * 60 * 60,
+        "max_num_trials_started": 100,
+        "max_num_trials_completed": None,
+        "n_workers": 2,
+        "random_seed": parms["random_seed"],
+        "tuner_name": "rhea-asha",
+        "results_root": "syne-tune",
+        "rotate_gpus": True,
+        "delete_checkpoints": False,
+        "save_tuner": True,
+        "sleep_time": 5.0,
+        "results_update_interval": 10.0,
+        "print_update_interval": 30.0,
     }
 
     return parms
@@ -142,7 +248,11 @@ def run_default_training(parms=None, report_fn=None):
     if parms is None:
         parms = build_default_parms()
 
-    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
+    (
+        dataset_asymptotic_train_list,
+        dataset_asymptotic_validation_list,
+        dataset_asymptotic_test_list,
+    ) = read_asymptotic_data(parms)
 
     # Preserve the current stable-dataset loading behavior even though the
     # training loop does not consume those datasets directly.
@@ -151,6 +261,7 @@ def run_default_training(parms=None, report_fn=None):
     return train_asymptotic_model(
         parms,
         dataset_asymptotic_train_list,
+        dataset_asymptotic_validation_list,
         dataset_asymptotic_test_list,
         report_fn=report_fn,
     )
