@@ -28,24 +28,6 @@ def unphysical_loss_fn(F4f_pred, F4f_true):
     # total conservation loss
     return negative_density_loss + fluxfac_loss
 
-def stability_loss_fn(logit, stability_true):
-    #print("logit min/max:", logit.min().item(), logit.max().item())
-
-    # clamp the logits to improve numerical stability
-    logit = logit.clamp(min=-10, max=10)
-
-    # determine the relative class weights for stable/unstable points
-    N_neg = torch.sum(1.0 - stability_true).item()
-    N_pos = torch.sum(stability_true).item()
-    
-    if N_pos>0 and N_neg>0:
-        pos_weight = torch.tensor([N_neg / N_pos], device=logit.device)
-        result = torch.nn.BCEWithLogitsLoss(reduction='mean', pos_weight=pos_weight)(logit, stability_true)
-    else:
-        result = torch.nn.BCEWithLogitsLoss(reduction='mean')(logit, stability_true)
-
-    return result
-
 def max_error(F4f_pred, F4f_true):
     if F4f_true == None:
         return 0

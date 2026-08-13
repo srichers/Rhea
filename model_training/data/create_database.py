@@ -7,8 +7,6 @@ import numpy as np
 from scipy.signal import argrelextrema
 from multiprocessing import Pool
 import generate
-import maxentropy
-import torch
 
 NF = 3
 file_format = "hdf5" # "hdf5" or "dat"
@@ -28,58 +26,6 @@ eV = 1.60218e-12 # erg
 GeV = 1e9 * eV
 GF = 1.1663787e-5 / GeV**2 * (hbar*c)**3 # erg cm^3
 ndens_to_invsec = GF/hbar
-
-#=================================================#
-# read in the stable points from the NSM snapshot #
-#=================================================#
-def write_NSM_stable_data(filename, outfilename):
-    # note that x represents the SUM of mu, tau, anti-mu, anti-tau and must be divided by 4 to get the individual flavors
-    # take only the y-z slice to limit the size of the data.
-    f_in = h5py.File(filename,"r")
-    discriminant = torch.from_numpy(f_in["crossing_discriminant"][...]).flatten()
-    # n has shape [Nx,Ny,Nz]]
-    ne = torch.from_numpy(f_in["n_e(1|ccm)"][...]).flatten()
-    na = torch.from_numpy(f_in["n_a(1|ccm)"][...]).flatten()
-    nx = torch.from_numpy(f_in["n_x(1|ccm)"][...]).flatten()
-    # f has shape [3, Nx,Ny,Nz]
-    fe = torch.from_numpy(f_in["fn_e(1|ccm)"][...]).flatten(start_dim=1)
-    fa = torch.from_numpy(f_in["fn_a(1|ccm)"][...]).flatten(start_dim=1)
-    fx = torch.from_numpy(f_in["fn_x(1|ccm)"][...]).flatten(start_dim=1)
-    f_in.close()
-
-    # remove any NaN points
-    print("NSM number of elements before NaN removal:",discriminant.numel())
-    good_locs = torch.where(ne==ne)[0]
-    discriminant = discriminant[good_locs]
-    ne = ne[good_locs]
-    na = na[good_locs]
-    nx = nx[good_locs]
-    fe = fe[:,good_locs]
-    fa = fa[:,good_locs]
-    fx = fx[:,good_locs]
-
-    num_elements = discriminant.numel()
-    print("NSM number of elements:",num_elements)
-    
-    # set stability bit
-    stable = torch.zeros(num_elements)
-    stable_locs = torch.where(discriminant<=0)
-    unstable_locs = torch.where(discriminant>0)
-    print(len(stable_locs[0]),"stable points")
-    print(len(unstable_locs[0]),"unstable points")
-    stable[stable_locs] = 1
-
-    F4_NSM = torch.zeros((num_elements,4,2,NF))
-    F4_NSM[:,3,0,0  ] = ne
-    F4_NSM[:,3,1,0  ] = na
-    F4_NSM[:,3,:,1:3] = nx[:,None,None] / 4.
-    for i in range(3):
-        F4_NSM[:,i,0,0  ] = fe[i]
-        F4_NSM[:,i,1,0  ] = fa[i]
-        F4_NSM[:,i,:,1:3] = fx[i][:,None,None] / 4.
-
-    generate.write_stable_dataset(outfilename, F4_NSM, stable)
-
 
 # get the list of files to process
 def simulation_is_finished(dirname):
@@ -322,38 +268,8 @@ def write_dummy_asymptotic_dataset(ngenerate, outfilename):
     output.close()
     
 if __name__ == "__main__":
-    # stable/unstable criteria based on maximum entropy conditions applied to NSM snapshot data
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl0_orthonormal.h5","stable_M1-NuLib_rl0.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl1_orthonormal.h5","stable_M1-NuLib_rl1.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl2_orthonormal.h5","stable_M1-NuLib_rl2.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib/M1VolumeData/model_rl3_orthonormal.h5","stable_M1-NuLib_rl3.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl0_orthonormal.h5","stable_M1-LeakageRates_rl0.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl1_orthonormal.h5","stable_M1-LeakageRates_rl1.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl2_orthonormal.h5","stable_M1-LeakageRates_rl2.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-LeakageRates/M1VolumeData/M1VolumeData/model_rl3_orthonormal.h5","stable_M1-LeakageRates_rl3.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-old/orthonormal_distributions/model_rl0_orthonormal.h5","stable_M1-NuLib-old_rl0.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl0_orthonormal.h5","stable_M1-Nulib-7ms_rl0.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl1_orthonormal.h5","stable_M1-Nulib-7ms_rl1.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl2_orthonormal.h5","stable_M1-Nulib-7ms_rl2.h5")
-    #write_NSM_stable_data("/mnt/scratch/NSM_ML/spec_data/M1-NuLib-7ms/model_rl3_orthonormal.h5","stable_M1-Nulib-7ms_rl3.h5")
-
     # randomly generated distributions
     ngenerate = 1000
-    nphi_maxentropy_check = 128
-
-    result = generate.generate_stable_F4_zerofluxfac(NF, ngenerate, False).numpy()
-    print("generate_stable_F4_zerofluxfac output: ",result.shape)
-    generate.write_stable_dataset("stable_zerofluxfac.h5",result, torch.ones(ngenerate))
-    
-    result = generate.generate_stable_F4_oneflavor(NF, ngenerate, False).numpy()
-    print("generate_stable_F4_oneflavor output: ",result.shape)
-    generate.write_stable_dataset("stable_oneflavor.h5", result, torch.ones(result.shape[0]))
-
-    result = generate.generate_random_F4(NF, ngenerate, False, 10, 0.95).numpy()
-    hascrossing = torch.tensor(maxentropy.has_crossing(result, 3, nphi_maxentropy_check))
-    print("generate_stable_F4_oneflavor output: ",result.shape)
-    print("nstable:",torch.sum(hascrossing))
-    generate.write_stable_dataset("stable_random.h5", result, 1-hascrossing)
 
     write_dummy_asymptotic_dataset(ngenerate, "dummy_asymptotic.h5")
     

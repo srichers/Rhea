@@ -58,6 +58,7 @@ def configure_loader(parms, dataset_train_list):
 
 def train_asymptotic_model(parms,
                            dataset_asymptotic_train_list,
+                           dataset_asymptotic_validation_list,
                            dataset_asymptotic_test_list,
                            report_fn=None):
 
@@ -242,6 +243,14 @@ def train_asymptotic_model(parms,
                         else:
                             total_loss = total_loss + torch.sum(model.log_task_weights[name])
 
+            # report the mean over datasets rather than the sum, so that train,
+            # validation, and test losses are directly comparable to each other
+            # and do not depend on how many databases were loaded
+            if len(dataset_list) > 0:
+                for key in ["F4","growthrate","unphysical"]:
+                    loss_dict[key+"_"+traintest+"_loss"] /= len(dataset_list)
+                total_loss = total_loss / len(dataset_list)
+
             return total_loss
 
         with torch.no_grad():
@@ -251,8 +260,8 @@ def train_asymptotic_model(parms,
         # track the total loss
         loss_dict["train_loss"] = train_loss.item()
         loss_dict["test_loss"]  =  test_loss.item()
-        # Keep the existing training behavior, but expose a stable validation
-        # metric name for Syne Tune and other external runners.
+        # placeholder so this column keeps its position in loss.dat - the real
+        # value is filled in below once the validation set has been evaluated
         loss_dict["validation_score"] = loss_dict["test_loss"]
 
         # track the task weights
@@ -270,6 +279,26 @@ def train_asymptotic_model(parms,
             scheduler = schedulers[1]
             loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
             scheduler.step(train_loss.item())
+
+        #==============================#
+        # EVALUATION ON VALIDATION SET #
+        #==============================#
+        # evaluated after the scheduler so that every column of loss.dat that
+        # already existed keeps its position and existing plot scripts still work.
+        # the scheduler deliberately still steps on the training loss - moving it
+        # onto the validation loss would change the optimization dynamics.
+        loss_dict["F4_validation_loss"] = 0
+        loss_dict["F4_validation_max"] = 0
+        loss_dict["growthrate_validation_loss"] = 0
+        loss_dict["growthrate_validation_max"] = 0
+        loss_dict["unphysical_validation_loss"] = 0
+        loss_dict["unphysical_validation_max"] = 0
+
+        with torch.no_grad():
+            validation_loss = accumulate_asymptotic_loss(dataset_asymptotic_validation_list, "validation")
+
+        loss_dict["validation_loss"]  = validation_loss.item()
+        loss_dict["validation_score"] = loss_dict["validation_loss"]
 
         #==========================================#
         # OUTPUT LOSS METRICS AND MODEL PARAMETERS #
@@ -294,7 +323,7 @@ def train_asymptotic_model(parms,
         stop_early = (scheduler.get_last_lr()[0]<=parms["min_lr"]) and (epoch>parms["warmup_iters"])
 
         # output
-        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
+        print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['validation_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
         if(epoch%parms["output_every"]==0 or stop_early):
             outfilename = os.getcwd()+"/model"+str(epoch)
             F4i = dataset_asymptotic_test_list[0].tensors[0]

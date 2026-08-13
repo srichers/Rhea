@@ -16,23 +16,17 @@ def build_default_parms():
     # create a list of options
     parms = {}
 
-    # list of asymptotic data
-    # First dataset is deemed test data
-    parms["database_list"] = [
-        "data/dummy_asymptotic.h5",
-        "data/dummy_asymptotic.h5",
+    # lists of asymptotic data, preprocessed by data/split_database.py
+    parms["train_database_list"] = [
+        "data/dummy_asymptotic_chunk3-0_thin1_maxfluxfac0.9.h5",
+    ]
+    parms["validation_database_list"] = [
+        "data/dummy_asymptotic_chunk3-1_thin1_maxfluxfac0.9.h5",
+    ]
+    parms["test_database_list"] = [
+        "data/dummy_asymptotic_chunk3-2_thin1_maxfluxfac0.9.h5",
     ]
 
-    # list of stability data
-    # First dataset is deemed test data
-    parms["stable_database_list"] = [
-        "data/stable_oneflavor_database.h5",
-        "data/stable_random_database.h5",
-        "data/stable_zerofluxfac_database.h5",
-    ]
-    parms["samples_per_database"] = 1000000
-
-    parms["test_size"] = 0.1
     parms["epochs"] = 10
     parms["output_every"] = 10
     parms["average_heavies_in_final_state"] = False
@@ -42,24 +36,21 @@ def build_default_parms():
     parms["loader.num_workers"] = 1
     parms["loader.prefetch_factor"] = 1
     parms["sampler"] = torch.utils.data.WeightedRandomSampler  # WeightedRandomSampler, SequentialSampler
-    parms["weightedrandomsampler.epoch_num_samples"] = 10  # parms["samples_per_database"]
+    parms["weightedrandomsampler.epoch_num_samples"] = 10
     parms["scalar_activation"] = nn.functional.silu
     parms["nonscalar_activation"] = torch.sigmoid
     parms["tensor_product_class"] = "norm"
 
     parms["do_learn_task_weights"] = False
-    parms["task_weight_stability"] = 1.0
     parms["task_weight_F4"] = 1.0
     parms["task_weight_unphysical"] = 1
     parms["task_weight_growthrate"] = 1.0
 
     # data augmentation options
-    parms["do_augment_final_stable"] = False  # True
     parms["do_unphysical_check"] = True  # True - seems to help prevent crazy results
 
     # neural network options
     parms["nhidden_shared"] = 1
-    parms["nhidden_stability"] = 3
     parms["nhidden_growthrate"] = 3
     parms["nhidden_F4"] = 3
     parms["irreps_hidden"] = e3nn.o3.Irreps("4x0e + 4x1o")
@@ -136,21 +127,18 @@ def build_default_parms():
 
 
 def run_default_training(parms=None, report_fn=None):
-    from ml_read_data import read_asymptotic_data, read_stable_data
+    from ml_read_data import read_asymptotic_data
     from ml_trainmodel import train_asymptotic_model
 
     if parms is None:
         parms = build_default_parms()
 
-    dataset_asymptotic_train_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
-
-    # Preserve the current stable-dataset loading behavior even though the
-    # training loop does not consume those datasets directly.
-    read_stable_data(parms)
+    dataset_asymptotic_train_list, dataset_asymptotic_validation_list, dataset_asymptotic_test_list = read_asymptotic_data(parms)
 
     return train_asymptotic_model(
         parms,
         dataset_asymptotic_train_list,
+        dataset_asymptotic_validation_list,
         dataset_asymptotic_test_list,
         report_fn=report_fn,
     )
