@@ -32,5 +32,5 @@ def max_error(F4f_pred, F4f_true):
     if F4f_true == None:
         return 0
     else:
-        return torch.max(torch.abs(F4f_pred - F4f_true))
+        return torch.max(torch.abs(F4f_pred - F4f_true)).item()
     
