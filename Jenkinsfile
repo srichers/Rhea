@@ -23,12 +23,14 @@ pipeline {
 	//=======//
 	// Tests //
 	//=======//
+	// create_database.py writes dummy_asymptotic.h5, which is only an intermediate.
+	// split_database.py turns it into the chunk files that parms["*_database_list"]
 	stage('data generation'){ steps{
-            dir('model_training'){ dir('data'){
-		sh 'python3 maxentropy.py'
-		sh 'python3 generate.py'
-		sh 'python3 create_database.py'
-	    }}
+	    dir('model_training'){ dir('data'){
+		    sh 'python3 create_database.py'
+		}
+		sh 'python3 data/split_database.py --n_chunks 3 data/dummy_asymptotic.h5'
+	    }
 	}}
 	stage('training'){ steps{
             dir('model_training'){
