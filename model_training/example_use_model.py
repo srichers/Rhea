@@ -10,6 +10,7 @@ This reads a trained model and passes a sample data point through it.
 import numpy as np
 import torch
 import sys
+import ml_constants as constants
 
 # read the filename
 if len(sys.argv) != 2:
@@ -63,6 +64,11 @@ print(before[0,:,:,3])
 
 # print the number densities predicted by the ML model
 after, growthrate, stable = model.predict_all(before)
+
+# predict_all returns the growth rate in number density units. The caller
+# multiplies by sqrt(2)*G_F/hbar to recover 1/s, because doing it inside the model
+# overflows float32.
+growthrate = growthrate * constants.ndens_to_invsec
 print()
 print("Stability prediction:", stable)
 print()
@@ -90,6 +96,7 @@ after_rotated = after.clone()
 after_rotated[:,:,:,0] = after[:,:,:,1]
 after_rotated[:,:,:,1] = after[:,:,:,0]
 after2, growthrate2, stable2 = model.predict_all(before_rotated)
+growthrate2 = growthrate2 * constants.ndens_to_invsec
 print()
 print("Stability prediction (rotated):", stable2)
 print("equivariance_error =", torch.max(torch.abs(stable - stable2)).item())
@@ -115,6 +122,7 @@ after_permuted = after.clone()
 after_permuted[:,0,:,:] = after[:,1,:,:]
 after_permuted[:,1,:,:] = after[:,0,:,:]
 after3, growthrate3, stable3 = model.predict_all(before_permuted)
+growthrate3 = growthrate3 * constants.ndens_to_invsec
 print()
 print("Stability prediction (permuted):", stable3)
 print("invariance_error =", torch.max(torch.abs(stable - stable3)).item())
@@ -139,6 +147,7 @@ after_flavor_permuted = after.clone()
 after_flavor_permuted[:, :, 0, :] = after[:, :, 1, :]
 after_flavor_permuted[:, :, 1, :] = after[:, :, 0, :]
 after4, growthrate4, stable4 = model.predict_all(before_flavor_permuted)
+growthrate4 = growthrate4 * constants.ndens_to_invsec
 print()
 print("Stability prediction (flavor permuted):", stable4)
 print("invariance_error =", torch.max(torch.abs(stable - stable4)).item())

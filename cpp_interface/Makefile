@@ -7,7 +7,7 @@ INCLUDE_FLAGS = -I$(LIBTORCH_DIR)/include -I$(LIBTORCH_DIR)/include/torch/csrc/a
 BUILD_FLAGS = -g -DUSE_C10D_GLOO -DUSE_DISTRIBUTED -DUSE_RPC -DUSE_TENSORPIPE -D_GLIBCXX_USE_CXX11_ABI=1 -g -std=gnu++2a -O0
 LINK_FLAGS = -Wl,-rpath,$(LIBTORCH_DIR)/lib -L$(LIBTORCH_DIR)/lib -ltorch_cpu -lc10 -lkineto
 
-test_torch_model:
+test_torch_model: test_torch_model.cpp FFISubgridModel.h
 	$(COMP) $(BUILD_FLAGS) -o test_torch_model test_torch_model.cpp $(INCLUDE_FLAGS) $(LINK_FLAGS)
 
 clean:

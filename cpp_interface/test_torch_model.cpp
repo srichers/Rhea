@@ -84,15 +84,24 @@ int main(int argc, const char* argv[]){
   auto output_tuple = output.toTuple()->elements();
   
   // Extract individual tensors
-  torch::Tensor F4_out        = output_tuple[0].toTensor();
-  torch::Tensor logGrowthRate = output_tuple[1].toTensor();
-  torch::Tensor stability     = output_tuple[2].toTensor();
+  torch::Tensor F4_out     = output_tuple[0].toTensor();
+  torch::Tensor growthRate = output_tuple[1].toTensor();
+  torch::Tensor stability  = output_tuple[2].toTensor();
+
+  // predict_all returns the growth rate in number density units. The caller
+  // multiplies by sqrt(2)*G_F/hbar to recover 1/s, because doing it inside the
+  // model overflows float32. Matches ml_constants.ndens_to_invsec.
+  const double hbar = 1.05457266e-27;                        // erg s
+  const double c    = 2.99792458e10;                         // cm/s
+  const double GeV  = 1e9 * 1.60218e-12;                     // erg
+  const double GF   = 1.1663787e-5 / (GeV*GeV) * pow(hbar*c, 3); // erg cm^3
+  const double ndens_to_invsec = sqrt(2.0) * GF / hbar;
 
   std::cout << std::endl;
   std::cout << "Output number densities" << std::endl;
   std::cout << F4_out.index({0,Slice(),Slice(),3}) << std::endl;
   std::cout << "Stability: " << stability << std::endl;
-  std::cout << "logGrowthRate: " << torch::exp(logGrowthRate) << std::endl;
+  std::cout << "growthRate (1|s): " << growthRate * ndens_to_invsec << std::endl;
   std::cout << std::endl << "==========================" << std::endl;
   
   return 0;
