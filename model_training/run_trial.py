@@ -108,7 +108,7 @@ def build_report_callback(enable_reporting):
 
 def summarize_history(history, final_metrics, parms):
     syne_tune_cfg = parms.get("syne_tune", {})
-    metric_name = syne_tune_cfg.get("metric", "validation_score")
+    metric_name = syne_tune_cfg.get("metric", "validation_loss")
     mode = syne_tune_cfg.get("mode", "min")
 
     if not history:

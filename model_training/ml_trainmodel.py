@@ -260,9 +260,6 @@ def train_asymptotic_model(parms,
         # track the total loss
         loss_dict["train_loss"] = train_loss.item()
         loss_dict["test_loss"]  =  test_loss.item()
-        # placeholder so this column keeps its position in loss.dat - the real
-        # value is filled in below once the validation set has been evaluated
-        loss_dict["validation_score"] = loss_dict["test_loss"]
 
         # track the task weights
         for name in model.log_task_weights.keys():
@@ -298,7 +295,6 @@ def train_asymptotic_model(parms,
             validation_loss = accumulate_asymptotic_loss(dataset_asymptotic_validation_list, "validation")
 
         loss_dict["validation_loss"]  = validation_loss.item()
-        loss_dict["validation_score"] = loss_dict["validation_loss"]
 
         #==========================================#
         # OUTPUT LOSS METRICS AND MODEL PARAMETERS #

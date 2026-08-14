@@ -81,7 +81,7 @@ def build_default_parms():
 
     parms["syne_tune"] = {
         "report": False,
-        "metric": "validation_score",
+        "metric": "validation_loss",
         "mode": "min",
         "resource_attr": "epoch",
         "max_resource_attr": "epochs",
