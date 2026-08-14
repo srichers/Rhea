@@ -79,7 +79,7 @@ def restrict_F4_to_physical(F4_final):
 
     return F4_final
 
-def save_model(model, outfilename, device, F4i_test):
+def save_model(model, outfilename, device):
     with torch.no_grad():
         # create a copy of the model so scripting doesn't modify the original
         modelcopy = copy.deepcopy(model)

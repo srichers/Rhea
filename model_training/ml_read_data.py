@@ -75,8 +75,8 @@ def read_asymptotic_data(parms):
     #===============================================#
     print("# PREPARING TEST/TRAIN DATA #")
 
-    # the training loop indexes the first test database and reports a validation
-    # loss every epoch, so none of the three lists may be empty
+    # an empty list would silently report a loss of zero for that split rather than
+    # failing, so require all three
     assert(len(parms["train_database_list"])      > 0)
     assert(len(parms["validation_database_list"]) > 0)
     assert(len(parms["test_database_list"])       > 0)
