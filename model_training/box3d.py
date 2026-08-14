@@ -56,6 +56,7 @@ def pair_box3d(ELN,i: int,j: int,weights):
 
 
 # assume that F4 has shape [npoints, nunubar, flavor, xyzt]
+# returns the *change* to F4, not the mixed moments themselves
 def mixBox3D_lebedev(F4, pts, weights):
 
     # Operate on a detached clone so Box3D computations don't modify
@@ -131,31 +132,33 @@ def mixBox3D_lebedev(F4, pts, weights):
     m02 = (invN*crosses02)[:,None,None] * (1-Psur02)[:,None,:]
     m12 = (invN*crosses12)[:,None,None] * (1-Psur12)[:,None,:]
 
-    # compute the mixed distribution function at each quadrature point [point, nunubar, flavor, quadrature]
-    g_t = torch.stack([(1-m01-m02)*g[:,:,0,:] +      m01*g[:,:,1,:] +      m02*g[:,:,2,:],
-                            m01*g[:,:,0,:] + (1-m01-m12)*g[:,:,1,:] +      m12*g[:,:,2,:],
-                            m02*g[:,:,0,:] +      m12*g[:,:,1,:] + (1-m02-m12)*g[:,:,2,:]], dim=2)
+    # Apply (M-I) rather than M, so that what comes out is the *change* to the
+    # distribution and the caller adds it to its own F4. 
+    # [point, nunubar, flavor, quadrature]
+    dg = torch.stack([m01*(g[:,:,1,:]-g[:,:,0,:]) + m02*(g[:,:,2,:]-g[:,:,0,:]),
+                      m01*(g[:,:,0,:]-g[:,:,1,:]) + m12*(g[:,:,2,:]-g[:,:,1,:]),
+                      m02*(g[:,:,0,:]-g[:,:,2,:]) + m12*(g[:,:,1,:]-g[:,:,2,:])], dim=2)
 
-    # integrate the mixed distribution function over the quadrature points, weighted by the weights, to get the mixed moments
+    # integrate the change over the quadrature points, weighted by the weights, to get the change in the moments
     # the basis columns are the three direction cosines followed by 1, so a
     # single matmul produces all four components at once [quadrature, xyzt]
     ptsT  = pts.transpose(0,1)
     basis = torch.cat([ptsT, torch.ones_like(ptsT[:,0:1])], dim=1) * weights[:,None]
-    F4mix = torch.matmul(g_t, basis)
+    dF4 = torch.matmul(dg, basis)
 
     # check that ELN-xln is still conserved
-    #check_conservation(F4, F4mix)
+    #check_conservation(F4, F4+dF4)
 
     # negative or non-finite densities are not a usable prediction [point]
-    unphysical = torch.logical_or(unphysical, (F4mix[:,:,:,3] < 0).flatten(start_dim=1).any(dim=1))
-    unphysical = torch.logical_or(unphysical, torch.logical_not(torch.isfinite(F4mix)).flatten(start_dim=1).any(dim=1))
+    unphysical = torch.logical_or(unphysical, ((F4[:,:,:,3]+dF4[:,:,:,3]) < 0).flatten(start_dim=1).any(dim=1))
+    unphysical = torch.logical_or(unphysical, torch.logical_not(torch.isfinite(dF4)).flatten(start_dim=1).any(dim=1))
 
     # return nan rather than raising, so that a single bad point does not kill
     # the whole batch. Callers running inside a simulation handle the nans.
-    F4mix      = torch.where(unphysical[:,None,None,None], torch.full_like(F4mix,      float("nan")), F4mix)
+    dF4        = torch.where(unphysical[:,None,None,None], torch.full_like(dF4,        float("nan")), dF4)
     growthrate = torch.where(unphysical,                   torch.full_like(growthrate, float("nan")), growthrate)
 
-    return F4mix, growthrate
+    return dF4, growthrate
 
 
 

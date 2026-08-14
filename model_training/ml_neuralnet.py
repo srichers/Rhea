@@ -271,12 +271,12 @@ class NeuralNetwork(nn.Module):
         # normalize the inputs by the total density
         F4_in = F4_in / ntot[:,None,None,None]
 
-        # get Box3D prediction (pass lebedev pts/weights registered as buffers)
-        F4_box3d, growthrate_box3d = box3d.mixBox3D_lebedev(F4_in, self.lebedev_pts, self.lebedev_weights)
+        # get the Box3D change to F4 (pass lebedev pts/weights registered as buffers)
+        dF4_box3d, growthrate_box3d = box3d.mixBox3D_lebedev(F4_in, self.lebedev_pts, self.lebedev_weights)
 
         if use_network:
-            # Combine F4_in and F4_box3D into a joint input of shape [nsamples, nu/nubar, flavor, xyzt(in)/xyzt(box3d)]
-            F4_joint = torch.cat([F4_in, F4_box3d], dim=-1)
+            # Combine F4_in and the Box3D change into a joint input of shape [nsamples, nu/nubar, flavor, xyzt(in)/xyzt(box3d)]
+            F4_joint = torch.cat([F4_in, dF4_box3d], dim=-1)
 
             # propagate through the network
             y_F4, y_growthrate = self.forward(F4_joint)
@@ -285,12 +285,12 @@ class NeuralNetwork(nn.Module):
             # Averaging over nodes in the graph
             y_growthrate = torch.mean(y_growthrate, dim=(1,2))
 
-            # reshape into a matrix
-            F4_out     = F4_box3d + y_F4.reshape((nsims,2,self.NF,4))
+            # Box3D and the network both supply a correction to the input
+            F4_out     = F4_in + dF4_box3d + y_F4.reshape((nsims,2,self.NF,4))
             growthrate = growthrate_box3d + torch.squeeze(y_growthrate)
         else:
             # clone because the conservation enforcement below is in-place
-            F4_out     = F4_box3d.clone()
+            F4_out     = (F4_in + dF4_box3d).clone()
             growthrate = growthrate_box3d
 
         # enforce symmetry in the heavies
