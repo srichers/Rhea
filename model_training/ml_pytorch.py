@@ -41,11 +41,13 @@ def build_default_parms():
 
     parms["do_learn_task_weights"] = False
     parms["task_weight_F4"] = 1.0
-    parms["task_weight_unphysical"] = 1
+    parms["task_weight_negative_density"] = 1
+    parms["task_weight_fluxfac"] = 1
     parms["task_weight_growthrate"] = 1.0
 
     # data augmentation options
-    parms["do_unphysical_check"] = True  # True - seems to help prevent crazy results
+    parms["do_negative_density_check"] = True  # True - seems to help prevent crazy results
+    parms["do_fluxfac_check"] = True  # True - seems to help prevent crazy results
 
     # neural network options
     parms["nhidden_shared"] = 1

@@ -103,10 +103,10 @@ def train_asymptotic_model(parms,
     F4i_train, F4f_true_train, growthrate_true_train, weight_train = configure_training_data(parms, dataset_asymptotic_train_list)
 
 
-    def contribute_loss(pred, true, traintest, key, loss_fn):
+    def contribute_loss(pred, true, traintest, key, loss_fn, max_fn):
         loss = loss_fn(pred, true)
         loss_dict[key+"_"+traintest+"_loss"] += loss.item()
-        loss_dict[key+"_"+traintest+"_max"]  = max(max_error(pred, true), loss_dict[key+"_"+traintest+"_max"])
+        loss_dict[key+"_"+traintest+"_max"]  = max(max_fn(pred, true), loss_dict[key+"_"+traintest+"_max"])
         return loss
 
     # set up file for writing performance metrics
@@ -124,7 +124,7 @@ def train_asymptotic_model(parms,
         # artifact of the order in which the values happen to be computed below.
         loss_dict = {}
         loss_dict["epoch"] = epoch
-        for key in ["F4","growthrate","unphysical"]:
+        for key in ["F4","growthrate","negative_density","fluxfac"]:
             for traintest in ["train","validation","test"]:
                 loss_dict[key+"_"+traintest+"_loss"] = 0
                 loss_dict[key+"_"+traintest+"_max"]  = 0
@@ -162,16 +162,19 @@ def train_asymptotic_model(parms,
         batch_loss = 0.0
         batch_loss = batch_loss + torch.exp(-model.log_task_weights["F4"]     ) * comparison_loss_fn(F4f_pred_norm, F4f_true_norm, weight_train)
         batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn(growthrate_pred_norm, growthrate_true_norm, weight_train)
-        if parms["do_unphysical_check"]:
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_norm, None, weight_train)
+        if parms["do_negative_density_check"]:
+            batch_loss = batch_loss + torch.exp(-model.log_task_weights["negative_density"]) * negative_density_loss_fn(F4f_pred_norm, None, weight_train)
+        if parms["do_fluxfac_check"]:
+            batch_loss = batch_loss + torch.exp(-model.log_task_weights["fluxfac"]) * fluxfac_loss_fn(F4f_pred_norm, None, weight_train)
 
         # add loss weights to loss
         if parms["do_learn_task_weights"]:
             for name in model.log_task_weights.keys():
-                if (not parms["do_unphysical_check"]) and name=="unphysical":
+                if (not parms["do_negative_density_check"]) and name=="negative_density":
                     continue
-                else:
-                    batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
+                if (not parms["do_fluxfac_check"]) and name=="fluxfac":
+                    continue
+                batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
 
         batch_loss.backward()
         optimizer.step()
@@ -207,29 +210,35 @@ def train_asymptotic_model(parms,
                 # accumulate losses
                 total_loss = total_loss + torch.exp(-model.log_task_weights["F4"]     ) * contribute_loss(F4f_pred,
                                                                                                           F4f_true,
-                                                                                                          traintest, "F4", comparison_loss_fn)
+                                                                                                          traintest, "F4", comparison_loss_fn, max_error)
                 total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss(growthrate_pred, #torch.log
                                                                                                              growthrate_true, #torch.log
-                                                                                                             traintest, "growthrate", comparison_loss_fn)
-                unphysical_loss = torch.exp(-model.log_task_weights["unphysical"]) * contribute_loss(F4f_pred,
-                                                                                                     None,
-                                                                                                     traintest, "unphysical", unphysical_loss_fn)
-                if parms["do_unphysical_check"]:
-                    total_loss = total_loss + unphysical_loss
+                                                                                                             traintest, "growthrate", comparison_loss_fn, max_error)
+                negative_density_loss = torch.exp(-model.log_task_weights["negative_density"]) * contribute_loss(F4f_pred,
+                                                                                                                 None,
+                                                                                                                 traintest, "negative_density", negative_density_loss_fn, negative_density_max)
+                fluxfac_loss          = torch.exp(-model.log_task_weights["fluxfac"]         ) * contribute_loss(F4f_pred,
+                                                                                                                 None,
+                                                                                                                 traintest, "fluxfac", fluxfac_loss_fn, fluxfac_max)
+                if parms["do_negative_density_check"]:
+                    total_loss = total_loss + negative_density_loss
+                if parms["do_fluxfac_check"]:
+                    total_loss = total_loss + fluxfac_loss
 
                 # add loss weights to loss
                 if parms["do_learn_task_weights"]:
                     for name in model.log_task_weights.keys():
-                        if (not parms["do_unphysical_check"]) and name=="unphysical":
+                        if (not parms["do_negative_density_check"]) and name=="negative_density":
                             continue
-                        else:
-                            total_loss = total_loss + torch.sum(model.log_task_weights[name])
+                        if (not parms["do_fluxfac_check"]) and name=="fluxfac":
+                            continue
+                        total_loss = total_loss + torch.sum(model.log_task_weights[name])
 
             # report the mean over datasets rather than the sum, so that train,
             # validation, and test losses are directly comparable to each other
             # and do not depend on how many databases were loaded
             if len(dataset_list) > 0:
-                for key in ["F4","growthrate","unphysical"]:
+                for key in ["F4","growthrate","negative_density","fluxfac"]:
                     loss_dict[key+"_"+traintest+"_loss"] /= len(dataset_list)
                 total_loss = total_loss / len(dataset_list)
 

@@ -145,12 +145,12 @@ class NeuralNetwork(nn.Module):
         if parms["do_learn_task_weights"]:
             self.log_task_weights = nn.ParameterDict({
                 name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
-                for name in ["growthrate", "F4", "unphysical"]
+                for name in ["growthrate", "F4", "negative_density", "fluxfac"]
             })
         else:
             self.log_task_weights = {
                 name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
-                for name in ["growthrate", "F4", "unphysical"]
+                for name in ["growthrate", "F4", "negative_density", "fluxfac"]
             }
 
         # The input irreps for each node are just the 4 components of F4_in followed by 4 components of F4_box3d
