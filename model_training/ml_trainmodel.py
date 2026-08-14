@@ -14,46 +14,36 @@ from ml_read_data import *
 import torch.autograd.profiler as profiler
 import pickle
 import os
-from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, SequentialSampler
 
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
 
-def configure_loader(parms, dataset_train_list):
-    # create list of weights
-    weights = torch.cat([
-        torch.full((len(dataset),), 1.0 / len(dataset), dtype=torch.double)
-        for dataset in dataset_train_list
-    ])
-    
-    # combine the datasets
-    dataset_train = ConcatDataset(dataset_train_list)
+# Each training step is a single full-batch pass over every training point, so
+# concatenate the databases once up front and keep them on the device.
+def configure_training_data(parms, dataset_train_list):
+    F4i_train        = torch.cat([dataset.tensors[0] for dataset in dataset_train_list]).to(parms["device"])
+    F4f_true_train   = torch.cat([dataset.tensors[1] for dataset in dataset_train_list]).to(parms["device"])
+    growthrate_train = torch.cat([dataset.tensors[2] for dataset in dataset_train_list]).to(parms["device"])
 
-    generator = torch.Generator().manual_seed(parms["random_seed"])
-    
-    # create sampler and data loader for test data
-    if parms["sampler"]==WeightedRandomSampler:
-        sampler = WeightedRandomSampler(weights=weights,
-                                        num_samples=parms["weightedrandomsampler.epoch_num_samples"],
-                                        replacement=True,
-                                        generator=generator)
-    elif parms["sampler"]==SequentialSampler:
-        sampler = SequentialSampler(dataset_train)
-    else:
-        raise ValueError("Unknown sampler type "+str(parms["sampler"]))
+    # relative weight of each database. None means weight them all equally.
+    database_weight_list = parms["database_weight_list"]
+    if database_weight_list == None:
+        database_weight_list = [1.0 for dataset in dataset_train_list]
+    assert(len(database_weight_list) == len(dataset_train_list))
+    assert(all([w > 0 for w in database_weight_list]))
+    wtot = sum(database_weight_list)
 
-    # set up the data loader
-    loader = DataLoader(dataset_train,
-                        batch_size=parms["loader.batch_size"],
-                        sampler=sampler,
-                        num_workers=parms["loader.num_workers"],
-                        pin_memory=True,
-                        persistent_workers=True,
-                        prefetch_factor=parms["loader.prefetch_factor"])
+    # Per-point weights, normalized so they sum to one. Each database's share is
+    # divided evenly among its points, so the loss is a weighted mean over databases
+    # and is independent of both the number of databases and their sizes. With equal
+    # weights this is exactly the mean over databases that accumulate_asymptotic_loss
+    # reports, and is what WeightedRandomSampler used to target in expectation.
+    weight_train = torch.cat([torch.full((len(dataset),), w/(wtot*len(dataset)))
+                              for dataset,w in zip(dataset_train_list, database_weight_list)]).to(parms["device"])
 
-    print("#  Configuring loader with batch_size=",parms["loader.batch_size"],"for a dataset with",len(dataset_train),"samples.")
+    print("#  Training on",len(F4i_train),"points from",len(dataset_train_list),"databases in a single full batch.")
 
-    return loader
+    return F4i_train, F4f_true_train, growthrate_train, weight_train
 
 
 def train_asymptotic_model(parms,
@@ -106,11 +96,11 @@ def train_asymptotic_model(parms,
                                                                 min_lr=parms["min_lr"]) #
     schedulers = [scheduler_warmup, scheduler_main]
 
-    #=========================#
-    # set up the data loaders #
-    #=========================#
-    print("#SETTING UP DATA LOADERS")
-    loader_asymptotic = configure_loader(parms, dataset_asymptotic_train_list)
+    #=======================#
+    # set up the input data #
+    #=======================#
+    print("#SETTING UP TRAINING DATA")
+    F4i_train, F4f_true_train, growthrate_true_train, weight_train = configure_training_data(parms, dataset_asymptotic_train_list)
 
 
     def contribute_loss(pred, true, traintest, key, loss_fn):
@@ -129,77 +119,69 @@ def train_asymptotic_model(parms,
     torch.backends.cudnn.benchmark = True # may help with performance
     final_metrics = {}
     for epoch in range(1,parms["epochs"]+1):
-        # set up the loss dictionary for IO
+        # Set up the loss dictionary for IO. Every key is seeded here so that the
+        # column order in loss.dat is defined in this one place, rather than being an
+        # artifact of the order in which the values happen to be computed below.
         loss_dict = {}
         loss_dict["epoch"] = epoch
+        for key in ["F4","growthrate","unphysical"]:
+            for traintest in ["train","validation","test"]:
+                loss_dict[key+"_"+traintest+"_loss"] = 0
+                loss_dict[key+"_"+traintest+"_max"]  = 0
+        for traintest in ["train","validation","test"]:
+            loss_dict[traintest+"_loss"] = 0
+        for name in model.log_task_weights.keys():
+            loss_dict["weight_"+name] = 0
+        loss_dict["learning_rate"] = 0
 
-        #============================#
-        # TRAINING LOOP OVER BATCHES #
-        #============================#
+        #===================================#
+        # TRAINING STEP ON THE FULL DATASET #
+        #===================================#
         model.train()
-        for (F4i_asymptotic_train, F4f_true_train, growthrate_true_train) in loader_asymptotic:
 
-            # move the minibatch to the device
-            F4i_asymptotic_train = F4i_asymptotic_train.to(parms["device"])
-            F4f_true_train = F4f_true_train.to(parms["device"])
-            growthrate_true_train = growthrate_true_train.to(parms["device"])
+        # get predicted values from the model
+        F4f_pred_train, growthrate_pred_train, stable = model.predict_all(F4i_train)
 
-            # get predicted values from the model
-            F4f_pred_train, growthrate_pred_train, stable = model.predict_all(F4i_asymptotic_train)
+        # convert F4 to densities and fluxes to feed to loss functions
+        # note the outputs are all normalized to the total number density
+        ntot_t = ntotal(F4f_true_train)
+        ntot_p = ntotal(F4f_pred_train)
+        assert torch.all(ntot_t > 0)
+        assert torch.all(ntot_p > 0)
 
-            # convert F4 to densities and fluxes to feed to loss functions
-            # note the outputs are all normalized to the total number density
-            #ntot_i = ntotal(F4i_asymptotic_train)
-            ntot_t = ntotal(F4f_true_train)
-            ntot_p = ntotal(F4f_pred_train)
-            #print("ntot_pred min/max:", ntot_p.min().item(), ntot_p.max().item())
-            assert torch.all(ntot_t > 0)
-            assert torch.all(ntot_p > 0)
+        # normalize quantities before computing losses
+        F4f_true_norm        = F4f_true_train        / ntot_t[:,None,None,None]
+        F4f_pred_norm        = F4f_pred_train        / ntot_p[:,None,None,None]
+        growthrate_true_norm = growthrate_true_train / ntot_t
+        growthrate_pred_norm = growthrate_pred_train / ntot_p
 
-            # normalize quantities before computing losses
-            F4f_true_train = F4f_true_train / ntot_t[:,None,None,None]
-            F4f_pred_train = F4f_pred_train / ntot_p[:,None,None,None]
-            growthrate_true_train = growthrate_true_train / ntot_t
-            growthrate_pred_train = growthrate_pred_train / ntot_p
+        # reset the loss and gradients
+        optimizer.zero_grad()
 
-            # reset the loss and gradients
-            optimizer.zero_grad()
+        # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
+        batch_loss = 0.0
+        batch_loss = batch_loss + torch.exp(-model.log_task_weights["F4"]     ) * comparison_loss_fn(F4f_pred_norm, F4f_true_norm, weight_train)
+        batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn(growthrate_pred_norm, growthrate_true_norm, weight_train)
+        if parms["do_unphysical_check"]:
+            batch_loss = batch_loss + torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_norm, None, weight_train)
 
-            # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
-            batch_loss = 0.0
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["F4"]     ) * comparison_loss_fn(F4f_pred_train, F4f_true_train)
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn(growthrate_pred_train, growthrate_true_train)
-            if parms["do_unphysical_check"]:
-                batch_loss = batch_loss + torch.exp(-model.log_task_weights["unphysical"]) * unphysical_loss_fn(F4f_pred_train, None)
+        # add loss weights to loss
+        if parms["do_learn_task_weights"]:
+            for name in model.log_task_weights.keys():
+                if (not parms["do_unphysical_check"]) and name=="unphysical":
+                    continue
+                else:
+                    batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
 
-            # add loss weights to loss
-            if parms["do_learn_task_weights"]:
-                for name in model.log_task_weights.keys():
-                    if (not parms["do_unphysical_check"]) and name=="unphysical":
-                        continue
-                    else:
-                        batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
-
-            batch_loss.backward()
-            optimizer.step()
+        batch_loss.backward()
+        optimizer.step()
 
         #============================#
         # EVALUATION ON FULL DATASET #
         #============================#
+        # evaluated separately from the training step above so that the reported
+        # losses are taken after the optimizer step and in eval mode
         model.eval()
-
-        loss_dict["F4_train_loss"] = 0
-        loss_dict["F4_train_max"] = 0
-        loss_dict["F4_test_loss"] = 0
-        loss_dict["F4_test_max"] = 0
-        loss_dict["growthrate_train_loss"] = 0
-        loss_dict["growthrate_train_max"] = 0
-        loss_dict["growthrate_test_loss"] = 0
-        loss_dict["growthrate_test_max"] = 0
-        loss_dict["unphysical_train_loss"] = 0
-        loss_dict["unphysical_train_max"] = 0
-        loss_dict["unphysical_test_loss"] = 0
-        loss_dict["unphysical_test_max"] = 0
 
         # Asymptotic losses
         def accumulate_asymptotic_loss(dataset_list, traintest):
@@ -254,12 +236,14 @@ def train_asymptotic_model(parms,
             return total_loss
 
         with torch.no_grad():
-            train_loss = accumulate_asymptotic_loss(dataset_asymptotic_train_list, "train")
-            test_loss  = accumulate_asymptotic_loss(dataset_asymptotic_test_list , "test" )
+            train_loss      = accumulate_asymptotic_loss(dataset_asymptotic_train_list     , "train"     )
+            validation_loss = accumulate_asymptotic_loss(dataset_asymptotic_validation_list, "validation")
+            test_loss       = accumulate_asymptotic_loss(dataset_asymptotic_test_list      , "test"      )
 
         # track the total loss
-        loss_dict["train_loss"] = train_loss.item()
-        loss_dict["test_loss"]  =  test_loss.item()
+        loss_dict["train_loss"]      =      train_loss.item()
+        loss_dict["validation_loss"] = validation_loss.item()
+        loss_dict["test_loss"]       =       test_loss.item()
 
         # track the task weights
         for name in model.log_task_weights.keys():
@@ -268,6 +252,10 @@ def train_asymptotic_model(parms,
         #=====================================#
         # ADVANCE THE LEARNING RATE SCHEDULER #
         #=====================================#
+        # step on the validation loss so that the learning rate decays, and training
+        # stops early, when generalization stalls rather than when optimization does.
+        # the test loss is deliberately never used here - it would stop being a
+        # held-out estimate the moment it fed back into a training decision.
         if epoch<=parms["warmup_iters"]:
             scheduler = schedulers[0]
             loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
@@ -275,26 +263,7 @@ def train_asymptotic_model(parms,
         else:
             scheduler = schedulers[1]
             loss_dict["learning_rate"] = scheduler.get_last_lr()[0]
-            scheduler.step(train_loss.item())
-
-        #==============================#
-        # EVALUATION ON VALIDATION SET #
-        #==============================#
-        # evaluated after the scheduler so that every column of loss.dat that
-        # already existed keeps its position and existing plot scripts still work.
-        # the scheduler deliberately still steps on the training loss - moving it
-        # onto the validation loss would change the optimization dynamics.
-        loss_dict["F4_validation_loss"] = 0
-        loss_dict["F4_validation_max"] = 0
-        loss_dict["growthrate_validation_loss"] = 0
-        loss_dict["growthrate_validation_max"] = 0
-        loss_dict["unphysical_validation_loss"] = 0
-        loss_dict["unphysical_validation_max"] = 0
-
-        with torch.no_grad():
-            validation_loss = accumulate_asymptotic_loss(dataset_asymptotic_validation_list, "validation")
-
-        loss_dict["validation_loss"]  = validation_loss.item()
+            scheduler.step(validation_loss.item())
 
         #==========================================#
         # OUTPUT LOSS METRICS AND MODEL PARAMETERS #

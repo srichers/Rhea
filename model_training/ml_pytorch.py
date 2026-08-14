@@ -27,16 +27,14 @@ def build_default_parms():
         "data/dummy_asymptotic_chunk3-2_thin1_maxfluxfac0.9.h5",
     ]
 
+    # relative weight of each training database in the loss. None weights them equally.
+    parms["database_weight_list"] = None
+
     parms["epochs"] = 10
     parms["output_every"] = 10
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = True
     parms["random_seed"] = 42
-    parms["loader.batch_size"] = 10
-    parms["loader.num_workers"] = 1
-    parms["loader.prefetch_factor"] = 1
-    parms["sampler"] = torch.utils.data.WeightedRandomSampler  # WeightedRandomSampler, SequentialSampler
-    parms["weightedrandomsampler.epoch_num_samples"] = 10
     parms["scalar_activation"] = nn.functional.silu
     parms["nonscalar_activation"] = torch.sigmoid
     parms["tensor_product_class"] = "norm"
@@ -91,11 +89,6 @@ def build_default_parms():
                 "type": "loguniform",
                 "lower": 1e-5,
                 "upper": 1e-3,
-            },
-            "loader.batch_size": {
-                "type": "randint",
-                "lower": 8,
-                "upper": 64,
             },
             "adamw.weight_decay": {
                 "type": "loguniform",

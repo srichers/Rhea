@@ -111,7 +111,7 @@ You’ll see parameters along these lines (non-exhaustive):
   - growth rate scaling handled inside prediction (see “Inference”)
 
 - **Training loop**
-  - `epoch_num_samples` (used with `WeightedRandomSampler`)
+  - `database_weight_list` (relative weight of each training database; `None` weights them equally)
   - loss multipliers (kept in the parameter dictionary)
 
 ### Running training
