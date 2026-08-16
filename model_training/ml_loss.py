@@ -26,12 +26,15 @@ def weighted_mean(error, weight):
 def negative_density_error(F4f_pred):
     return torch.min(F4f_pred[:,:,:,3], torch.zeros_like(F4f_pred[:,:,:,3])) # [sim, nu/nubar, flavor]
 
-# the amount by which each squared flux magnitude exceeds the squared number density,
-# i.e. by which the flux factor exceeds one. Never negative.
+# the amount by which each flux magnitude exceeds its number density, i.e. by which the
+# flux factor exceeds one. Never negative. Same units as negative_density_error, so the
+# two task weights are commensurate. The epsilon keeps the sqrt gradient finite at zero
+# flux; d|f|/df is bounded by one no matter how small it is.
+# the density is clamped at zero so that this measures only the flux factor violation.
 def fluxfac_error(F4f_pred):
-    flux_mag2 = torch.sum(F4f_pred[:,:,:,0:3]**2, dim=3) # [sim, nu/nubar, flavor]
-    ndens2 = F4f_pred[:,:,:,3]**2 # [sim, nu/nubar, flavor]
-    return torch.max(flux_mag2 - ndens2, torch.zeros_like(ndens2)) # [sim, nu/nubar, flavor]
+    flux_mag = torch.sqrt(torch.sum(F4f_pred[:,:,:,0:3]**2, dim=3) + torch.finfo(F4f_pred.dtype).tiny) # [sim, nu/nubar, flavor]
+    ndens = torch.max(F4f_pred[:,:,:,3], torch.zeros_like(F4f_pred[:,:,:,3])) # [sim, nu/nubar, flavor]
+    return torch.max(flux_mag - ndens, torch.zeros_like(ndens)) # [sim, nu/nubar, flavor]
 
 #================#
 # loss functions #
@@ -42,8 +45,10 @@ def comparison_loss_fn(y_pred, y_true, weight=None):
 
 # enforce that number density cannot be less than zero. The second argument is ignored, and
 # is kept only so that every loss function can be called the same way.
+# both unphysical penalties are linear in the violation so that the gradient does not vanish
+# at the bound.
 def negative_density_loss_fn(F4f_pred, _, weight=None):
-    return weighted_mean(negative_density_error(F4f_pred)**2, weight)
+    return weighted_mean(torch.abs(negative_density_error(F4f_pred)), weight)
 
 # enforce that flux factors cannot be larger than 1
 def fluxfac_loss_fn(F4f_pred, _, weight=None):
