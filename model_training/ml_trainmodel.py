@@ -18,32 +18,31 @@ import os
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
 
-# Each training step is a single full-batch pass over every training point, so
-# concatenate the databases once up front and keep them on the device.
-def configure_training_data(parms, dataset_train_list):
-    F4i_train        = torch.cat([dataset.tensors[0] for dataset in dataset_train_list]).to(parms["device"])
-    F4f_true_train   = torch.cat([dataset.tensors[1] for dataset in dataset_train_list]).to(parms["device"])
-    growthrate_train = torch.cat([dataset.tensors[2] for dataset in dataset_train_list]).to(parms["device"])
+# Each step is a single full-batch pass over every point in the split, so concatenate the
+# databases once up front and keep them on the device. Every split is built the same way,
+# so the training objective and the reported losses use identical weighting.
+def configure_split_data(parms, dataset_list, label):
+    F4i        = torch.cat([dataset.tensors[0] for dataset in dataset_list]).to(parms["device"])
+    F4f_true   = torch.cat([dataset.tensors[1] for dataset in dataset_list]).to(parms["device"])
+    growthrate = torch.cat([dataset.tensors[2] for dataset in dataset_list]).to(parms["device"])
 
     # relative weight of each database. None means weight them all equally.
     database_weight_list = parms["database_weight_list"]
     if database_weight_list == None:
-        database_weight_list = [1.0 for dataset in dataset_train_list]
-    assert(len(database_weight_list) == len(dataset_train_list))
+        database_weight_list = [1.0 for dataset in dataset_list]
+    assert(len(database_weight_list) == len(dataset_list))
     assert(all([w > 0 for w in database_weight_list]))
     wtot = sum(database_weight_list)
 
     # Per-point weights, normalized so they sum to one. Each database's share is
     # divided evenly among its points, so the loss is a weighted mean over databases
-    # and is independent of both the number of databases and their sizes. With equal
-    # weights this is exactly the mean over databases that accumulate_asymptotic_loss
-    # reports, and is what WeightedRandomSampler used to target in expectation.
-    weight_train = torch.cat([torch.full((len(dataset),), w/(wtot*len(dataset)))
-                              for dataset,w in zip(dataset_train_list, database_weight_list)]).to(parms["device"])
+    # and is independent of both the number of databases and their sizes.
+    weight = torch.cat([torch.full((len(dataset),), w/(wtot*len(dataset)))
+                        for dataset,w in zip(dataset_list, database_weight_list)]).to(parms["device"])
 
-    print("#  Training on",len(F4i_train),"points from",len(dataset_train_list),"databases in a single full batch.")
+    print("#   "+label+":",len(F4i),"points from",len(dataset_list),"databases in a single full batch.")
 
-    return F4i_train, F4f_true_train, growthrate_train, weight_train
+    return F4i, F4f_true, growthrate, weight
 
 
 def train_asymptotic_model(parms,
@@ -52,12 +51,6 @@ def train_asymptotic_model(parms,
                            dataset_asymptotic_test_list,
                            report_fn=None):
 
-    # print out all parameters for the record
-    parmfile = open(os.getcwd()+"/parameters.txt","w")
-    for key in parms.keys():
-        parmfile.write(key+" = "+str(parms[key])+"\n")
-    parmfile.close()
-    
     print("#Using",parms["device"],"device")
     if parms["device"] == "cuda":
         print("# ",torch.cuda.get_device_name(0))
@@ -100,18 +93,97 @@ def train_asymptotic_model(parms,
     # set up the input data #
     #=======================#
     print("#SETTING UP TRAINING DATA")
-    F4i_train, F4f_true_train, growthrate_true_train, weight_train = configure_training_data(parms, dataset_asymptotic_train_list)
+    # One database_weight_list applies to every split, so entry i has to name the same
+    # physical database in each list. split_database.py already produces exactly that
+    # structure - the three lists are parallel chunks of the same databases.
+    assert(len(dataset_asymptotic_train_list) == len(dataset_asymptotic_validation_list))
+    assert(len(dataset_asymptotic_train_list) == len(dataset_asymptotic_test_list))
+    F4i             = {}
+    F4f_true        = {}
+    growthrate_true = {}
+    weight          = {}
+    for traintest, dataset_list in [("train"     , dataset_asymptotic_train_list     ),
+                                    ("validation", dataset_asymptotic_validation_list),
+                                    ("test"      , dataset_asymptotic_test_list      )]:
+        F4i[traintest], F4f_true[traintest], growthrate_true[traintest], weight[traintest] = \
+            configure_split_data(parms, dataset_list, traintest)
 
+    # Run the model and normalize everything by the total number density. The predicted
+    # and true totals are normalized separately to avoid floating point issues. Used by
+    # the training step, by the evaluation of every split, and by the Box3D scales below,
+    # so all three see identical preprocessing.
+    def predict_normalized(traintest, use_network=True):
+        F4f_pred, growthrate_pred, _ = model.predict_all(F4i[traintest], use_network)
 
-    def contribute_loss(pred, true, traintest, key, loss_fn, max_fn):
-        loss = loss_fn(pred, true)
-        loss_dict[key+"_"+traintest+"_loss"] += loss.item()
-        loss_dict[key+"_"+traintest+"_max"]  = max(max_fn(pred, true), loss_dict[key+"_"+traintest+"_max"])
+        ntot_t = ntotal(F4f_true[traintest])
+        ntot_p = ntotal(F4f_pred)
+        assert torch.all(ntot_t > 0)
+        assert torch.all(ntot_p > 0)
+
+        return (F4f_pred                  / ntot_p[:,None,None,None],
+                F4f_true[traintest]       / ntot_t[:,None,None,None],
+                growthrate_pred           / ntot_p,
+                growthrate_true[traintest]/ ntot_t)
+
+    #==========================================================================#
+    # set the task scales from the analytic Box3D baseline on the training set #
+    #==========================================================================#
+    # These depend only on the data, never on the random seed, the initialization, or any
+    # optimizer hyperparameter, so the reported losses are comparable between runs and
+    # between Syne Tune trials. A scale calibrated from the run's own progress would not
+    # be - a trial that trained badly would have a larger scale and so report a smaller
+    # loss for the same true performance. Because the network predicts a residual on top
+    # of Box3D, a loss of 1 means the network is doing no better than the analytic model.
+    print("#SETTING TASK SCALES FROM THE BOX3D BASELINE")
+    with torch.no_grad():
+        F4f_box3d, F4f_true_norm, growthrate_box3d, growthrate_true_norm = predict_normalized("train", use_network=False)
+        scale_F4         = comparison_loss_fn(F4f_box3d       , F4f_true_norm       , weight["train"]).item()
+        scale_growthrate = comparison_loss_fn(growthrate_box3d, growthrate_true_norm, weight["train"]).item()
+    assert(scale_F4 > 0)
+    assert(scale_growthrate > 0)
+    print("#  scale_F4        :", scale_F4)
+    print("#  scale_growthrate:", scale_growthrate)
+
+    # The weights that turn the four raw losses into the single number that is minimized.
+    # F4 and growthrate are measured against the Box3D baseline error and so need no
+    # weight of their own. The two unphysical penalties are linear in a violation measured
+    # in number-density units, so they are measured against the RMS baseline error rather
+    # than against its square, and a weight of 1 means a violation as large as that error
+    # costs as much as the entire F4 loss. Setting a weight to zero disables the penalty.
+    task_weights = {
+        "F4"               : 1.0 / scale_F4,
+        "growthrate"       : 1.0 / scale_growthrate,
+        "negative_density" : parms["penalty_negative_density"] / scale_F4**0.5,
+        "fluxfac"          : parms["penalty_fluxfac"]          / scale_F4**0.5,
+    }
+
+    # print out all parameters for the record, including the data-derived task scales
+    parmfile = open(os.getcwd()+"/parameters.txt","w")
+    for key in parms.keys():
+        parmfile.write(key+" = "+str(parms[key])+"\n")
+    parmfile.write("scale_F4 = "+str(scale_F4)+"\n")
+    parmfile.write("scale_growthrate = "+str(scale_growthrate)+"\n")
+    parmfile.close()
+
+    # combine the four raw losses into the single number that is minimized. This is also
+    # what is reported for every split, so the objective and the metric that the learning
+    # rate scheduler sees are the same fixed function.
+    # NOTE - I don't use += because pytorch fails if I do. Just don't do it.
+    def total_loss(losses):
+        total = 0.0
+        for key in ["F4","growthrate","negative_density","fluxfac"]:
+            total = total + task_weights[key] * losses[key]
+        return total
+
+    def contribute_loss(pred, true, weight, traintest, key, loss_fn, max_fn):
+        loss = loss_fn(pred, true, weight)
+        loss_dict[key+"_"+traintest+"_loss"] = loss.item()
+        loss_dict[key+"_"+traintest+"_max"]  = max_fn(pred, true)
         return loss
 
     # set up file for writing performance metrics
     loss_file = open(os.getcwd()+"/loss.dat","w")
-    
+
     #===============#
     # training loop #
     #===============#
@@ -130,8 +202,6 @@ def train_asymptotic_model(parms,
                 loss_dict[key+"_"+traintest+"_max"]  = 0
         for traintest in ["train","validation","test"]:
             loss_dict[traintest+"_loss"] = 0
-        for name in model.log_task_weights.keys():
-            loss_dict["weight_"+name] = 0
         loss_dict["learning_rate"] = 0
 
         #===================================#
@@ -139,42 +209,19 @@ def train_asymptotic_model(parms,
         #===================================#
         model.train()
 
-        # get predicted values from the model
-        F4f_pred_train, growthrate_pred_train, stable = model.predict_all(F4i_train)
+        # get predicted values from the model, normalized by the total number density
+        F4f_pred_norm, F4f_true_norm, growthrate_pred_norm, growthrate_true_norm = predict_normalized("train")
 
-        # convert F4 to densities and fluxes to feed to loss functions
-        # note the outputs are all normalized to the total number density
-        ntot_t = ntotal(F4f_true_train)
-        ntot_p = ntotal(F4f_pred_train)
-        assert torch.all(ntot_t > 0)
-        assert torch.all(ntot_p > 0)
-
-        # normalize quantities before computing losses
-        F4f_true_norm        = F4f_true_train        / ntot_t[:,None,None,None]
-        F4f_pred_norm        = F4f_pred_train        / ntot_p[:,None,None,None]
-        growthrate_true_norm = growthrate_true_train / ntot_t
-        growthrate_pred_norm = growthrate_pred_train / ntot_p
-
-        # reset the loss and gradients
+        # reset the gradients
         optimizer.zero_grad()
 
-        # accumulate losses. NOTE - I don't use += because pytorch fails if I do. Just don't do it.
-        batch_loss = 0.0
-        batch_loss = batch_loss + torch.exp(-model.log_task_weights["F4"]     ) * comparison_loss_fn(F4f_pred_norm, F4f_true_norm, weight_train)
-        batch_loss = batch_loss + torch.exp(-model.log_task_weights["growthrate"]) * comparison_loss_fn(growthrate_pred_norm, growthrate_true_norm, weight_train)
-        if parms["do_negative_density_check"]:
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["negative_density"]) * negative_density_loss_fn(F4f_pred_norm, None, weight_train)
-        if parms["do_fluxfac_check"]:
-            batch_loss = batch_loss + torch.exp(-model.log_task_weights["fluxfac"]) * fluxfac_loss_fn(F4f_pred_norm, None, weight_train)
-
-        # add loss weights to loss
-        if parms["do_learn_task_weights"]:
-            for name in model.log_task_weights.keys():
-                if (not parms["do_negative_density_check"]) and name=="negative_density":
-                    continue
-                if (not parms["do_fluxfac_check"]) and name=="fluxfac":
-                    continue
-                batch_loss = batch_loss + torch.sum(model.log_task_weights[name])
+        # accumulate losses
+        batch_losses = {}
+        batch_losses["F4"]               = comparison_loss_fn(      F4f_pred_norm       , F4f_true_norm       , weight["train"])
+        batch_losses["growthrate"]       = comparison_loss_fn(      growthrate_pred_norm, growthrate_true_norm, weight["train"])
+        batch_losses["negative_density"] = negative_density_loss_fn(F4f_pred_norm       , None                , weight["train"])
+        batch_losses["fluxfac"]          = fluxfac_loss_fn(         F4f_pred_norm       , None                , weight["train"])
+        batch_loss = total_loss(batch_losses)
 
         batch_loss.backward()
         optimizer.step()
@@ -187,76 +234,28 @@ def train_asymptotic_model(parms,
         model.eval()
 
         # Asymptotic losses
-        def accumulate_asymptotic_loss(dataset_list, traintest):
-            total_loss = torch.tensor(0.0, requires_grad=False)
-            for dataset in dataset_list:
-                F4i = dataset.tensors[0].to(parms["device"])
-                F4f_true = dataset.tensors[1].to(parms["device"])
-                growthrate_true = dataset.tensors[2].to(parms["device"])
+        def accumulate_asymptotic_loss(traintest):
+            # get predicted values from the model, normalized by the total number density
+            F4f_pred, F4f_true_n, growthrate_pred, growthrate_true_n = predict_normalized(traintest)
 
-                # get predicted values from the model
-                F4f_pred, growthrate_pred, _ = model.predict_all(F4i)
+            # accumulate losses
+            losses = {}
+            losses["F4"]               = contribute_loss(F4f_pred       , F4f_true_n       , weight[traintest], traintest, "F4"              , comparison_loss_fn      , max_error           )
+            losses["growthrate"]       = contribute_loss(growthrate_pred, growthrate_true_n, weight[traintest], traintest, "growthrate"      , comparison_loss_fn      , max_error           )
+            losses["negative_density"] = contribute_loss(F4f_pred       , None             , weight[traintest], traintest, "negative_density", negative_density_loss_fn, negative_density_max)
+            losses["fluxfac"]          = contribute_loss(F4f_pred       , None             , weight[traintest], traintest, "fluxfac"         , fluxfac_loss_fn         , fluxfac_max         )
 
-                # normalize quantities by ntotal before computing losses to avoid floating point issues
-                ntot_t = ntotal(F4f_true)
-                ntot_p = ntotal(F4f_pred)
-                assert torch.all(ntot_t > 0)
-                assert torch.all(ntot_p > 0)
-                F4f_true = F4f_true / ntot_t[:,None,None,None]
-                F4f_pred = F4f_pred / ntot_p[:,None,None,None]
-                growthrate_true = growthrate_true / ntot_t
-                growthrate_pred = growthrate_pred / ntot_p
-
-                # accumulate losses
-                total_loss = total_loss + torch.exp(-model.log_task_weights["F4"]     ) * contribute_loss(F4f_pred,
-                                                                                                          F4f_true,
-                                                                                                          traintest, "F4", comparison_loss_fn, max_error)
-                total_loss = total_loss + torch.exp(-model.log_task_weights["growthrate"]) * contribute_loss(growthrate_pred, #torch.log
-                                                                                                             growthrate_true, #torch.log
-                                                                                                             traintest, "growthrate", comparison_loss_fn, max_error)
-                negative_density_loss = torch.exp(-model.log_task_weights["negative_density"]) * contribute_loss(F4f_pred,
-                                                                                                                 None,
-                                                                                                                 traintest, "negative_density", negative_density_loss_fn, negative_density_max)
-                fluxfac_loss          = torch.exp(-model.log_task_weights["fluxfac"]         ) * contribute_loss(F4f_pred,
-                                                                                                                 None,
-                                                                                                                 traintest, "fluxfac", fluxfac_loss_fn, fluxfac_max)
-                if parms["do_negative_density_check"]:
-                    total_loss = total_loss + negative_density_loss
-                if parms["do_fluxfac_check"]:
-                    total_loss = total_loss + fluxfac_loss
-
-                # add loss weights to loss
-                if parms["do_learn_task_weights"]:
-                    for name in model.log_task_weights.keys():
-                        if (not parms["do_negative_density_check"]) and name=="negative_density":
-                            continue
-                        if (not parms["do_fluxfac_check"]) and name=="fluxfac":
-                            continue
-                        total_loss = total_loss + torch.sum(model.log_task_weights[name])
-
-            # report the mean over datasets rather than the sum, so that train,
-            # validation, and test losses are directly comparable to each other
-            # and do not depend on how many databases were loaded
-            if len(dataset_list) > 0:
-                for key in ["F4","growthrate","negative_density","fluxfac"]:
-                    loss_dict[key+"_"+traintest+"_loss"] /= len(dataset_list)
-                total_loss = total_loss / len(dataset_list)
-
-            return total_loss
+            return total_loss(losses)
 
         with torch.no_grad():
-            train_loss      = accumulate_asymptotic_loss(dataset_asymptotic_train_list     , "train"     )
-            validation_loss = accumulate_asymptotic_loss(dataset_asymptotic_validation_list, "validation")
-            test_loss       = accumulate_asymptotic_loss(dataset_asymptotic_test_list      , "test"      )
+            train_loss      = accumulate_asymptotic_loss("train"     )
+            validation_loss = accumulate_asymptotic_loss("validation")
+            test_loss       = accumulate_asymptotic_loss("test"      )
 
         # track the total loss
         loss_dict["train_loss"]      =      train_loss.item()
         loss_dict["validation_loss"] = validation_loss.item()
         loss_dict["test_loss"]       =       test_loss.item()
-
-        # track the task weights
-        for name in model.log_task_weights.keys():
-            loss_dict["weight_"+name] = torch.exp(-model.log_task_weights[name]).item()
 
         #=====================================#
         # ADVANCE THE LEARNING RATE SCHEDULER #
@@ -311,6 +310,6 @@ def train_asymptotic_model(parms,
         if stop_early:
             print("Learning rate below minimum threshold - stopping training")
             break
-        
+
 
     return final_metrics

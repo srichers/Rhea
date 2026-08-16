@@ -141,18 +141,6 @@ class NeuralNetwork(nn.Module):
         # store input arguments
         self.NF = parms["NF"]
 
-        # store loss weight parameters for tasks
-        if parms["do_learn_task_weights"]:
-            self.log_task_weights = nn.ParameterDict({
-                name: nn.Parameter(torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32))
-                for name in ["growthrate", "F4", "negative_density", "fluxfac"]
-            })
-        else:
-            self.log_task_weights = {
-                name: torch.tensor(-np.log(parms[f"task_weight_{name}"]), dtype=torch.float32)
-                for name in ["growthrate", "F4", "negative_density", "fluxfac"]
-            }
-
         # The input irreps for each node are just the 4 components of F4_in followed by 4 components of F4_box3d
         self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e + 1x1o + 1x0e")
         

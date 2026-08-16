@@ -39,15 +39,14 @@ def build_default_parms():
     parms["nonscalar_activation"] = torch.sigmoid
     parms["tensor_product_class"] = "norm"
 
-    parms["do_learn_task_weights"] = False
-    parms["task_weight_F4"] = 1.0
-    parms["task_weight_negative_density"] = 1
-    parms["task_weight_fluxfac"] = 1
-    parms["task_weight_growthrate"] = 1.0
-
-    # data augmentation options
-    parms["do_negative_density_check"] = True  # True - seems to help prevent crazy results
-    parms["do_fluxfac_check"] = True  # True - seems to help prevent crazy results
+    # Coefficients of the two unphysical-state penalties. The F4 and growthrate losses are
+    # normalized by the Box3D baseline error and so need no weight of their own. These two
+    # are hinges with no such baseline, so they are measured in units of the RMS Box3D F4
+    # error: a weight of 1 means a violation as large as that error costs as much as the
+    # entire F4 loss. Both violations share units, so the two are commensurate. Zero
+    # disables the penalty.
+    parms["penalty_negative_density"] = 1
+    parms["penalty_fluxfac"] = 1
 
     # neural network options
     parms["nhidden_shared"] = 1
