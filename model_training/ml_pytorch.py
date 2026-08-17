@@ -32,6 +32,12 @@ def build_default_parms():
 
     parms["epochs"] = 10
     parms["output_every"] = 10
+
+    # directory for loss.dat, parameters.txt, and model*.pt. None means the current
+    # working directory. run_trial.py points this at the trial directory so that
+    # concurrent Syne Tune trials do not overwrite each other's output.
+    parms["output_dir"] = None
+
     parms["average_heavies_in_final_state"] = False
     parms["conserve_lepton_number"] = True
     parms["random_seed"] = 42
@@ -78,14 +84,22 @@ def build_default_parms():
     #========================#
     parms["device"] = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # Hyperparameter search, driven by launch_syne_tune.py. The metric is the same fixed
+    # objective that is minimized, normalized by the run-independent Box3D baseline errors,
+    # so it is comparable across trials. Do not put penalty_negative_density or
+    # penalty_fluxfac in the config space - they change what the objective means, which
+    # would make validation_loss incomparable between trials.
     parms["syne_tune"] = {
         "report": False,
         "metric": "validation_loss",
-        "mode": "min",
-        "resource_attr": "epoch",
-        "max_resource_attr": "epochs",
+        "do_minimize": True,
+        "time_attr": "epoch",
+        # Report to the tuner only every this many epochs. An epoch is a single full-batch
+        # optimizer step, so a real run reports tens of thousands of times otherwise, and
+        # each report costs a parsed line of stdout and a searcher update. The final epoch
+        # is always reported so that a run stopped early by min_lr still lands its result.
+        "report_every": 100,
         "config_space": {
-            "epochs": 10,
             "learning_rate": {
                 "type": "loguniform",
                 "lower": 1e-5,
@@ -102,11 +116,15 @@ def build_default_parms():
             "rotate_gpus": True,
             "num_gpus_per_trial": 1,
         },
+        # The rung levels are measured in epochs and are grace_period * reduction_factor**k,
+        # so grace_period has to be a real fraction of parms["epochs"] - a rung at epoch 1 of
+        # a run that takes thousands of optimizer steps carries no signal. It also has to be
+        # a multiple of report_every, or the first rung is never observed. The upper limit of
+        # the resource, max_t, is parms["epochs"] and is not set here.
         "scheduler": {
-            "name": "hyperband",
-            "searcher": "random",
-            "type": "stopping",
-            "grace_period": 1,
+            "name": "asha",
+            "searcher": "random_search",
+            "grace_period": 500,
             "reduction_factor": 3,
         },
         "tuner": {

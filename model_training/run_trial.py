@@ -81,7 +81,7 @@ def serialize_config_value(value):
     return str(value)
 
 
-def build_report_callback(enable_reporting):
+def build_report_callback(enable_reporting, parms):
     history = []
     reporter = None
     if enable_reporting:
@@ -93,42 +93,60 @@ def build_report_callback(enable_reporting):
             ) from exc
         reporter = Reporter()
 
-    def report_fn(metrics):
+    syne_tune_cfg = parms.get("syne_tune", {})
+    report_every = syne_tune_cfg.get("report_every", 1)
+    last_reported_epoch = [0]
+
+    def do_report(metrics):
         numeric_metrics = {
             key: value
             for key, value in metrics.items()
             if isinstance(value, (int, float, bool))
         }
+        last_reported_epoch[0] = numeric_metrics["epoch"]
         history.append(dict(numeric_metrics))
         if reporter is not None:
             reporter(**numeric_metrics)
 
-    return report_fn, history
+    def report_fn(metrics):
+        # an epoch is a single full-batch optimizer step, so reporting every one of them
+        # would flood the tuner with tens of thousands of results per trial
+        if metrics["epoch"] % report_every == 0:
+            do_report(metrics)
+
+    def report_final(metrics):
+        # the last epoch a run actually reached is rarely a multiple of report_every, since
+        # training stops on min_lr rather than on a round number. Report it so that the
+        # trial delivers a result at the resource level it really used.
+        if metrics and metrics["epoch"] != last_reported_epoch[0]:
+            do_report(metrics)
+
+    return report_fn, report_final, history
 
 
 def summarize_history(history, final_metrics, parms):
     syne_tune_cfg = parms.get("syne_tune", {})
     metric_name = syne_tune_cfg.get("metric", "validation_loss")
-    mode = syne_tune_cfg.get("mode", "min")
+    do_minimize = syne_tune_cfg.get("do_minimize", True)
 
     if not history:
         return {
             "status": "completed",
             "metric": metric_name,
-            "mode": mode,
+            "do_minimize": do_minimize,
             "epochs_reported": 0,
             "final_metrics": final_metrics,
         }
 
-    if mode == "max":
-        best_metrics = max(history, key=lambda metrics: metrics[metric_name])
-    else:
+    if do_minimize:
         best_metrics = min(history, key=lambda metrics: metrics[metric_name])
+    else:
+        best_metrics = max(history, key=lambda metrics: metrics[metric_name])
 
     return {
         "status": "completed",
         "metric": metric_name,
-        "mode": mode,
+        "do_minimize": do_minimize,
         "epochs_reported": len(history),
         "best_epoch": int(best_metrics["epoch"]),
         "best_metric_value": float(best_metrics[metric_name]),
@@ -146,11 +164,25 @@ def load_trial_parms():
         type=Path,
         help="Syne Tune JSON config handoff. No manual CLI overrides are supported.",
     )
+    parser.add_argument(
+        "--st_checkpoint_dir",
+        type=Path,
+        help="Syne Tune checkpoint directory. LocalBackend always passes this, even in JSON "
+             "mode, and its parent is the trial directory that all output is written to.",
+    )
     args = parser.parse_args()
 
     parms = build_default_parms()
     if args.st_config_json_filename is not None:
         parms = apply_overrides(parms, load_json_dict(args.st_config_json_filename))
+
+    # Syne Tune does not set the working directory of a trial subprocess, so every trial
+    # would otherwise write its loss.dat and parameters.txt on top of every other trial's.
+    # Set this after the overrides - coerce_override would try to json-decode the path,
+    # since the default value is None.
+    if args.st_checkpoint_dir is not None:
+        parms["output_dir"] = str(args.st_checkpoint_dir.parent)
+
     return args, parms
 
 
@@ -167,7 +199,8 @@ def write_json(path, payload):
 
 def main():
     args, parms = load_trial_parms()
-    output_dir = Path.cwd()
+    output_dir = Path(parms["output_dir"]) if parms["output_dir"] is not None else Path.cwd()
+    output_dir.mkdir(parents=True, exist_ok=True)
     resolved_config_path = output_dir / "trial_config_resolved.json"
     summary_path = output_dir / "trial_summary.json"
 
@@ -176,12 +209,14 @@ def main():
         {key: serialize_config_value(value) for key, value in parms.items()},
     )
 
-    report_fn, history = build_report_callback(
-        should_report_to_syne_tune(parms, args.st_config_json_filename)
+    report_fn, report_final, history = build_report_callback(
+        should_report_to_syne_tune(parms, args.st_config_json_filename),
+        parms,
     )
 
     try:
         final_metrics = run_default_training(parms=parms, report_fn=report_fn)
+        report_final(final_metrics)
         summary = summarize_history(history, final_metrics, parms)
     except Exception as exc:
         summary = {

@@ -14,6 +14,7 @@ from ml_read_data import *
 import torch.autograd.profiler as profiler
 import pickle
 import os
+import copy
 
 # create an empty dictionary that will eventually contain all of the loss metrics of an iteration
 loss_dict = {}
@@ -54,6 +55,12 @@ def train_asymptotic_model(parms,
     print("#Using",parms["device"],"device")
     if parms["device"] == "cuda":
         print("# ",torch.cuda.get_device_name(0))
+
+    # all output files go here. Syne Tune's LocalBackend does not set the working
+    # directory of a trial subprocess, so without this every trial would truncate
+    # every other trial's loss.dat and parameters.txt.
+    output_dir = parms["output_dir"] if parms["output_dir"] is not None else os.getcwd()
+    print("#Writing output to",output_dir)
 
     #=======================#
     # instantiate the model #
@@ -158,7 +165,7 @@ def train_asymptotic_model(parms,
     }
 
     # print out all parameters for the record, including the data-derived task scales
-    parmfile = open(os.getcwd()+"/parameters.txt","w")
+    parmfile = open(output_dir+"/parameters.txt","w")
     for key in parms.keys():
         parmfile.write(key+" = "+str(parms[key])+"\n")
     parmfile.write("scale_F4 = "+str(scale_F4)+"\n")
@@ -182,7 +189,7 @@ def train_asymptotic_model(parms,
         return loss
 
     # set up file for writing performance metrics
-    loss_file = open(os.getcwd()+"/loss.dat","w")
+    loss_file = open(output_dir+"/loss.dat","w")
 
     #===============#
     # training loop #
@@ -190,6 +197,10 @@ def train_asymptotic_model(parms,
     print("#STARTING TRAINING LOOP")
     torch.backends.cudnn.benchmark = True # may help with performance
     final_metrics = {}
+    best_validation_loss = float("inf")
+    best_epoch          = 0
+    best_saved_epoch    = 0
+    best_state          = None
     for epoch in range(1,parms["epochs"]+1):
         # Set up the loss dictionary for IO. Every key is seeded here so that the
         # column order in loss.dat is defined in this one place, rather than being an
@@ -297,10 +308,28 @@ def train_asymptotic_model(parms,
 
         # output
         print(f"{epoch:4d}  {loss_dict['learning_rate']:12.5e}  {loss_dict['train_loss']:12.5e}  {loss_dict['validation_loss']:12.5e}  {loss_dict['test_loss']:12.5e}", flush=True)
+        # Remember the best weights seen so far. Only the state dict is copied here, which
+        # costs microseconds - deep-copying or scripting the model costs ~1s, far more than
+        # an epoch, so the export itself happens on the output_every cadence below.
+        if loss_dict["validation_loss"] < best_validation_loss:
+            best_validation_loss = loss_dict["validation_loss"]
+            best_epoch = epoch
+            best_state = copy.deepcopy(model.state_dict())
+
         if(epoch%parms["output_every"]==0 or stop_early):
-            outfilename = os.getcwd()+"/model"+str(epoch)
+            outfilename = output_dir+"/model"+str(epoch)
             save_model(model, outfilename, parms["device"])
             print("Saved",outfilename, flush=True)
+
+            # Write out the best model too. A trial that a hyperparameter tuner stops at an
+            # arbitrary epoch is SIGKILLed, so anything not already on disk is lost - without
+            # this, a search would return a winning configuration and no weights to go with it.
+            if best_epoch > best_saved_epoch:
+                best_saved_epoch = best_epoch
+                modelbest = copy.deepcopy(model)
+                modelbest.load_state_dict(best_state)
+                save_model(modelbest, output_dir+"/modelbest", parms["device"])
+                print("Saved",output_dir+"/modelbest","from epoch",best_epoch, flush=True)
 
         final_metrics = dict(loss_dict)
         if report_fn is not None:
