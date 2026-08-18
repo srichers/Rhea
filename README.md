@@ -103,8 +103,12 @@ You’ll see parameters along these lines (non-exhaustive):
   - `irreps_hidden` (e3nn irreps string)
   - `nhidden_F4`
   - `scalar_activation`, `nonscalar_activation`
-  - `dropout_probability`
-  - `do_batchnorm` (preferred)
+  - `nhidden_shared`, `nhidden_growthrate`
+  - `tensor_product_class` (`norm` or `quadratic`)
+
+- **Regularization** (set separately for the trunk and each head)
+  - `weight_decay_shared`, `weight_decay_F4`, `weight_decay_growthrate`
+  - `dropout_shared`, `dropout_F4`, `dropout_growthrate`
 
 - **Physics/data handling**
   - internal normalization via `ntot`

@@ -86,7 +86,7 @@ class PETP_Quadratic(nn.Module):
         return y
 
 class PE_GatedBlock(nn.Module):
-    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class):
+    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability=0):
         super().__init__()
         # determine the irreps that need to go into gate
         self.irreps_out = irreps_out
@@ -107,6 +107,12 @@ class PE_GatedBlock(nn.Module):
             irreps_gated = irreps_nonscalars,
         )
 
+        # e3nn's Dropout drops whole irreps rather than individual components, and its mask has
+        # shape [sim, multiplicity], so it broadcasts over the nu/nubar and flavor axes. Both
+        # rotational and flavor-permutation equivariance therefore survive it. torch.nn.Dropout
+        # would break both - do not substitute it.
+        self.dropout = e3nn.nn.Dropout(irreps_out, p=dropout_probability) if dropout_probability > 0 else nn.Identity()
+
     def forward(self, x):
         # get the full output (scalars + gates + nonscalars) from one linear
         y = self.tp(x)
@@ -114,11 +120,14 @@ class PE_GatedBlock(nn.Module):
         # apply the gate. 
         y = self.gate(y)
 
+        # drop whole irreps. Identity when the probability is zero, and inactive in eval mode
+        y = self.dropout(y)
+
         return y
     
 class PE_ResidualGatedBlock(PE_GatedBlock):
-    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class):
-        super().__init__(irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class)
+    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability=0):
+        super().__init__(irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability)
         assert irreps_in == irreps_out, "For residual connection, input and output irreps must be the same"
 
     def forward(self, x):
@@ -127,6 +136,9 @@ class PE_ResidualGatedBlock(PE_GatedBlock):
 
         # apply the gate. 
         y = self.gate(y)
+
+        # dropout goes on the residual branch only, so the identity path stays clean
+        y = self.dropout(y)
 
         return x + y
     
@@ -149,8 +161,8 @@ class NeuralNetwork(nn.Module):
         self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
         self.conserve_lepton_number = parms["conserve_lepton_number"]
 
-        # append a full layer including linear and activation
-        def append_full_layer(modules, in_irreps, out_irreps):
+        # append a full layer including linear, activation, and dropout
+        def append_full_layer(modules, in_irreps, out_irreps, dropout_probability):
 
             # use PE layer if irreps_in==irreps_out
             if in_irreps == out_irreps:
@@ -171,22 +183,25 @@ class NeuralNetwork(nn.Module):
                 out_irreps,
                 parms["scalar_activation"   ],
                 parms["nonscalar_activation"],
-                tensor_product_class
+                tensor_product_class,
+                dropout_probability
             ))
 
 
         # set up shared layers
         def build_shared(modules_shared):
             assert(parms["nhidden_shared"] >= 1), "Number of shared hidden layers must be positive"
-            append_full_layer(modules_shared, self.irreps_in, parms["irreps_hidden"])
+            dropout_probability = parms["dropout_shared"]
+            append_full_layer(modules_shared, self.irreps_in, parms["irreps_hidden"], dropout_probability)
             for _ in range(parms["nhidden_shared"]-1):
-                append_full_layer(modules_shared, parms["irreps_hidden"], parms["irreps_hidden"])
+                append_full_layer(modules_shared, parms["irreps_hidden"], parms["irreps_hidden"], dropout_probability)
 
-        # set up task-specific layers
-        def build_task(modules_task, nhidden_task, irreps_final):
+        # set up task-specific layers. Each head carries its own dropout probability, since the
+        # two tasks overfit at very different rates - see the regularization notes in CLAUDE.md
+        def build_task(modules_task, nhidden_task, irreps_final, dropout_probability):
             assert nhidden_task >= 1, "Number of hidden layers must be positive"
             for _ in range(nhidden_task):
-                append_full_layer(modules_task, parms["irreps_hidden"], parms["irreps_hidden"])
+                append_full_layer(modules_task, parms["irreps_hidden"], parms["irreps_hidden"], dropout_probability)
 
             # append linear layer at the end to get the correct output irreps for the task
             # couldn't get the gated block to work with a final layer with no nonscalar irreps
@@ -197,8 +212,8 @@ class NeuralNetwork(nn.Module):
         modules_growthrate = []
         modules_F4 = []
         build_shared(modules_shared)
-        build_task(modules_growthrate, parms["nhidden_growthrate"], e3nn.o3.Irreps("1x0e"       ))
-        build_task(modules_F4,         parms["nhidden_F4"],         e3nn.o3.Irreps("1x1o + 1x0e"))
+        build_task(modules_growthrate, parms["nhidden_growthrate"], e3nn.o3.Irreps("1x0e"       ), parms["dropout_growthrate"])
+        build_task(modules_F4,         parms["nhidden_F4"],         e3nn.o3.Irreps("1x1o + 1x0e"), parms["dropout_F4"        ])
 
         # turn the list of modules into a sequential model
         self.TP_activation_stack_shared     = nn.Sequential(*modules_shared)

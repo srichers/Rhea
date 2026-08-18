@@ -68,8 +68,18 @@ def train_asymptotic_model(parms,
     print("#SETTING UP NEURAL NETWORK")
     model = NeuralNetwork(parms).to(parms["device"])
     if parms["op"] == torch.optim.AdamW:
-        optimizer = parms["op"](model.parameters(),
-                                weight_decay=parms["adamw.weight_decay"],
+        # One parameter group per branch, so the trunk and the two heads can be regularized
+        # separately. These three stacks partition every parameter in the model, so nothing is
+        # left to pick up AdamW's constructor default of 0.01 by accident.
+        param_groups = [
+            {"params": list(model.TP_activation_stack_shared.parameters()),     "weight_decay": parms["weight_decay_shared"    ]},
+            {"params": list(model.TP_activation_stack_F4.parameters()),         "weight_decay": parms["weight_decay_F4"        ]},
+            {"params": list(model.TP_activation_stack_growthrate.parameters()), "weight_decay": parms["weight_decay_growthrate"]},
+        ]
+        ngrouped = sum(sum(p.numel() for p in g["params"]) for g in param_groups)
+        assert(all(len(g["params"]) > 0 for g in param_groups)), "every parameter group must be non-empty"
+        assert(ngrouped == sum(p.numel() for p in model.parameters())), "parameter groups must cover every parameter"
+        optimizer = parms["op"](param_groups,
                                 lr=parms["learning_rate"],
                                 amsgrad=parms["adamw.amsgrad"],
                                 fused=parms["adamw.fused"]

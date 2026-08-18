@@ -63,8 +63,20 @@ def build_default_parms():
     # optimizer options
     parms["op"] = torch.optim.AdamW  # Adam, SGD, RMSprop
     parms["adamw.amsgrad"] = False
-    parms["adamw.weight_decay"] = 0
     parms["adamw.fused"] = True
+
+    # Regularization, set separately for the trunk and for each head. The two tasks overfit at
+    # very different rates - the growthrate head predicts a single scalar per point from as many
+    # parameters as the F4 head uses for 24, so it memorizes far more readily - and the three
+    # branches partition every parameter in the model, so each needs its own explicit value.
+    # Weight decay shrinks uniformly; dropout, whose mask is drawn per point, penalizes in
+    # proportion to how strongly each feature actually fires. Zero disables either one.
+    parms["weight_decay_shared"]     = 0
+    parms["weight_decay_F4"]         = 0
+    parms["weight_decay_growthrate"] = 0
+    parms["dropout_shared"]     = 0.0
+    parms["dropout_F4"]         = 0.0
+    parms["dropout_growthrate"] = 0.0
     parms["learning_rate"] = 2e-4
     parms["patience"] = 500
     parms["cooldown"] = 500
@@ -101,10 +113,17 @@ def build_default_parms():
                 "lower": 1e-5,
                 "upper": 1e-3,
             },
-            "adamw.weight_decay": {
+            # the growthrate head is the one that overfits, so it is the one worth searching.
+            # The trunk is 0.3% of the parameters, so its regularization is nearly inert.
+            "weight_decay_growthrate": {
                 "type": "loguniform",
                 "lower": 1e-8,
                 "upper": 1e-2,
+            },
+            "dropout_growthrate": {
+                "type": "uniform",
+                "lower": 0.0,
+                "upper": 0.5,
             },
         },
         "backend": {
