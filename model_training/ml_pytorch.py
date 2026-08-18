@@ -58,7 +58,12 @@ def build_default_parms():
     parms["nhidden_shared"] = 1
     parms["nhidden_growthrate"] = 3
     parms["nhidden_F4"] = 3
-    parms["irreps_hidden"] = e3nn.o3.Irreps("4x0e + 4x1o")
+    # Width of the trunk and of each head, set separately. The first layer of a head is a
+    # transition layer whenever its width differs from the trunk's. Scalars must come first
+    # in each, which is asserted.
+    parms["irreps_shared"]     = e3nn.o3.Irreps("4x0e + 4x1o")
+    parms["irreps_F4"]         = e3nn.o3.Irreps("4x0e + 4x1o")
+    parms["irreps_growthrate"] = e3nn.o3.Irreps("4x0e + 4x1o")
 
     # optimizer options
     parms["op"] = torch.optim.AdamW  # Adam, SGD, RMSprop
@@ -108,10 +113,12 @@ def build_default_parms():
         # is always reported so that a run stopped early by min_lr still lands its result.
         "report_every": 100,
         "config_space": {
+            # the 50-trial search found a monotonic response across three decades with the
+            # optimum at the top of the old 1e-5 - 1e-3 range, so the range moved up
             "learning_rate": {
                 "type": "loguniform",
-                "lower": 1e-5,
-                "upper": 1e-3,
+                "lower": 1e-2,
+                "upper": 3e-1,
             },
             # the growthrate head is the one that overfits, so it is the one worth searching.
             # The trunk is 0.3% of the parameters, so its regularization is nearly inert.
@@ -134,12 +141,15 @@ def build_default_parms():
         # The rung levels are measured in epochs and are grace_period * reduction_factor**k,
         # so grace_period has to be a real fraction of parms["epochs"] - a rung at epoch 1 of
         # a run that takes thousands of optimizer steps carries no signal. It also has to be
-        # a multiple of report_every, or the first rung is never observed. The upper limit of
-        # the resource, max_t, is parms["epochs"] and is not set here.
+        # a multiple of report_every, or the first rung is never observed. It also has to land
+        # past the epoch at which overfitting sets in (~800 for the configurations measured so
+        # far), or regularization has nothing to show by the time most trials are killed - which
+        # is why the 50-trial search resolved nothing about weight decay. The upper limit of the
+        # resource, max_t, is parms["epochs"] and is not set here.
         "scheduler": {
             "name": "asha",
             "searcher": "random_search",
-            "grace_period": 500,
+            "grace_period": 2000,
             "reduction_factor": 3,
         },
         "tuner": {

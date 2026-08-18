@@ -8,6 +8,7 @@ This is the file contains the main training loop, including accumulation of the 
 
 import torch
 from ml_loss import *
+from ml_loss import comparison_per_point, negative_density_per_point, fluxfac_per_point
 from ml_neuralnet import *
 from ml_tools import *
 from ml_read_data import *
@@ -41,9 +42,15 @@ def configure_split_data(parms, dataset_list, label):
     weight = torch.cat([torch.full((len(dataset),), w/(wtot*len(dataset)))
                         for dataset,w in zip(dataset_list, database_weight_list)]).to(parms["device"])
 
+    # Which database each point came from, so that per-database losses can be segment-reduced
+    # out of the same single full-batch pass. This is reporting only - it must not become a
+    # loop over databases in either the training step or the evaluation.
+    database_index = torch.cat([torch.full((len(dataset),), i, dtype=torch.long)
+                                for i,dataset in enumerate(dataset_list)]).to(parms["device"])
+
     print("#   "+label+":",len(F4i),"points from",len(dataset_list),"databases in a single full batch.")
 
-    return F4i, F4f_true, growthrate, weight
+    return F4i, F4f_true, growthrate, weight, database_index
 
 
 def train_asymptotic_model(parms,
@@ -67,6 +74,11 @@ def train_asymptotic_model(parms,
     #=======================#
     print("#SETTING UP NEURAL NETWORK")
     model = NeuralNetwork(parms).to(parms["device"])
+    # a config written before the split would set this and be silently ignored, training with
+    # no weight decay at all rather than the intended amount
+    assert "adamw.weight_decay" not in parms, \
+        "adamw.weight_decay has been replaced by weight_decay_shared / weight_decay_F4 / weight_decay_growthrate"
+
     if parms["op"] == torch.optim.AdamW:
         # One parameter group per branch, so the trunk and the two heads can be regularized
         # separately. These three stacks partition every parameter in the model, so nothing is
@@ -119,10 +131,11 @@ def train_asymptotic_model(parms,
     F4f_true        = {}
     growthrate_true = {}
     weight          = {}
+    database_index  = {}
     for traintest, dataset_list in [("train"     , dataset_asymptotic_train_list     ),
                                     ("validation", dataset_asymptotic_validation_list),
                                     ("test"      , dataset_asymptotic_test_list      )]:
-        F4i[traintest], F4f_true[traintest], growthrate_true[traintest], weight[traintest] = \
+        F4i[traintest], F4f_true[traintest], growthrate_true[traintest], weight[traintest], database_index[traintest] = \
             configure_split_data(parms, dataset_list, traintest)
 
     # Run the model and normalize everything by the total number density. The predicted
@@ -198,6 +211,11 @@ def train_asymptotic_model(parms,
         loss_dict[key+"_"+traintest+"_max"]  = max_fn(pred, true)
         return loss
 
+    # Short labels for the per-database diagnostic columns. Taken from the training list, since
+    # entry i names the same physical database in all three splits.
+    database_names = [os.path.basename(d).split("_chunk")[0] for d in parms["train_database_list"]]
+    ndatabases     = len(database_names)
+
     # set up file for writing performance metrics
     loss_file = open(output_dir+"/loss.dat","w")
 
@@ -224,6 +242,14 @@ def train_asymptotic_model(parms,
         for traintest in ["train","validation","test"]:
             loss_dict[traintest+"_loss"] = 0
         loss_dict["learning_rate"] = 0
+        # Diagnostics go after learning_rate, so columns 1-29 keep the meaning they have always
+        # had and quickplot_loss.gplt's hard-coded column numbers stay correct. The per-database
+        # block is last because its width depends on how many databases are configured.
+        for traintest in ["train","validation","test"]:
+            loss_dict[traintest+"_median"] = 0
+        for traintest in ["train","validation","test"]:
+            for name in database_names:
+                loss_dict[name+"_"+traintest] = 0
 
         #===================================#
         # TRAINING STEP ON THE FULL DATASET #
@@ -265,6 +291,27 @@ def train_asymptotic_model(parms,
             losses["growthrate"]       = contribute_loss(growthrate_pred, growthrate_true_n, weight[traintest], traintest, "growthrate"      , comparison_loss_fn      , max_error           )
             losses["negative_density"] = contribute_loss(F4f_pred       , None             , weight[traintest], traintest, "negative_density", negative_density_loss_fn, negative_density_max)
             losses["fluxfac"]          = contribute_loss(F4f_pred       , None             , weight[traintest], traintest, "fluxfac"         , fluxfac_loss_fn         , fluxfac_max         )
+
+            # Diagnostics, out of the same pass and never fed back into any training decision.
+            # The per-point objective uses the same task weights as the scalar above, so summing
+            # weight*per_point reproduces the reported total exactly.
+            per_point = (task_weights["F4"]               * comparison_per_point(F4f_pred, F4f_true_n)
+                       + task_weights["growthrate"]       * comparison_per_point(growthrate_pred, growthrate_true_n)
+                       + task_weights["negative_density"] * negative_density_per_point(F4f_pred)
+                       + task_weights["fluxfac"]          * fluxfac_per_point(F4f_pred))
+
+            # The median is far below the mean whenever a thin tail of hard points dominates,
+            # so the gap between them is a free read on how tail-driven the current model is.
+            loss_dict[traintest+"_median"] = torch.median(per_point).item()
+
+            # Per-database means, segment-reduced rather than looped. Each database's points are
+            # averaged among themselves, so this shows a configuration that wins overall by
+            # sacrificing one database.
+            idx    = database_index[traintest]
+            totals = torch.zeros(ndatabases, device=per_point.device).index_add_(0, idx, per_point)
+            counts = torch.zeros(ndatabases, device=per_point.device).index_add_(0, idx, torch.ones_like(per_point))
+            for i,name in enumerate(database_names):
+                loss_dict[name+"_"+traintest] = (totals[i]/counts[i]).item()
 
             return total_loss(losses)
 

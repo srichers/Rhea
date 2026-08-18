@@ -147,8 +147,10 @@ class NeuralNetwork(nn.Module):
     def __init__(self, parms):
         super().__init__()
 
-        # make sure the irreps are scalar first to make sure it is consistent with the output of Gate
-        assert parms["irreps_hidden"] == parms["irreps_hidden"].sort().irreps, "Hidden irreps must have scalars first"
+        # The trunk and the two heads each have their own width. 
+        # scalars must come first in every branch, to stay consistent with the output of Gate
+        for key in ["irreps_shared","irreps_F4","irreps_growthrate"]:
+            assert parms[key] == parms[key].sort().irreps, key+" must have scalars first"
 
         # store input arguments
         self.NF = parms["NF"]
@@ -191,29 +193,30 @@ class NeuralNetwork(nn.Module):
         # set up shared layers
         def build_shared(modules_shared):
             assert(parms["nhidden_shared"] >= 1), "Number of shared hidden layers must be positive"
+            irreps_shared       = parms["irreps_shared"]
             dropout_probability = parms["dropout_shared"]
-            append_full_layer(modules_shared, self.irreps_in, parms["irreps_hidden"], dropout_probability)
+            append_full_layer(modules_shared, self.irreps_in, irreps_shared, dropout_probability)
             for _ in range(parms["nhidden_shared"]-1):
-                append_full_layer(modules_shared, parms["irreps_hidden"], parms["irreps_hidden"], dropout_probability)
+                append_full_layer(modules_shared, irreps_shared, irreps_shared, dropout_probability)
 
-        # set up task-specific layers. Each head carries its own dropout probability, since the
-        # two tasks overfit at very different rates - see the regularization notes in CLAUDE.md
-        def build_task(modules_task, nhidden_task, irreps_final, dropout_probability):
+        # set up task-specific layers.
+        def build_task(modules_task, nhidden_task, irreps_task, irreps_final, dropout_probability):
             assert nhidden_task >= 1, "Number of hidden layers must be positive"
-            for _ in range(nhidden_task):
-                append_full_layer(modules_task, parms["irreps_hidden"], parms["irreps_hidden"], dropout_probability)
+            append_full_layer(modules_task, parms["irreps_shared"], irreps_task, dropout_probability)
+            for _ in range(nhidden_task-1):
+                append_full_layer(modules_task, irreps_task, irreps_task, dropout_probability)
 
             # append linear layer at the end to get the correct output irreps for the task
             # couldn't get the gated block to work with a final layer with no nonscalar irreps
-            modules_task.append(e3nn.o3.Linear(parms["irreps_hidden"], irreps_final))
+            modules_task.append(e3nn.o3.Linear(irreps_task, irreps_final))
 
         # put together the layers of the neural network
         modules_shared = []
         modules_growthrate = []
         modules_F4 = []
         build_shared(modules_shared)
-        build_task(modules_growthrate, parms["nhidden_growthrate"], e3nn.o3.Irreps("1x0e"       ), parms["dropout_growthrate"])
-        build_task(modules_F4,         parms["nhidden_F4"],         e3nn.o3.Irreps("1x1o + 1x0e"), parms["dropout_F4"        ])
+        build_task(modules_growthrate, parms["nhidden_growthrate"], parms["irreps_growthrate"], e3nn.o3.Irreps("1x0e"       ), parms["dropout_growthrate"])
+        build_task(modules_F4,         parms["nhidden_F4"],         parms["irreps_F4"        ], e3nn.o3.Irreps("1x1o + 1x0e"), parms["dropout_F4"        ])
 
         # turn the list of modules into a sequential model
         self.TP_activation_stack_shared     = nn.Sequential(*modules_shared)

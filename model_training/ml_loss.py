@@ -16,7 +16,28 @@ def weighted_mean(error, weight):
     if weight == None:
         return torch.mean(error)
     else:
-        return torch.sum(weight * torch.mean(error.reshape(error.shape[0],-1), dim=1)) # [sim, everything else]
+        return torch.sum(weight * per_point_error(error))
+
+# The per-point quantity that weighted_mean sums over, exposed so that the training loop can
+# report a median and a per-database breakdown out of the same single full-batch pass rather
+# than by looping over databases. sum(weight * per_point_error(e)) is weighted_mean(e, weight)
+# by construction, so the diagnostics can never drift from the objective.
+# reshape rather than flatten(1), because growthrate has only the point dimension.
+def per_point_error(error):
+    return torch.mean(error.reshape(error.shape[0],-1), dim=1) # [sim]
+
+#===========================================================================#
+# per-point versions of the four losses, in the same units as their scalar  #
+# counterparts below. Used only for reporting, never for the gradient.      #
+#===========================================================================#
+def comparison_per_point(y_pred, y_true):
+    return per_point_error((y_pred - y_true)**2)
+
+def negative_density_per_point(F4f_pred, _=None):
+    return per_point_error(torch.abs(negative_density_error(F4f_pred)))
+
+def fluxfac_per_point(F4f_pred, _=None):
+    return per_point_error(fluxfac_error(F4f_pred))
 
 #===================================================================#
 # violations of the physical bounds that the final state must obey. #
