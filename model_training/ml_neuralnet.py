@@ -130,17 +130,28 @@ class PE_ResidualGatedBlock(PE_GatedBlock):
         super().__init__(irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability)
         assert irreps_in == irreps_out, "For residual connection, input and output irreps must be the same"
 
+        # ReZero (Bachlechner et al. 2020): a learnable per-block scale on the residual branch,
+        # initialized to zero. Nothing in this block normalizes activations - no batchnorm (see
+        # CLAUDE.md), no layer norm - so a plain x+y stack has no mechanism to keep forward
+        # activation magnitude bounded as blocks are added, and a deep stack risks blowing up
+        # before it ever trains. Starting alpha at 0 makes every block the identity at init
+        # regardless of depth, so training starts as if the stack had zero extra blocks and each
+        # block's contribution grows only as its own alpha moves away from zero. alpha is a single
+        # scalar multiplying y uniformly, so it commutes with rotation and flavor permutation and
+        # does not disturb equivariance.
+        self.alpha = nn.Parameter(torch.zeros(1))
+
     def forward(self, x):
         # get the full output (scalars + gates + nonscalars) from one linear
         y = self.tp(x)
 
-        # apply the gate. 
+        # apply the gate.
         y = self.gate(y)
 
         # dropout goes on the residual branch only, so the identity path stays clean
         y = self.dropout(y)
 
-        return x + y
+        return x + self.alpha * y
     
 # define the NN model
 class NeuralNetwork(nn.Module):
