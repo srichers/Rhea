@@ -9,7 +9,7 @@ This file contains the structure of the neural network, including the means of t
 import torch
 import numpy as np
 from torch import nn
-from ml_tools import restrict_F4_to_physical, ntotal
+from ml_tools import ntotal
 import e3nn.o3
 import e3nn.nn
 import box3d
@@ -149,7 +149,7 @@ class NeuralNetwork(nn.Module):
         self.average_heavies_in_final_state = parms["average_heavies_in_final_state"]
         self.conserve_lepton_number = parms["conserve_lepton_number"]
 
-        # append a full layer including linear, activation, and batchnorm/dropout if desired
+        # append a full layer including linear and activation
         def append_full_layer(modules, in_irreps, out_irreps):
 
             # use PE layer if irreps_in==irreps_out

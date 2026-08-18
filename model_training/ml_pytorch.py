@@ -59,10 +59,6 @@ def build_default_parms():
     parms["nhidden_growthrate"] = 3
     parms["nhidden_F4"] = 3
     parms["irreps_hidden"] = e3nn.o3.Irreps("4x0e + 4x1o")
-    parms["dropout_probability"] = 0.0
-    parms["do_batchnorm"] = False
-    parms["do_fdotu"] = True
-    parms["activation"] = nn.LeakyReLU  # nn.LeakyReLU, nn.ReLU
 
     # optimizer options
     parms["op"] = torch.optim.AdamW  # Adam, SGD, RMSprop
