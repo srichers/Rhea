@@ -112,11 +112,6 @@ def mixBox3D_lebedev(F4, pts, weights):
     Psur02, crosses02, rate02 = pair_box3d(ELN,0,2,weights)
     Psur12, crosses12, rate12 = pair_box3d(ELN,1,2,weights)
 
-    # The fastest growing pair sets the growth rate. Every pair is tested, so a
-    # crossing between the heavies is seen. This is invariant under any permutation
-    # of the three flavors.
-    growthrate = torch.maximum(rate01, torch.maximum(rate02, rate12))
-
     unphysical = torch.logical_or(unphysical, torch.logical_not((Psur01 >= 0) & (Psur01 <= 1)).any(dim=1))
     unphysical = torch.logical_or(unphysical, torch.logical_not((Psur02 >= 0) & (Psur02 <= 1)).any(dim=1))
     unphysical = torch.logical_or(unphysical, torch.logical_not((Psur12 >= 0) & (Psur12 <= 1)).any(dim=1))
@@ -153,12 +148,15 @@ def mixBox3D_lebedev(F4, pts, weights):
     unphysical = torch.logical_or(unphysical, ((F4[:,:,:,3]+dF4[:,:,:,3]) < 0).flatten(start_dim=1).any(dim=1))
     unphysical = torch.logical_or(unphysical, torch.logical_not(torch.isfinite(dF4)).flatten(start_dim=1).any(dim=1))
 
+    # the three pairwise growth rates, stacked [point, pair] in a fixed order (01,02,12).
+    pairwise_growthrate = torch.stack([rate01, rate02, rate12], dim=1)
+
     # return nan rather than raising, so that a single bad point does not kill
     # the whole batch. Callers running inside a simulation handle the nans.
     dF4        = torch.where(unphysical[:,None,None,None], torch.full_like(dF4,        float("nan")), dF4)
-    growthrate = torch.where(unphysical,                   torch.full_like(growthrate, float("nan")), growthrate)
+    pairwise_growthrate = torch.where(unphysical[:,None], torch.full_like(pairwise_growthrate, float("nan")), pairwise_growthrate)
 
-    return dF4, growthrate
+    return dF4, pairwise_growthrate
 
 
 
@@ -168,6 +166,6 @@ if __name__ == "__main__":
     F4 = torch.rand(10,2,3,4)
     F4[:,:,:,:3] = (F4[:,:,:,:3] - 0.5) * F4[:,:,:,3:]
     F4 = F4 / torch.sum(F4[:,:,:,3], dim=(1,2))[:,None,None,None]
-    F4mix, I = mixBox3D_lebedev(F4, pts, weights)
+    F4mix, pairwise_I = mixBox3D_lebedev(F4, pts, weights)
     print(F4mix)
-    print(I)
+    print(pairwise_I)

@@ -157,7 +157,9 @@ class NeuralNetwork(nn.Module):
         self.NF = parms["NF"]
 
         # The input irreps for each node are just the 4 components of F4_in followed by 4 components of F4_box3d
-        self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e + 1x1o + 1x0e")
+        # the last two scalars are the sorted (min,max) pair of each flavor's two incident
+        # Box3D pairwise growth rates - see predict_all
+        self.irreps_in  = e3nn.o3.Irreps("1x1o + 1x0e + 1x1o + 1x0e + 1x0e + 1x0e")
         
         # one y matrix for ndens, one for flux
         # add one extra to predict growth rate
@@ -273,11 +275,33 @@ class NeuralNetwork(nn.Module):
         F4_in = F4_in / ntot[:,None,None,None]
 
         # get the Box3D change to F4 (pass lebedev pts/weights registered as buffers)
-        dF4_box3d, growthrate_box3d = box3d.mixBox3D_lebedev(F4_in, self.lebedev_pts, self.lebedev_weights)
+        dF4_box3d, pairwise_growthrate_box3d = box3d.mixBox3D_lebedev(F4_in, self.lebedev_pts, self.lebedev_weights)
+
+        # the fastest growing pair sets the growth rate. Every pair is tested, so a crossing
+        # between the heavies is seen. This is invariant under any permutation of the flavors.
+        rate01 = pairwise_growthrate_box3d[:,0]
+        rate02 = pairwise_growthrate_box3d[:,1]
+        rate12 = pairwise_growthrate_box3d[:,2]
+        growthrate_box3d = torch.maximum(rate01, torch.maximum(rate02, rate12))
 
         if use_network:
-            # Combine F4_in and the Box3D change into a joint input of shape [nsamples, nu/nubar, flavor, xyzt(in)/xyzt(box3d)]
-            F4_joint = torch.cat([F4_in, dF4_box3d], dim=-1)
+            # Give each flavor its two incident pairwise growth rates as an extra pair of
+            # scalar input channels, sorted (min,max)
+            incident_min = torch.stack([torch.minimum(rate01,rate02),
+                                         torch.minimum(rate01,rate12),
+                                         torch.minimum(rate02,rate12)], dim=1) # [nsims,NF]
+            incident_max = torch.stack([torch.maximum(rate01,rate02),
+                                         torch.maximum(rate01,rate12),
+                                         torch.maximum(rate02,rate12)], dim=1) # [nsims,NF]
+
+            # broadcast identically across nu/nubar - the pairwise rate is a property of a
+            # flavor pair, not of nu vs nubar - and give each a trailing xyzt-like axis of 1
+            incident_min = incident_min[:,None,:,None].expand(-1,2,-1,-1) # [nsims,2,NF,1]
+            incident_max = incident_max[:,None,:,None].expand(-1,2,-1,-1) # [nsims,2,NF,1]
+
+            # Combine F4_in, the Box3D change, and the sorted incident growth rates into a
+            # joint input of shape [nsamples, nu/nubar, flavor, features]
+            F4_joint = torch.cat([F4_in, dF4_box3d, incident_min, incident_max], dim=-1)
 
             # propagate through the network
             y_F4, y_growthrate = self.forward(F4_joint)
