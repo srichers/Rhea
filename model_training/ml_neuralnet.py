@@ -30,41 +30,40 @@ def PE_inputs(x):
 
         return x_self, x_flavor, x_nunubar, x_all
 
-# permutation equivariant tensor product between irreps and their norms
-class PETP_Norm(nn.Module):
+# permutation equivariant linear map.
+# All of this block's nonlinearity comes from the Gate that follows it in
+# PE_ResidualGatedBlock; this layer only does the per-branch equivariant linear mixing (and,
+# for transition layers, the irreps_in -> irreps_out projection).
+class PETP_Linear(nn.Module):
     def __init__(self, irreps_in, irreps_out):
         super().__init__()
-        self.norm = e3nn.o3.Norm(irreps_in)
-        self.tp_self    = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
-        self.tp_flavor  = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
-        self.tp_nunubar = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
-        self.tp_all     = e3nn.o3.FullyConnectedTensorProduct(irreps_in, self.norm.irreps_out, irreps_out)
+        self.lin_self    = e3nn.o3.Linear(irreps_in, irreps_out)
+        self.lin_flavor  = e3nn.o3.Linear(irreps_in, irreps_out)
+        self.lin_nunubar = e3nn.o3.Linear(irreps_in, irreps_out)
+        self.lin_all     = e3nn.o3.Linear(irreps_in, irreps_out)
 
     # x has shape [nsamples, nunubar, flavor, features]
     def forward(self, x):
         # compute the inputs to each node
         x_self, x_flavor, x_nunubar, x_all = PE_inputs(x)
 
-        # compute invariant scalars from all irreps
-        s_self = self.norm(x_self)
-        s_flavor = self.norm(x_flavor)
-        s_nunubar = self.norm(x_nunubar)
-        s_all = self.norm(x_all)
-
-        # apply the tensor products to the original features, using the invariant scalars as gates
-        y_self = self.tp_self(x_self, s_self)
-        y_flavor = self.tp_flavor(x_flavor, s_flavor)
-        y_nunubar = self.tp_nunubar(x_nunubar, s_nunubar)
-        y_all = self.tp_all(x_all, s_all)
+        # apply the linear maps
+        y_self = self.lin_self(x_self)
+        y_flavor = self.lin_flavor(x_flavor)
+        y_nunubar = self.lin_nunubar(x_nunubar)
+        y_all = self.lin_all(x_all)
 
         # sum the contributions
         y = y_self + y_flavor + y_nunubar + y_all
         return y
 
-# permutation equivariant tensor product between irreps and themselves (quadratic in the features)
+# permutation equivariant tensor product between irreps and a bounded rescaling of themselves.
+# NormActivation computes x/|x| * tanh(|x|): for large |x| the tanh saturates, so the second argument becomes
+# scale-invariant and the product's growth is capped back to degree 1; for small |x| it reduces to x/|x| * |x| = x.
 class PETP_Quadratic(nn.Module):
     def __init__(self, irreps_in, irreps_out):
         super().__init__()
+        self.norm_act   = e3nn.nn.NormActivation(irreps_in, torch.tanh, normalize=True)
         self.tp_self    = e3nn.o3.FullyConnectedTensorProduct(irreps_in, irreps_in, irreps_out)
         self.tp_flavor  = e3nn.o3.FullyConnectedTensorProduct(irreps_in, irreps_in, irreps_out)
         self.tp_nunubar = e3nn.o3.FullyConnectedTensorProduct(irreps_in, irreps_in, irreps_out)
@@ -75,37 +74,40 @@ class PETP_Quadratic(nn.Module):
         # compute the inputs to each node
         x_self, x_flavor, x_nunubar, x_all = PE_inputs(x)
 
-        # compute tensor products
-        y_self = self.tp_self(x_self, x_self)
-        y_flavor = self.tp_flavor(x_flavor, x_flavor)
-        y_nunubar = self.tp_nunubar(x_nunubar, x_nunubar)
-        y_all = self.tp_all(x_all, x_all)
+        # compute tensor products against a bounded rescaling of the same tensor
+        y_self = self.tp_self(x_self, self.norm_act(x_self))
+        y_flavor = self.tp_flavor(x_flavor, self.norm_act(x_flavor))
+        y_nunubar = self.tp_nunubar(x_nunubar, self.norm_act(x_nunubar))
+        y_all = self.tp_all(x_all, self.norm_act(x_all))
 
         # sum the contributions
         y = y_self + y_flavor + y_nunubar + y_all
         return y
 
-class PE_GatedBlock(nn.Module):
+class PE_ResidualGatedBlock(nn.Module):
     def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability=0):
         super().__init__()
         # determine the irreps that need to go into gate
         self.irreps_out = irreps_out
         irreps_scalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l == 0)
         irreps_nonscalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l > 0)
-        irreps_gates = e3nn.o3.Irreps(f"{irreps_nonscalars.num_irreps}x0e")
-        irreps_with_gates = irreps_scalars + irreps_gates + irreps_nonscalars
 
-        # define the tensor product that produces the scalars, gates, and nonscalars all at once
-        self.tp = tensor_product_class(irreps_in, irreps_with_gates)
-
-        # gate the scalars, and use additional gate scalars to gate the nonscalars
-        self.gate = e3nn.nn.Gate(
-            irreps_scalars = irreps_scalars,
-            act_scalars = [act_scalars] * len(irreps_scalars),
-            irreps_gates = irreps_gates,
-            act_gates = [act_gates] * len(irreps_gates),
-            irreps_gated = irreps_nonscalars,
-        )
+        # Gate needs at least one nonscalar irrep to gate - its ElementwiseTensorProduct over
+        # an empty pair fails. With none (e.g. growthrate's 1x0e output), there is nothing to
+        # gate, so just activate the scalars directly instead.
+        if len(irreps_nonscalars) > 0:
+            irreps_gates = e3nn.o3.Irreps(f"{irreps_nonscalars.num_irreps}x0e")
+            self.tp = tensor_product_class(irreps_in, irreps_scalars + irreps_gates + irreps_nonscalars)
+            self.gate = e3nn.nn.Gate(
+                irreps_scalars = irreps_scalars,
+                act_scalars = [act_scalars] * len(irreps_scalars),
+                irreps_gates = irreps_gates,
+                act_gates = [act_gates] * len(irreps_gates),
+                irreps_gated = irreps_nonscalars,
+            )
+        else:
+            self.tp = tensor_product_class(irreps_in, irreps_scalars)
+            self.gate = e3nn.nn.Activation(irreps_scalars, [act_scalars] * len(irreps_scalars))
 
         # e3nn's Dropout drops whole irreps rather than individual components, and its mask has
         # shape [sim, multiplicity], so it broadcasts over the nu/nubar and flavor axes. Both
@@ -113,32 +115,20 @@ class PE_GatedBlock(nn.Module):
         # would break both - do not substitute it.
         self.dropout = e3nn.nn.Dropout(irreps_out, p=dropout_probability) if dropout_probability > 0 else nn.Identity()
 
-    def forward(self, x):
-        # get the full output (scalars + gates + nonscalars) from one linear
-        y = self.tp(x)
-
-        # apply the gate. 
-        y = self.gate(y)
-
-        # drop whole irreps. Identity when the probability is zero, and inactive in eval mode
-        y = self.dropout(y)
-
-        return y
-    
-class PE_ResidualGatedBlock(PE_GatedBlock):
-    def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability=0):
-        super().__init__(irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability)
-        assert irreps_in == irreps_out, "For residual connection, input and output irreps must be the same"
+        # When irreps_in != irreps_out there is no valid x + y to form, so this falls back to a
+        # learned linear projection of x (a "projection shortcut", the standard ResNet answer to
+        # a shape-changing residual block) instead of dropping the residual connection entirely.
+        if irreps_in == irreps_out:
+            self.skip = nn.Identity()
+        else:
+            self.skip = e3nn.o3.Linear(irreps_in, irreps_out)
 
         # ReZero (Bachlechner et al. 2020): a learnable per-block scale on the residual branch,
-        # initialized to zero. Nothing in this block normalizes activations - no batchnorm (see
-        # CLAUDE.md), no layer norm - so a plain x+y stack has no mechanism to keep forward
-        # activation magnitude bounded as blocks are added, and a deep stack risks blowing up
-        # before it ever trains. Starting alpha at 0 makes every block the identity at init
-        # regardless of depth, so training starts as if the stack had zero extra blocks and each
-        # block's contribution grows only as its own alpha moves away from zero. alpha is a single
-        # scalar multiplying y uniformly, so it commutes with rotation and flavor permutation and
-        # does not disturb equivariance.
+        # initialized to zero. Starting alpha at 0 makes every block equal to its skip path at
+        # init regardless of depth, so training starts as if the stack had zero extra blocks and
+        # each block's contribution grows only as its own alpha moves away from zero. alpha is a
+        # single scalar multiplying y uniformly, so it commutes with rotation and flavor
+        # permutation and does not disturb equivariance.
         self.alpha = nn.Parameter(torch.zeros(1))
 
     def forward(self, x):
@@ -148,10 +138,10 @@ class PE_ResidualGatedBlock(PE_GatedBlock):
         # apply the gate.
         y = self.gate(y)
 
-        # dropout goes on the residual branch only, so the identity path stays clean
+        # dropout goes on the residual branch only, so the skip path stays clean
         y = self.dropout(y)
 
-        return x + self.alpha * y
+        return self.skip(x) + self.alpha * y
     
 # define the NN model
 class NeuralNetwork(nn.Module):
@@ -177,21 +167,15 @@ class NeuralNetwork(nn.Module):
         # append a full layer including linear, activation, and dropout
         def append_full_layer(modules, in_irreps, out_irreps, dropout_probability):
 
-            # use PE layer if irreps_in==irreps_out
-            if in_irreps == out_irreps:
-                gate_class = PE_ResidualGatedBlock
-            else:
-                gate_class = PE_GatedBlock
-            
             # select the type of tensor product to use in the gate
-            if parms["tensor_product_class"] == "norm":
-                tensor_product_class = PETP_Norm
+            if parms["tensor_product_class"] == "linear":
+                tensor_product_class = PETP_Linear
             elif parms["tensor_product_class"] == "quadratic":
                 tensor_product_class = PETP_Quadratic
-            else:                    
+            else:
                 assert False, f"Unknown tensor product class {parms['tensor_product_class']}"
 
-            modules.append(gate_class(
+            modules.append(PE_ResidualGatedBlock(
                 in_irreps,
                 out_irreps,
                 parms["scalar_activation"   ],
@@ -210,16 +194,16 @@ class NeuralNetwork(nn.Module):
             for _ in range(parms["nhidden_shared"]-1):
                 append_full_layer(modules_shared, irreps_shared, irreps_shared, dropout_probability)
 
-        # set up task-specific layers.
+        # set up task-specific layers. nhidden_task is the exact number of layers: the first
+        # layer's input is always irreps_shared (from the trunk) and the last layer's output is
+        # always irreps_final (the task's output structure), regardless of nhidden_task - with
+        # nhidden_task==1 those are the same layer, and irreps_task goes unused.
         def build_task(modules_task, nhidden_task, irreps_task, irreps_final, dropout_probability):
             assert nhidden_task >= 1, "Number of hidden layers must be positive"
-            append_full_layer(modules_task, parms["irreps_shared"], irreps_task, dropout_probability)
-            for _ in range(nhidden_task-1):
-                append_full_layer(modules_task, irreps_task, irreps_task, dropout_probability)
-
-            # append linear layer at the end to get the correct output irreps for the task
-            # couldn't get the gated block to work with a final layer with no nonscalar irreps
-            modules_task.append(e3nn.o3.Linear(irreps_task, irreps_final))
+            for i in range(nhidden_task):
+                in_irreps  = parms["irreps_shared"] if i == 0 else irreps_task
+                out_irreps = irreps_final if i == nhidden_task-1 else irreps_task
+                append_full_layer(modules_task, in_irreps, out_irreps, dropout_probability)
 
         # put together the layers of the neural network
         modules_shared = []

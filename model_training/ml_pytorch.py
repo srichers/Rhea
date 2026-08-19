@@ -43,7 +43,7 @@ def build_default_parms():
     parms["random_seed"] = 42
     parms["scalar_activation"] = nn.functional.silu
     parms["nonscalar_activation"] = torch.sigmoid
-    parms["tensor_product_class"] = "norm"
+    parms["tensor_product_class"] = "linear"
 
     # Coefficients of the two unphysical-state penalties. The F4 and growthrate losses are
     # normalized by the Box3D baseline error and so need no weight of their own. These two
