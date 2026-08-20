@@ -148,7 +148,11 @@ class NeuralNetwork(nn.Module):
     def __init__(self, parms):
         super().__init__()
 
-        # The trunk and the two heads each have their own width. 
+        # initialize random seeds before layers are constructed/initialized.
+        torch.manual_seed(parms["random_seed"])
+        np.random.seed(parms["random_seed"])
+
+        # The trunk and the two heads each have their own width.
         # scalars must come first in every branch, to stay consistent with the output of Gate
         for key in ["irreps_shared","irreps_F4","irreps_growthrate"]:
             assert parms[key] == parms[key].sort().irreps, key+" must have scalars first"
@@ -223,10 +227,6 @@ class NeuralNetwork(nn.Module):
         # register lebedev quadrature tensors as buffers so they are scriptable and move with the model
         self.register_buffer('lebedev_pts', box3d.pts)
         self.register_buffer('lebedev_weights', box3d.weights)
-
-        # initialize the weights
-        torch.manual_seed(parms["random_seed"])
-        np.random.seed(parms["random_seed"])
 
         # print the model structure
         print(self)
