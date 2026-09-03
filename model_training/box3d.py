@@ -88,14 +88,16 @@ def mixBox3D_lebedev(F4, pts, weights):
     # normF is zero only if F is, so the floor leaves Fhat exactly zero there
     Fhat = F / torch.where(normF > 0, normF, torch.ones_like(normF))
 
-    # Nonpositive density, and flux the quadrature cannot represent, are
-    # unphysical. The limit is below the causal value of 1 because the beam
-    # width goes like 1/Z: the total density is off by 3% at a flux factor of
-    # 0.98, 54% at 0.995 and 666% at 0.999. It must stay inline rather than
-    # become a module constant, which torch.jit.script cannot close over. [point]
-    fluxfac = normF/n
-    bad     = torch.logical_or(n <= 0, fluxfac >= 0.98)
-    unphysical = torch.logical_or(unphysical, bad.flatten(start_dim=1).any(dim=1))
+    # treat empty flavors in a sane way
+    empty   = torch.logical_and(n == 0, normF == 0)
+    fluxfac = normF / torch.where(empty, torch.ones_like(n), n)
+
+    # a density smaller than the flux is unphysical.
+    unphysical = torch.logical_or(unphysical, (n < normF).flatten(start_dim=1).any(dim=1))
+
+    # The quadrature cannot resolve a beam narrower than ~1/Z: 3% error at 0.98,
+    # 54% at 0.995 and 666% at 0.999. Cap what the closure sees. Only Z is affected.
+    fluxfac = fluxfac.clamp(max=0.98)
 
     Z = get_Z(fluxfac)
 

@@ -350,7 +350,9 @@ class NeuralNetwork(nn.Module):
         #assert torch.all(torch.isfinite(growthrate))
         #assert torch.all(torch.isfinite(stability))
 
-        # stability is determined only by box3d, output as float
-        stability = (growthrate_box3d <= 0).float()
+        # stability is determined only by box3d, output as float. nan if box3d refused.
+        stability = torch.where(torch.isnan(growthrate_box3d),
+                                torch.full_like(growthrate_box3d, float("nan")),
+                                (growthrate_box3d <= 0).float())
 
         return F4_out, growthrate, stability
