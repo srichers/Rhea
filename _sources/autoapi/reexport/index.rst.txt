@@ -1,0 +1,74 @@
+reexport
+========
+
+.. py:module:: reexport
+
+.. autoapi-nested-parse::
+
+   Re-export a trained checkpoint's weights under the current source.
+
+   A checkpoint saved by save_model is TorchScript, so box3d and predict_all are frozen
+   into it as they were at training time. Fixing either one leaves every existing
+   checkpoint on the old behavior. This rebuilds the network from the current source,
+   loads the old weights into it, and saves it again - no retraining.
+
+   The architecture is read back off the checkpoint rather than supplied, so this keeps
+   working as the config space changes. The two things that cannot be read back are the
+   activations and the dropout probabilities, because neither has parameters: dropout is
+   identity at eval and so cannot matter here, while a wrong activation would load
+   silently. That is what the verification below is for - it compares the rebuilt model
+   against the original and refuses to save unless they agree exactly.
+
+   Usage:
+       python3 reexport.py old_cuda.pt newname          # writes newname_{cpu,cuda}.pt
+       python3 reexport.py old_cuda.pt newname --devices cpu
+       python3 reexport.py old_cuda.pt newname --scalar-activation relu
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   reexport.ACTIVATIONS
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   reexport.resolve_activation
+   reexport.infer_parms
+   reexport.verify
+   reexport.main
+
+
+Module Contents
+---------------
+
+.. py:data:: ACTIVATIONS
+
+.. py:function:: resolve_activation(name)
+
+.. py:function:: infer_parms(model, scalar_activation, nonscalar_activation)
+
+   Recover the constructor parms from a scripted checkpoint.
+
+   Layer counts and irreps come from the built modules themselves, so a checkpoint
+   trained with a different width or depth reconstructs without being told.
+
+
+.. py:function:: verify(old, new, nbatch=64)
+
+   Compare the rebuilt network against the original.
+
+   forward() is the network alone, so it isolates the weights from box3d and must
+   agree bit for bit - this is what catches a wrong activation, which loads cleanly
+   because activations carry no parameters. predict_all is allowed to differ, since
+   changing box3d is the whole point, but only by turning a nan into a real number.
+
+
+.. py:function:: main()
+

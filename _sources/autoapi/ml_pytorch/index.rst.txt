@@ -1,0 +1,34 @@
+ml_pytorch
+==========
+
+.. py:module:: ml_pytorch
+
+.. autoapi-nested-parse::
+
+   Authors: Sherwood Richers, John McGuigan
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This is the file that is actually run to train a model. It requires access to various databases that are published elsewhere. All model hyperparameters are listed here.
+
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_pytorch.build_default_parms
+   ml_pytorch.run_default_training
+   ml_pytorch.main
+
+
+Module Contents
+---------------
+
+.. py:function:: build_default_parms()
+
+.. py:function:: run_default_training(parms=None, report_fn=None)
+
+.. py:function:: main()
+

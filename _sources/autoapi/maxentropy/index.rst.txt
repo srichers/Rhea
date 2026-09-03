@@ -1,0 +1,53 @@
+maxentropy
+==========
+
+.. py:module:: maxentropy
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This is the file contains functions that describe maximum entropy distributions, and interpolate those functions onto a sphere.
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   maxentropy.F4i
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   maxentropy.function
+   maxentropy.dfunctiondZ
+   maxentropy.get_Z
+   maxentropy.distribution
+   maxentropy.uniform_sphere
+   maxentropy.has_crossing
+
+
+Module Contents
+---------------
+
+.. py:function:: function(Z, fluxfac)
+
+.. py:function:: dfunctiondZ(Z, fluxfac)
+
+.. py:function:: get_Z(fluxfac)
+
+.. py:function:: distribution(n, Z, costheta)
+
+.. py:function:: uniform_sphere(nphi_at_equator)
+
+.. py:function:: has_crossing(F4i, NF, nphi_at_equator)
+
+.. py:data:: F4i
+

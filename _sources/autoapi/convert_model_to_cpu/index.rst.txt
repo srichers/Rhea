@@ -1,0 +1,24 @@
+convert_model_to_cpu
+====================
+
+.. py:module:: convert_model_to_cpu
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   convert_model_to_cpu.convert_model_to_cpu
+
+
+Module Contents
+---------------
+
+.. py:function:: convert_model_to_cpu(input_path, output_path=None)
+
+   Loads a TorchScript model (possibly saved on CUDA) and re-saves it as a CPU model.
+   Usage:
+       python convert_model_to_cpu.py model_gpu.pt [model_cpu.pt]
+
+

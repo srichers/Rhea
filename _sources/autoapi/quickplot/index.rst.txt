@@ -1,0 +1,38 @@
+quickplot
+=========
+
+.. py:module:: quickplot
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   quickplot.NF
+   quickplot.f
+   quickplot.t
+   quickplot.suffix
+   quickplot.N
+   quickplot.datasetname
+
+
+Module Contents
+---------------
+
+.. py:data:: NF
+   :value: 3
+
+
+.. py:data:: f
+
+.. py:data:: t
+
+.. py:data:: suffix
+   :value: ['', 'bar']
+
+
+.. py:data:: N
+
+.. py:data:: datasetname
+

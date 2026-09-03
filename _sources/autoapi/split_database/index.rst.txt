@@ -1,0 +1,60 @@
+split_database
+==============
+
+.. py:module:: split_database
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This file splits an asymptotic database into chunks that can be used separately as training,
+   validation, and test data. Points with too large a flux factor are removed, the survivors are
+   divided into contiguous chunks, and each chunk may be thinned to a lower sampling density. The
+   databases are stored sorted by grid index, so a contiguous chunk of rows is a contiguous region of
+   the simulation. The parameters used are recorded in the output filenames and file attributes.
+
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   split_database.per_sim_datasets
+   split_database.whole_database_datasets
+   split_database.dropped_datasets
+   split_database.parser
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   split_database.capped_indices
+   split_database.split_database
+
+
+Module Contents
+---------------
+
+.. py:data:: per_sim_datasets
+   :value: ['F4_initial(1|ccm)', 'F4_final(1|ccm)', 'F4_final_stddev(1|ccm)', 'growthRate(1|s)', 'directorynames']
+
+
+.. py:data:: whole_database_datasets
+   :value: ['nf']
+
+
+.. py:data:: dropped_datasets
+   :value: ['xplot', 'y0plot', 'y1plot']
+
+
+.. py:function:: capped_indices(F4_initial, max_fluxfac)
+
+.. py:function:: split_database(infilename, outdirectory, max_fluxfac, n_chunks, thinning)
+
+.. py:data:: parser
+
