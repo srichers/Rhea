@@ -1,0 +1,64 @@
+ml_loss
+=======
+
+.. py:module:: ml_loss
+
+.. autoapi-nested-parse::
+
+   Author: Sherwood Richers
+
+   Copyright: GPLv3 (see LICENSE file)
+
+   This is the file contains the functions that define the various loss sources.
+
+
+
+Functions
+---------
+
+.. autoapisummary::
+
+   ml_loss.weighted_mean
+   ml_loss.per_point_error
+   ml_loss.comparison_per_point
+   ml_loss.negative_density_per_point
+   ml_loss.fluxfac_per_point
+   ml_loss.negative_density_error
+   ml_loss.fluxfac_error
+   ml_loss.comparison_loss_fn
+   ml_loss.negative_density_loss_fn
+   ml_loss.fluxfac_loss_fn
+   ml_loss.max_error
+   ml_loss.negative_density_max
+   ml_loss.fluxfac_max
+
+
+Module Contents
+---------------
+
+.. py:function:: weighted_mean(error, weight)
+
+.. py:function:: per_point_error(error)
+
+.. py:function:: comparison_per_point(y_pred, y_true)
+
+.. py:function:: negative_density_per_point(F4f_pred, _=None)
+
+.. py:function:: fluxfac_per_point(F4f_pred, _=None)
+
+.. py:function:: negative_density_error(F4f_pred)
+
+.. py:function:: fluxfac_error(F4f_pred)
+
+.. py:function:: comparison_loss_fn(y_pred, y_true, weight=None)
+
+.. py:function:: negative_density_loss_fn(F4f_pred, _, weight=None)
+
+.. py:function:: fluxfac_loss_fn(F4f_pred, _, weight=None)
+
+.. py:function:: max_error(F4f_pred, F4f_true)
+
+.. py:function:: negative_density_max(F4f_pred, _)
+
+.. py:function:: fluxfac_max(F4f_pred, _)
+
