@@ -2,3 +2,7 @@
 *.pkl
 *.pt
 *.pdf
+trial_summary.json
+trial_config_resolved.json
+*.dat
+*.rhea

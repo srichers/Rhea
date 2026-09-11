@@ -1,2 +1,9 @@
-test_torch_model
+predict_torch
+predict_kokkos
+predict_cpu
+bench_rhea_kokkos
+*.bin
+*.o
+*.rhea
 *~
+*.pt

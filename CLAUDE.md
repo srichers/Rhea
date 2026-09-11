@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Rhea trains an `e3nn` equivariant neural network to predict the asymptotic outcome of the neutrino fast flavor instability (FFI). `model_training/` is the Python training code; `cpp_interface/` is a LibTorch consumer of the exported TorchScript model.
+Rhea trains an `e3nn` equivariant neural network to predict the asymptotic outcome of the neutrino fast flavor instability (FFI). `model_training/` is the Python training code. `cpp_interface/` has two consumers of a trained model: `cpp_interface/torch/` loads the exported TorchScript through LibTorch, and `cpp_interface/kokkos/` is a standalone evaluator that reads a flat `.rhea` file written by `cpp_interface/kokkos/export_rhea.py` and needs neither LibTorch nor e3nn.
 
 ## Running things
 
@@ -14,14 +14,17 @@ Smoke test after a change (this is the de facto test suite — there is no pytes
 cd model_training && python3 ml_pytorch.py                                    # 10-epoch dummy run
 python3 convert_model_to_cpu.py model10_cuda.pt model10_cpu.pt
 python3 example_use_model.py ../model_training/model10_cuda.pt
-cd ../cpp_interface && make && ./test_torch_model ../model_training/model10_cpu.pt
+python3 ../cpp_interface/kokkos/export_rhea.py model10_cuda.pt model10.rhea   # the .rhea the kokkos side reads
+cd ../cpp_interface && make compare
 ```
 
 Use `/verify` to run that sequence. If `data/*.h5` is missing, regenerate it with `/regen-data` — `data/create_database.py` then `data/split_database.py`, in that order. (`data/generate.py` is now a library only; it has no `__main__`.)
 
 **`data/split_database.py` is a prerequisite for training, not an optional step.** The reader loads whatever files it is pointed at and performs no splitting, capping, or subsampling of its own, so the train/validation/test databases have to exist on disk first. It caps the flux factor (`--max_fluxfac`), divides the rows into contiguous chunks (`--n_chunks`), and strides within each chunk (`--thinning`), recording all three in the output filename and in the file's HDF5 attributes.
 
-`cpp_interface/build_test_torch_model.sh` is stale (references a `CMakeLists.txt` that does not exist). Use `make`.
+`cpp_interface/torch/build_test_torch_model.sh` is stale (references a `CMakeLists.txt` that does not exist). Use `make`.
+
+`make` runs from `cpp_interface/`, with `KOKKOS_DIR` alongside `LIBTORCH_DIR` and CUDA detected from `KokkosCore_config.h`. **The two consumers are built into separate binaries that share no code and are never linked together** — LibTorch's headers do not survive nvcc, and keeping them apart is what removes the need for a shim. There are **three interchangeable producers** — `predict_torch`, `predict_kokkos` and `predict_cpu` — each running the same deterministic cells (`rhea_test_cells.hpp`) and writing the same predictions file, so `compare_predictions.py` can diff any pair; it also asserts the two really saw identical inputs. `make compare` runs the first two, which is the regression gate. `make predict_cpu` builds the evaluator with neither Kokkos nor LibTorch, in a couple of seconds with plain g++ — diffing it against `predict_kokkos` separates a bug in the Kokkos driver from one in the evaluator, which comparing either against LibTorch cannot do, and on Serial the two agree to exactly 0. See `README_athenak.md` for the measurements and for why the per-cell workspace is a local array rather than Kokkos scratch.
 
 ## Configuration
 
@@ -145,6 +148,5 @@ Training writes `loss.dat`, `parameters.txt`, and `model<epoch>_<device>.pt` int
 Flag these if you touch the surrounding code, but they are pre-existing:
 
 - `data/create_database.py` defines a local `ndens_to_invsec = G_F/hbar`, missing the `sqrt(2)` that `ml_constants.py` uses.
-- `cpp_interface/test_torch_model.cpp` sets `torch::kCUDA` while the `Makefile` links only `-ltorch_cpu`, and CI feeds it a CPU model.
-- `FFISubgridModel.h` carries legacy `NX/Ny/do_fdotu` constants and a `restrict_to_physical` that assumes the old `[sim, xyzt, nu/nubar, flavor]` layout.
+- `cpp_interface/torch/FFISubgridModel.h` carries legacy `NX/Ny/do_fdotu` constants and a `restrict_to_physical` that assumes the old `[sim, xyzt, nu/nubar, flavor]` layout.
 - `.github/copilot-instructions.md` is untracked and stale (wrong CUDA version, renamed classes, describes the removed stability loss). Do not treat it as current.

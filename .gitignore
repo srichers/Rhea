@@ -1,5 +1,7 @@
 __pycache__/
 build
+CLAUDE.local.md
+.claude/settings.local.json
 .vscode
 .DS_Store
 notes.txt
