@@ -49,7 +49,7 @@ class FFISubgridModel{
   //===================================//
   FFISubgridModel(std::string filename, auto device){
     // Deserialize the ScriptModule from a file using torch::jit::load().
-    model = torch::jit::load(filename.c_str());
+    model = torch::jit::load(filename.c_str(), device);
     model.to(device);
 
     // set the model to evaluation mode
