@@ -88,9 +88,13 @@ class PE_ResidualGatedBlock(nn.Module):
     def __init__(self, irreps_in, irreps_out, act_scalars, act_gates, tensor_product_class, dropout_probability=0):
         super().__init__()
         # determine the irreps that need to go into gate
-        self.irreps_out = irreps_out
         irreps_scalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l == 0)
         irreps_nonscalars = irreps_out.filter(lambda mul_ir: mul_ir.ir.l > 0)
+
+        # Gate always emits scalars before nonscalars internally regardless of what order
+        # irreps_out was given in
+        irreps_out = irreps_scalars + irreps_nonscalars
+        self.irreps_out = irreps_out
 
         # Gate needs at least one nonscalar irrep to gate - its ElementwiseTensorProduct over
         # an empty pair fails. With none (e.g. growthrate's 1x0e output), there is nothing to
@@ -217,7 +221,7 @@ class NeuralNetwork(nn.Module):
         modules_F4 = []
         build_shared(modules_shared)
         build_task(modules_growthrate, parms["nhidden_growthrate"], parms["irreps_growthrate"], e3nn.o3.Irreps("1x0e"       ), parms["dropout_growthrate"])
-        build_task(modules_F4,         parms["nhidden_F4"],         parms["irreps_F4"        ], e3nn.o3.Irreps("1x1o + 1x0e"), parms["dropout_F4"        ])
+        build_task(modules_F4,         parms["nhidden_F4"],         parms["irreps_F4"        ], e3nn.o3.Irreps("1x0e + 1x1o"), parms["dropout_F4"        ])
 
         # turn the list of modules into a sequential model
         self.TP_activation_stack_shared     = nn.Sequential(*modules_shared)
@@ -311,7 +315,11 @@ class NeuralNetwork(nn.Module):
             y_growthrate = torch.mean(y_growthrate, dim=(1,2))
 
             # Box3D and the network both supply a correction to the input
-            F4_out     = F4_in + dF4_box3d + y_F4.reshape((nsims,2,self.NF,4))
+            # reshape Gate's output to match conventions of the data passed in
+            # (i.e., vector then scalar)
+            y_F4       = y_F4.reshape((nsims,2,self.NF,4))
+            y_F4       = torch.cat([y_F4[:,:,:,1:], y_F4[:,:,:,0:1]], dim=-1)
+            F4_out     = F4_in + dF4_box3d + y_F4
             growthrate = growthrate_box3d + torch.squeeze(y_growthrate)
         else:
             # clone because the conservation enforcement below is in-place
